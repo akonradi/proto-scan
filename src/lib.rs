@@ -1,14 +1,12 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+pub mod read;
+pub mod visitor;
+mod wire;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum DecodeError<R> {
+    Read(R),
+    UnexpectedEnd,
+    UnterminatedVarint,
+    InvalidWireType(u8),
+    TooLargeLengthDelimited(u64),
 }
