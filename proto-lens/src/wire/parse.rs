@@ -1,8 +1,9 @@
+use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use crate::DecodeError;
 use crate::read::Read;
-use crate::wire::{FieldNumber, I32, I64, ScalarWireType, Tag, Varint, WireType};
+use crate::wire::{FieldNumber, I32, I64, ScalarField, ScalarWireType, Tag, Varint, WireType};
 
 pub trait LengthDelimited {
     type ReadBuffer: AsRef<[u8]>;
@@ -16,7 +17,7 @@ pub trait LengthDelimited {
 
     fn as_bytes(self) -> Result<Self::ReadBuffer, DecodeError<Self::ReadError>>;
 
-    fn as_events(self) -> impl ParseEventReader;
+    fn as_events(self) -> impl ParseEventReader<ReadError = Self::ReadError>;
 }
 
 pub trait ParseEventReader {
@@ -24,20 +25,23 @@ pub trait ParseEventReader {
 
     fn next(
         &mut self,
-    ) -> Option<Result<ParseEvent<impl LengthDelimited>, DecodeError<Self::ReadError>>>;
+    ) -> Option<
+        Result<
+            ParseEvent<impl LengthDelimited<ReadError = Self::ReadError>>,
+            DecodeError<Self::ReadError>,
+        >,
+    >;
 }
 
 #[derive(Debug)]
 pub enum ParseEvent<L> {
-    Varint(FieldNumber, <Varint as ScalarWireType>::Repr),
-    I64(FieldNumber, <I64 as ScalarWireType>::Repr),
-    I32(FieldNumber, <I32 as ScalarWireType>::Repr),
+    Scalar(FieldNumber, ScalarField),
     StartGroup(FieldNumber),
     EndGroup(FieldNumber),
     LengthDelimited(FieldNumber, L),
 }
 
-pub fn parse<R: Read>(r: R) -> impl ParseEventReader {
+pub fn parse<R: Read>(r: R) -> impl ParseEventReader<ReadError = R::Error> {
     Impl {
         reader: r,
         error: OwnedOrMut::Owned(false),
@@ -76,7 +80,12 @@ impl<'a, R: Read> ParseEventReader for Impl<'a, R> {
     type ReadError = R::Error;
     fn next(
         &mut self,
-    ) -> Option<Result<ParseEvent<impl LengthDelimited>, DecodeError<Self::ReadError>>> {
+    ) -> Option<
+        Result<
+            ParseEvent<impl LengthDelimited<ReadError = Self::ReadError>>,
+            DecodeError<Self::ReadError>,
+        >,
+    > {
         if *self.error.as_ref() {
             return None;
         }
@@ -99,11 +108,11 @@ impl<'a, R: Read> ParseEventReader for Impl<'a, R> {
 
         Some(match wire_type {
             WireType::Varint => Varint::read_from(&mut &mut self.reader)
-                .map(|value| ParseEvent::Varint(field_number, value)),
+                .map(|value| ParseEvent::Scalar(field_number, ScalarField::Varint(value))),
             WireType::I64 => I64::read_from(&mut &mut self.reader)
-                .map(|value| ParseEvent::I64(field_number, value)),
+                .map(|value| ParseEvent::Scalar(field_number, ScalarField::I64(value))),
             WireType::I32 => I32::read_from(&mut &mut self.reader)
-                .map(|value| ParseEvent::I32(field_number, value)),
+                .map(|value| ParseEvent::Scalar(field_number, ScalarField::I32(value))),
             WireType::Sgroup => Ok(ParseEvent::StartGroup(field_number)),
             WireType::Egroup => Ok(ParseEvent::EndGroup(field_number)),
             WireType::LengthDelimited => {
@@ -119,10 +128,10 @@ impl<'a, R: Read> ParseEventReader for Impl<'a, R> {
                 Ok(ParseEvent::LengthDelimited(
                     field_number,
                     LengthDelimitedImpl {
-                        reader: LimitReader {
+                        reader: Some(LimitReader {
                             inner: &mut self.reader,
                             remaining: length,
-                        },
+                        }),
                         error: OwnedOrMut::Mut(self.error.as_mut()),
                     },
                 ))
@@ -132,8 +141,19 @@ impl<'a, R: Read> ParseEventReader for Impl<'a, R> {
 }
 
 struct LengthDelimitedImpl<'a, R: Read> {
-    reader: LimitReader<&'a mut R>,
+    reader: Option<LimitReader<&'a mut R>>,
     error: OwnedOrMut<'a, bool>,
+}
+
+impl<'a, R: Read> Drop for LengthDelimitedImpl<'a, R> {
+    fn drop(&mut self) {
+        let Self { reader, error } = self;
+        let reader = reader.take().unwrap();
+        let Ok(_) = reader.inner.skip(reader.remaining) else {
+            *error.as_mut() = true;
+            return;
+        };
+    }
 }
 
 impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedImpl<'a, R> {
@@ -141,15 +161,13 @@ impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedI
     type ReadError = R::Error;
 
     fn len(&self) -> u32 {
-        self.reader.remaining
+        self.reader.as_ref().unwrap().remaining
     }
 
     fn as_bytes(mut self) -> Result<R::Buffer, DecodeError<R::Error>> {
-        let bytes_len = self.reader.remaining;
-        let bytes = self.reader.read(bytes_len).map_err(DecodeError::Read)?;
-
-        if bytes.as_ref().len() != bytes_len as usize {
-            *self.error.as_mut() = true;
+        let remaining = self.reader.as_ref().unwrap().remaining;
+        let bytes = self.read(remaining).map_err(DecodeError::Read)?;
+        if bytes.as_ref().len() != remaining as usize {
             return Err(DecodeError::UnexpectedEnd);
         }
         Ok(bytes)
@@ -159,21 +177,40 @@ impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedI
         self,
     ) -> impl Iterator<Item = Result<W::Repr, DecodeError<R::Error>>> {
         ScalarIter {
-            reader: self.reader,
+            reader: self,
             _wire_type: PhantomData::<W>,
         }
     }
 
-    fn as_events(self) -> impl ParseEventReader {
+    fn as_events(mut self) -> impl ParseEventReader<ReadError = Self::ReadError> {
         Impl {
-            reader: self.reader,
-            error: self.error,
+            error: std::mem::replace(&mut self.error, OwnedOrMut::Owned(false)),
+            reader: self,
         }
     }
 }
 
+impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
+    type Buffer = R::Buffer;
+    type Error = R::Error;
+
+    fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
+        let reader = self.reader.as_mut().unwrap();
+        let buffer = reader.read(bytes)?;
+
+        if buffer.as_ref().len() != bytes as usize {
+            *self.error.as_mut() = true;
+        }
+        Ok(buffer)
+    }
+
+    fn skip(&mut self, bytes: u32) -> Result<u32, Self::Error> {
+        self.reader.as_mut().unwrap().skip(bytes)
+    }
+}
+
 struct ScalarIter<R, W> {
-    reader: LimitReader<R>,
+    reader: R,
     _wire_type: PhantomData<W>,
 }
 
@@ -221,11 +258,11 @@ impl<R: Read> Read for CountReader<R> {
     }
 }
 
-impl<R: Read, W: ScalarWireType> Iterator for ScalarIter<R, W> {
+impl<R: Read, W: ScalarWireType> Iterator for ScalarIter<LengthDelimitedImpl<'_, R>, W> {
     type Item = Result<W::Repr, DecodeError<R::Error>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.reader.remaining == 0 {
+        if self.reader.reader.as_ref().unwrap().remaining == 0 {
             return None;
         }
 
@@ -233,7 +270,7 @@ impl<R: Read, W: ScalarWireType> Iterator for ScalarIter<R, W> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self.reader.remaining;
+        let remaining = self.reader.reader.as_ref().unwrap().remaining;
         let (min, max) = W::BYTE_LEN.into_inner();
 
         (

@@ -1,214 +1,86 @@
-use std::marker::PhantomData;
-
 use crate::DecodeError;
-use crate::read::Read;
-use crate::wire::{I32, I64, ScalarWireType, Tag, Varint, WireType};
+use crate::wire::{
+    FieldNumber, LengthDelimited, ParseEvent, ParseEventReader, ScalarField, ScalarWireType,
+};
 
 mod build;
 pub use build::Builder;
 
 pub trait Visitor {
-    fn on_scalar(&mut self, field_number: u32, field: ScalarField);
+    fn on_scalar(&mut self, field_number: FieldNumber, field: ScalarField);
 
-    fn on_length_delimited<'s>(&'s mut self, handler: impl LengthDelimited + 's);
+    fn on_length_delimited<'s>(
+        &'s mut self,
+        field_number: FieldNumber,
+        handler: impl VisitMessage + LengthDelimited + 's,
+    );
 
-    fn on_group_begin(&mut self, field_number: u32);
+    fn on_group_begin(&mut self, field_number: FieldNumber);
 
-    fn on_group_end(&mut self, field_number: u32);
+    fn on_group_end(&mut self, field_number: FieldNumber);
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ScalarField {
-    Varint(u64),
-    I64(u64),
-    I32(u32),
+pub trait VisitMessage {
+    fn visit_message(self, visitor: impl Visitor);
 }
 
-pub trait LengthDelimited {
-    type ReadBuffer: AsRef<[u8]>;
-    type ReadError: std::error::Error + 'static;
-
-    fn len(&self) -> u32;
-
-    fn as_packed<W: ScalarWireType>(
-        self,
-    ) -> impl Iterator<Item = Result<W::Repr, DecodeError<Self::ReadError>>>;
-
-    fn as_bytes(self) -> Result<Self::ReadBuffer, DecodeError<Self::ReadError>>;
-
-    fn visit_as_message(self, visitor: impl Visitor);
-}
-
-pub fn visit_message<R: Read>(
-    mut r: R,
+pub fn visit_message<P: ParseEventReader>(
+    mut reader: P,
     mut visitor: impl Visitor,
-) -> Result<(), DecodeError<R::Error>> {
-    loop {
-        let mut tag_reader = CountReader {
-            inner: &mut r,
-            count: 0,
-        };
-
-        let tag = match Tag::read_from(&mut tag_reader) {
-            Ok(tag) => tag,
-            Err(DecodeError::UnexpectedEnd) if tag_reader.count == 0 => return Ok(()),
-            Err(e) => return Err(e),
-        };
-        let Tag {
-            wire_type,
-            field_number,
-        } = tag;
-
-        match wire_type {
-            WireType::Varint => {
-                let value = Varint::read_from(&mut r)?;
-                visitor.on_scalar(field_number, ScalarField::Varint(value));
-            }
-            WireType::I64 => {
-                let value = I64::read_from(&mut r)?;
-                visitor.on_scalar(field_number, ScalarField::I64(value));
-            }
-            WireType::I32 => {
-                let value = I32::read_from(&mut r)?;
-                visitor.on_scalar(field_number, ScalarField::I32(value));
-            }
-            WireType::Sgroup => visitor.on_group_begin(field_number),
-            WireType::Egroup => visitor.on_group_end(field_number),
-            WireType::LengthDelimited => {
-                let length = Varint::read_from(&mut r)?;
-                let length = u32::try_from(length)
-                    .map_err(|_| DecodeError::<R::Error>::TooLargeLengthDelimited(length))?;
-
-                let mut decode_result = Ok(());
-                let mut reader = LimitReader {
-                    inner: &mut r,
-                    remaining: length,
-                };
-
-                visitor.on_length_delimited(LengthDelimitedImpl {
-                    reader: &mut reader,
-                    decode_result: &mut decode_result,
-                });
-
-                let () = decode_result?;
-                let LimitReader {
-                    inner: _,
-                    remaining,
-                } = reader;
-
-                if remaining != 0 {
-                    r.skip(remaining).map_err(DecodeError::Read)?;
-                }
+) -> Result<(), DecodeError<P::ReadError>> {
+    while let Some(event) = reader.next() {
+        match event? {
+            ParseEvent::Scalar(field_number, value) => visitor.on_scalar(field_number, value),
+            ParseEvent::StartGroup(field_number) => visitor.on_group_begin(field_number),
+            ParseEvent::EndGroup(field_number) => visitor.on_group_end(field_number),
+            ParseEvent::LengthDelimited(field_number, length_delimited) => {
+                let mut result = Ok(());
+                visitor.on_length_delimited(
+                    field_number,
+                    LengthDelimitedImpl {
+                        inner: length_delimited,
+                        result: &mut result,
+                    },
+                );
+                result?;
             }
         }
     }
+    Ok(())
 }
 
-struct LengthDelimitedImpl<'a, R: Read> {
-    reader: &'a mut LimitReader<R>,
-    decode_result: &'a mut Result<(), DecodeError<R::Error>>,
+struct LengthDelimitedImpl<'a, L: LengthDelimited> {
+    inner: L,
+    result: &'a mut Result<(), DecodeError<L::ReadError>>,
 }
 
-impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedImpl<'a, R> {
-    type ReadBuffer = R::Buffer;
-    type ReadError = R::Error;
+impl<L: LengthDelimited> LengthDelimited for LengthDelimitedImpl<'_, L> {
+    type ReadBuffer = L::ReadBuffer;
+    type ReadError = L::ReadError;
 
     fn len(&self) -> u32 {
-        self.reader.remaining
-    }
-
-    fn as_bytes(self) -> Result<R::Buffer, DecodeError<R::Error>> {
-        let bytes_len = self.reader.remaining;
-        let bytes = self.reader.read(bytes_len).map_err(DecodeError::Read)?;
-
-        if bytes.as_ref().len() != bytes_len as usize {
-            return Err(DecodeError::UnexpectedEnd);
-        }
-        Ok(bytes)
+        self.inner.len()
     }
 
     fn as_packed<W: ScalarWireType>(
         self,
-    ) -> impl Iterator<Item = Result<W::Repr, DecodeError<R::Error>>> {
-        ScalarIter {
-            reader: self.reader,
-            _wire_type: PhantomData::<W>,
-        }
+    ) -> impl Iterator<Item = Result<W::Repr, DecodeError<Self::ReadError>>> {
+        self.inner.as_packed::<W>()
     }
 
-    fn visit_as_message(self, visitor: impl Visitor) {
-        *self.decode_result = visit_message(self.reader, visitor).map_err(Into::into)
-    }
-}
-
-struct ScalarIter<'a, R, W> {
-    reader: &'a mut LimitReader<R>,
-    _wire_type: PhantomData<W>,
-}
-
-struct LimitReader<R> {
-    inner: R,
-    remaining: u32,
-}
-
-impl<R: Read> Read for LimitReader<R> {
-    type Buffer = R::Buffer;
-    type Error = R::Error;
-
-    fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
-        let r = self.inner.read(bytes)?;
-        self.remaining = self.remaining - bytes;
-        Ok(r)
+    fn as_bytes(self) -> Result<Self::ReadBuffer, DecodeError<Self::ReadError>> {
+        self.inner.as_bytes()
     }
 
-    fn skip(&mut self, bytes: u32) -> Result<u32, Self::Error> {
-        let skipped = self.inner.skip(bytes)?;
-        self.remaining = self.remaining - skipped;
-        Ok(skipped)
+    fn as_events(self) -> impl ParseEventReader<ReadError = Self::ReadError> {
+        self.inner.as_events()
     }
 }
 
-struct CountReader<R> {
-    inner: R,
-    count: usize,
-}
-
-impl<R: Read> Read for CountReader<R> {
-    type Buffer = R::Buffer;
-    type Error = R::Error;
-
-    fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
-        let r = self.inner.read(bytes)?;
-        self.count += r.as_ref().len();
-        Ok(r)
-    }
-
-    fn skip(&mut self, bytes: u32) -> Result<u32, Self::Error> {
-        let r = self.inner.skip(bytes)?;
-        self.count += r as usize;
-        Ok(r)
-    }
-}
-
-impl<R: Read, W: ScalarWireType> Iterator for ScalarIter<'_, R, W> {
-    type Item = Result<W::Repr, DecodeError<R::Error>>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.reader.remaining == 0 {
-            return None;
-        }
-
-        Some(W::read_from(&mut self.reader).map_err(Into::into))
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self.reader.remaining;
-        let (min, max) = W::BYTE_LEN.into_inner();
-
-        (
-            (remaining / u32::from(max)).try_into().unwrap_or(0),
-            (remaining.div_ceil(min.into())).try_into().ok(),
-        )
+impl<L: LengthDelimited> VisitMessage for LengthDelimitedImpl<'_, L> {
+    fn visit_message(self, visitor: impl Visitor) {
+        let reader = self.inner.as_events();
+        *self.result = visit_message(reader, visitor);
     }
 }
 
@@ -225,7 +97,7 @@ mod test {
         let mut extracted = None;
 
         let visitor = Builder::new(&mut extracted)
-            .set_on_length_delimited(|extracted, delimited| {
+            .set_on_length_delimited(|extracted, _field_number, delimited| {
                 assert_matches!(
                     extracted.replace(delimited.as_bytes().expect("can read")),
                     None
@@ -233,7 +105,7 @@ mod test {
             })
             .build();
 
-        let result = visit_message(&mut input.as_slice(), visitor);
+        let result = visit_message(crate::wire::parse(&mut input.as_slice()), visitor);
         assert_matches!(result, Ok(()));
         assert_eq!(extracted, Some("testing".to_string().into()))
     }
