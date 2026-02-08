@@ -1,6 +1,6 @@
 pub mod read;
 pub mod visitor;
-mod wire;
+pub mod wire;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DecodeError<R> {

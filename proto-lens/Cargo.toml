@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-derive_more = { version = "2.1.1", features = ["from", "try_from"] }
+derive_more = { version = "2.1.1", features = ["from", "into", "try_from"] }
 num-traits = "0.2.19"
 
 [dev-dependencies]
