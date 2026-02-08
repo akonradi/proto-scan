@@ -22,7 +22,7 @@ pub(crate) enum WireType {
 impl Tag {
     pub(crate) fn read_from<R: Read>(r: &mut R) -> Result<Self, DecodeError<R::Error>> {
         let value: u32 = super::parse_base128_varint(r)?;
-        let (field_number, wire_type) = (value >> 3, (value & 0b11) as u8);
+        let (field_number, wire_type) = (value >> 3, (value & 0b111) as u8);
         let wire_type = wire_type
             .try_into()
             .map_err(|_| DecodeError::<R::Error>::InvalidWireType(wire_type))?;
@@ -50,5 +50,14 @@ mod test {
                 wire_type: WireType::Varint
             })
         )
+    }
+
+    #[test]
+    fn read_i32() {
+        let bytes = [61u8];
+
+        let tag = Tag::read_from(&mut bytes.as_slice());
+
+        assert_eq!(tag, Ok(Tag {field_number: 7, wire_type: WireType::I32}));
     }
 }

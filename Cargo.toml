@@ -1,11 +1,4 @@
-[package]
-name = "proto-lens"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-derive_more = { version = "2.1.1", features = ["from", "try_from"] }
-num-traits = "0.2.19"
-
-[dev-dependencies]
-assert_matches = "1.5.0"
+[workspace]
+members = ["proto-lens", "proto-lens-tests"]
+default-members = ["proto-lens"]
+resolver = "3"

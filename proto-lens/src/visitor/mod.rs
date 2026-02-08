@@ -17,6 +17,7 @@ pub trait Visitor {
     fn on_group_end(&mut self, field_number: u32);
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ScalarField {
     Varint(u64),
     I64(u64),
