@@ -6,20 +6,33 @@ use crate::wire::{
 mod build;
 pub use build::Builder;
 
+/// Visitor for a serialized protobuf message.
+/// 
+/// Implementers can be passed as an argument to [`visit_message`] to receive
+/// callbacks for each field in the message.
 pub trait Visitor {
+    /// Called when a scalar field is parsed.
     fn on_scalar(&mut self, field_number: FieldNumber, field: ScalarField);
 
+    /// Called when a length-delimited field is parsed.
+    /// 
+    /// Implementations can use the provided handler argument to access the
+    /// contents of the field.
     fn on_length_delimited<'s>(
         &'s mut self,
         field_number: FieldNumber,
         handler: impl VisitMessage + LengthDelimited + 's,
     );
 
+    /// Called when a SGROUP tag is found.
     fn on_group_begin(&mut self, field_number: FieldNumber);
 
+    /// Called when a EGROUP tag is found.
     fn on_group_end(&mut self, field_number: FieldNumber);
 }
 
+/// Allows visiting the contents of a length-delimited message with a
+/// [`Visitor`].
 pub trait VisitMessage {
     fn visit_message(self, visitor: impl Visitor);
 }

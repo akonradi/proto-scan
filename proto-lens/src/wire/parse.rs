@@ -5,24 +5,50 @@ use crate::DecodeError;
 use crate::read::Read;
 use crate::wire::{FieldNumber, I32, I64, ScalarField, ScalarWireType, Tag, Varint, WireType};
 
+/// Accessor for the contents of a length-delimited field.
+/// 
+/// Length-delimited fields are used to encode several different types of values
+/// - raw byte sequences (`repeated byte` or `string` fields)
+/// - embedded messages
+/// - packed repeated scalar fields
+/// 
+/// This trait allows interpreting the contents of length-delimited field as at
+/// most one of those representations.
 pub trait LengthDelimited {
     type ReadBuffer: AsRef<[u8]>;
     type ReadError: std::error::Error + 'static;
 
+    /// Returns the number of bytes in the field.
     fn len(&self) -> u32;
 
+    /// Interprets the contents of a field as packed values.
+    /// 
+    /// Consumes the contents of the field and returns an iterator that, on `next()`,
+    /// returns the next value or an error if it cannot be decoded. If the
+    /// iterator is dropped before it is exhausted, the remaining values and/or
+    /// read errors are dropped.
     fn as_packed<W: ScalarWireType>(
         self,
     ) -> impl Iterator<Item = Result<W::Repr, DecodeError<Self::ReadError>>>;
 
+    /// Reads the contents of the delimited field as bytes.
     fn as_bytes(self) -> Result<Self::ReadBuffer, DecodeError<Self::ReadError>>;
 
+    /// Consumes the contents of the field as a sequence of [`ParseEvent`]s in
+    /// the form of a [`ParseEventReader`].
     fn as_events(self) -> impl ParseEventReader<ReadError = Self::ReadError>;
 }
 
+/// Protobuf parser that interprets a message as a sequence of events.
+/// 
+/// This acts as a lending iterator, where the [`ParseEvent`] returned by
+/// [`Self::next`] can borrow from `self`.
 pub trait ParseEventReader {
+    /// Error returned on a failed read.
     type ReadError: std::error::Error + 'static;
 
+    /// Advances the parse state and returns the next event, an error, or `None`
+    /// if the underlying source is exhausted.
     fn next(
         &mut self,
     ) -> Option<
@@ -33,11 +59,16 @@ pub trait ParseEventReader {
     >;
 }
 
+/// An event returned by [`ParseEventReader::next`].
 #[derive(Debug)]
 pub enum ParseEvent<L> {
+    /// A scalar field was encountered.
     Scalar(FieldNumber, ScalarField),
+    /// An group was opened.
     StartGroup(FieldNumber),
+    /// A group was closed.
     EndGroup(FieldNumber),
+    /// A length-delimited field was encountered.
     LengthDelimited(FieldNumber, L),
 }
 
