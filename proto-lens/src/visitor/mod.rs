@@ -2,6 +2,7 @@ use crate::DecodeError;
 use crate::wire::{
     FieldNumber, LengthDelimited, ParseEvent, ParseEventReader, ScalarField, ScalarWireType,
 };
+use crate::read::ReadError;
 
 mod build;
 pub use build::Builder;
@@ -40,7 +41,7 @@ pub trait VisitMessage {
 pub fn visit_message<P: ParseEventReader>(
     mut reader: P,
     mut visitor: impl Visitor,
-) -> Result<(), DecodeError<P::ReadError>> {
+) -> Result<(), DecodeError<P::Error>> {
     while let Some(event) = reader.next() {
         match event? {
             ParseEvent::Scalar(field_number, value) => visitor.on_scalar(field_number, value),
@@ -62,14 +63,17 @@ pub fn visit_message<P: ParseEventReader>(
     Ok(())
 }
 
-struct LengthDelimitedImpl<'a, L: LengthDelimited> {
+struct LengthDelimitedImpl<'a, L: ReadError> {
     inner: L,
-    result: &'a mut Result<(), DecodeError<L::ReadError>>,
+    result: &'a mut Result<(), DecodeError<L::Error>>,
+}
+
+impl<L: ReadError> ReadError for LengthDelimitedImpl<'_, L> {
+    type Error = L::Error;
 }
 
 impl<L: LengthDelimited> LengthDelimited for LengthDelimitedImpl<'_, L> {
     type ReadBuffer = L::ReadBuffer;
-    type ReadError = L::ReadError;
 
     fn len(&self) -> u32 {
         self.inner.len()
@@ -77,15 +81,15 @@ impl<L: LengthDelimited> LengthDelimited for LengthDelimitedImpl<'_, L> {
 
     fn as_packed<W: ScalarWireType>(
         self,
-    ) -> impl Iterator<Item = Result<W::Repr, DecodeError<Self::ReadError>>> {
+    ) -> impl Iterator<Item = Result<W::Repr, DecodeError<Self::Error>>> {
         self.inner.as_packed::<W>()
     }
 
-    fn as_bytes(self) -> Result<Self::ReadBuffer, DecodeError<Self::ReadError>> {
+    fn as_bytes(self) -> Result<Self::ReadBuffer, DecodeError<Self::Error>> {
         self.inner.as_bytes()
     }
 
-    fn as_events(self) -> impl ParseEventReader<ReadError = Self::ReadError> {
+    fn as_events(self) -> impl ParseEventReader<Error = Self::Error> {
         self.inner.as_events()
     }
 }

@@ -2,21 +2,20 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use crate::DecodeError;
-use crate::read::Read;
+use crate::read::{Read, ReadError};
 use crate::wire::{FieldNumber, I32, I64, ScalarField, ScalarWireType, Tag, Varint, WireType};
 
 /// Accessor for the contents of a length-delimited field.
-/// 
+///
 /// Length-delimited fields are used to encode several different types of values
 /// - raw byte sequences (`repeated byte` or `string` fields)
 /// - embedded messages
 /// - packed repeated scalar fields
-/// 
+///
 /// This trait allows interpreting the contents of length-delimited field as at
 /// most one of those representations.
-pub trait LengthDelimited {
+pub trait LengthDelimited: ReadError {
     type ReadBuffer: AsRef<[u8]>;
-    type ReadError: std::error::Error + 'static;
 
     /// Returns the number of bytes in the field.
     fn len(&self) -> u32;
@@ -29,32 +28,29 @@ pub trait LengthDelimited {
     /// read errors are dropped.
     fn as_packed<W: ScalarWireType>(
         self,
-    ) -> impl Iterator<Item = Result<W::Repr, DecodeError<Self::ReadError>>>;
+    ) -> impl Iterator<Item = Result<W::Repr, DecodeError<Self::Error>>>;
 
     /// Reads the contents of the delimited field as bytes.
-    fn as_bytes(self) -> Result<Self::ReadBuffer, DecodeError<Self::ReadError>>;
+    fn as_bytes(self) -> Result<Self::ReadBuffer, DecodeError<Self::Error>>;
 
     /// Consumes the contents of the field as a sequence of [`ParseEvent`]s in
     /// the form of a [`ParseEventReader`].
-    fn as_events(self) -> impl ParseEventReader<ReadError = Self::ReadError>;
+    fn as_events(self) -> impl ParseEventReader<Error = Self::Error>;
 }
 
 /// Protobuf parser that interprets a message as a sequence of events.
-/// 
+///
 /// This acts as a lending iterator, where the [`ParseEvent`] returned by
 /// [`Self::next`] can borrow from `self`.
-pub trait ParseEventReader {
-    /// Error returned on a failed read.
-    type ReadError: std::error::Error + 'static;
-
+pub trait ParseEventReader: ReadError {
     /// Advances the parse state and returns the next event, an error, or `None`
     /// if the underlying source is exhausted.
     fn next(
         &mut self,
     ) -> Option<
         Result<
-            ParseEvent<impl LengthDelimited<ReadError = Self::ReadError>>,
-            DecodeError<Self::ReadError>,
+            ParseEvent<impl LengthDelimited<Error = <Self as ReadError>::Error>>,
+            DecodeError<<Self as ReadError>::Error>,
         >,
     >;
 }
@@ -72,7 +68,7 @@ pub enum ParseEvent<L> {
     LengthDelimited(FieldNumber, L),
 }
 
-pub fn parse<R: Read>(r: R) -> impl ParseEventReader<ReadError = R::Error> {
+pub fn parse<R: Read>(r: R) -> impl ParseEventReader<Error = R::Error> {
     Impl {
         reader: r,
         error: OwnedOrMut::Owned(false),
@@ -102,20 +98,20 @@ impl<T> AsMut<T> for OwnedOrMut<'_, T> {
     }
 }
 
-struct Impl<'a, R: Read> {
+struct Impl<'a, R> {
     reader: R,
     error: OwnedOrMut<'a, bool>,
 }
 
+impl<R: ReadError> ReadError for Impl<'_, R> {
+    type Error = R::Error;
+}
+
 impl<'a, R: Read> ParseEventReader for Impl<'a, R> {
-    type ReadError = R::Error;
     fn next(
         &mut self,
     ) -> Option<
-        Result<
-            ParseEvent<impl LengthDelimited<ReadError = Self::ReadError>>,
-            DecodeError<Self::ReadError>,
-        >,
+        Result<ParseEvent<impl LengthDelimited<Error = Self::Error>>, DecodeError<Self::Error>>,
     > {
         if *self.error.as_ref() {
             return None;
@@ -187,9 +183,12 @@ impl<'a, R: Read> Drop for LengthDelimitedImpl<'a, R> {
     }
 }
 
+impl<R: Read> ReadError for LengthDelimitedImpl<'_, R> {
+    type Error = R::Error;
+}
+
 impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedImpl<'a, R> {
     type ReadBuffer = R::Buffer;
-    type ReadError = R::Error;
 
     fn len(&self) -> u32 {
         self.reader.as_ref().unwrap().remaining
@@ -213,7 +212,7 @@ impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedI
         }
     }
 
-    fn as_events(mut self) -> impl ParseEventReader<ReadError = Self::ReadError> {
+    fn as_events(mut self) -> impl ParseEventReader<Error = Self::Error> {
         Impl {
             error: std::mem::replace(&mut self.error, OwnedOrMut::Owned(false)),
             reader: self,
@@ -223,7 +222,6 @@ impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedI
 
 impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
     type Buffer = R::Buffer;
-    type Error = R::Error;
 
     fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
         let reader = self.reader.as_mut().unwrap();
@@ -250,9 +248,12 @@ struct LimitReader<R> {
     remaining: u32,
 }
 
+impl<R: ReadError> ReadError for LimitReader<R> {
+    type Error = R::Error;
+}
+
 impl<R: Read> Read for LimitReader<R> {
     type Buffer = R::Buffer;
-    type Error = R::Error;
 
     fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
         let r = self.inner.read(bytes)?;
@@ -272,9 +273,12 @@ struct CountReader<R> {
     count: usize,
 }
 
+impl<R: ReadError> ReadError for CountReader<R> {
+    type Error = R::Error;
+}
+
 impl<R: Read> Read for CountReader<R> {
     type Buffer = R::Buffer;
-    type Error = R::Error;
 
     fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
         let r = self.inner.read(bytes)?;

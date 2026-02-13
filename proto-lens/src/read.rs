@@ -1,8 +1,11 @@
 use std::convert::Infallible as Never;
 
-pub trait Read {
-    type Buffer: AsRef<[u8]>;
+pub trait ReadError {
     type Error: std::error::Error + 'static;
+}
+
+pub trait Read: ReadError {
+    type Buffer: AsRef<[u8]>;
 
     /// Reads the given number of bytes.
     ///
@@ -18,9 +21,12 @@ pub trait Read {
     fn skip(&mut self, bytes: u32) -> Result<u32, Self::Error>;
 }
 
+impl ReadError for &[u8] {
+    type Error = Never;
+}
+
 impl<'a> Read for &'a [u8] {
     type Buffer = Self;
-    type Error = Never;
 
     fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
         let (bytes, after) = match self.split_at_checked(bytes as usize) {
@@ -38,9 +44,12 @@ impl<'a> Read for &'a [u8] {
     }
 }
 
+impl<R: ReadError> ReadError for &mut R {
+    type Error = R::Error;
+}
+
 impl<R: Read> Read for &mut R {
     type Buffer = R::Buffer;
-    type Error = R::Error;
 
     fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
         (*self).read(bytes)
