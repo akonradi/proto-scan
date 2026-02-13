@@ -2,7 +2,7 @@ use crate::DecodeError;
 use crate::wire::{
     FieldNumber, LengthDelimited, ParseEvent, ParseEventReader, ScalarField, ScalarWireType,
 };
-use crate::read::ReadError;
+use crate::read::{ReadError, ReadTypes};
 
 mod build;
 pub use build::Builder;
@@ -72,9 +72,11 @@ impl<L: ReadError> ReadError for LengthDelimitedImpl<'_, L> {
     type Error = L::Error;
 }
 
-impl<L: LengthDelimited> LengthDelimited for LengthDelimitedImpl<'_, L> {
-    type ReadBuffer = L::ReadBuffer;
+impl<L: ReadTypes> ReadTypes for LengthDelimitedImpl<'_, L> {
+    type Buffer = L::Buffer;
+}
 
+impl<L: LengthDelimited> LengthDelimited for LengthDelimitedImpl<'_, L> {
     fn len(&self) -> u32 {
         self.inner.len()
     }
@@ -85,7 +87,7 @@ impl<L: LengthDelimited> LengthDelimited for LengthDelimitedImpl<'_, L> {
         self.inner.as_packed::<W>()
     }
 
-    fn as_bytes(self) -> Result<Self::ReadBuffer, DecodeError<Self::Error>> {
+    fn as_bytes(self) -> Result<Self::Buffer, DecodeError<Self::Error>> {
         self.inner.as_bytes()
     }
 

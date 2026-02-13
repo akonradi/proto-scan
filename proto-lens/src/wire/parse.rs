@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use crate::DecodeError;
-use crate::read::{Read, ReadError};
+use crate::read::{Read, ReadError, ReadTypes};
 use crate::wire::{FieldNumber, I32, I64, ScalarField, ScalarWireType, Tag, Varint, WireType};
 
 /// Accessor for the contents of a length-delimited field.
@@ -14,14 +14,12 @@ use crate::wire::{FieldNumber, I32, I64, ScalarField, ScalarWireType, Tag, Varin
 ///
 /// This trait allows interpreting the contents of length-delimited field as at
 /// most one of those representations.
-pub trait LengthDelimited: ReadError {
-    type ReadBuffer: AsRef<[u8]>;
-
+pub trait LengthDelimited: ReadTypes {
     /// Returns the number of bytes in the field.
     fn len(&self) -> u32;
 
     /// Interprets the contents of a field as packed values.
-    /// 
+    ///
     /// Consumes the contents of the field and returns an iterator that, on `next()`,
     /// returns the next value or an error if it cannot be decoded. If the
     /// iterator is dropped before it is exhausted, the remaining values and/or
@@ -31,7 +29,7 @@ pub trait LengthDelimited: ReadError {
     ) -> impl Iterator<Item = Result<W::Repr, DecodeError<Self::Error>>>;
 
     /// Reads the contents of the delimited field as bytes.
-    fn as_bytes(self) -> Result<Self::ReadBuffer, DecodeError<Self::Error>>;
+    fn as_bytes(self) -> Result<Self::Buffer, DecodeError<Self::Error>>;
 
     /// Consumes the contents of the field as a sequence of [`ParseEvent`]s in
     /// the form of a [`ParseEventReader`].
@@ -188,8 +186,6 @@ impl<R: Read> ReadError for LengthDelimitedImpl<'_, R> {
 }
 
 impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedImpl<'a, R> {
-    type ReadBuffer = R::Buffer;
-
     fn len(&self) -> u32 {
         self.reader.as_ref().unwrap().remaining
     }
@@ -220,9 +216,11 @@ impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedI
     }
 }
 
-impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
+impl<R: Read> ReadTypes for LengthDelimitedImpl<'_, R> {
     type Buffer = R::Buffer;
+}
 
+impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
     fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
         let reader = self.reader.as_mut().unwrap();
         let buffer = reader.read(bytes)?;
@@ -252,9 +250,11 @@ impl<R: ReadError> ReadError for LimitReader<R> {
     type Error = R::Error;
 }
 
-impl<R: Read> Read for LimitReader<R> {
+impl<R: ReadTypes> ReadTypes for LimitReader<R> {
     type Buffer = R::Buffer;
+}
 
+impl<R: Read> Read for LimitReader<R> {
     fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
         let r = self.inner.read(bytes)?;
         self.remaining = self.remaining - bytes;
@@ -277,9 +277,11 @@ impl<R: ReadError> ReadError for CountReader<R> {
     type Error = R::Error;
 }
 
-impl<R: Read> Read for CountReader<R> {
+impl<R: ReadTypes> ReadTypes for CountReader<R> {
     type Buffer = R::Buffer;
+}
 
+impl<R: Read> Read for CountReader<R> {
     fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
         let r = self.inner.read(bytes)?;
         self.count += r.as_ref().len();
