@@ -256,8 +256,11 @@ impl<R: ReadTypes> ReadTypes for LimitReader<R> {
 
 impl<R: Read> Read for LimitReader<R> {
     fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
-        let r = self.inner.read(bytes)?;
-        self.remaining = self.remaining - bytes;
+        let Self { inner, remaining } = self;
+        let b = bytes.min(*remaining);
+        let bytes = b;
+        let r = inner.read(bytes)?;
+        *remaining = *remaining - bytes;
         Ok(r)
     }
 
@@ -320,6 +323,38 @@ impl<R: Read, W: ScalarWireType> Iterator for ScalarIter<LengthDelimitedImpl<'_,
 #[cfg(test)]
 mod test {
     use super::*;
+
+    mod limit_reader {
+        use super::*;
+        #[test]
+        fn read_from_empty() {
+            let mut empty = LimitReader {
+                inner: &mut [1, 2, 3, 4].as_slice(),
+                remaining: 0,
+            };
+            assert_eq!(empty.read(1), Ok([].as_slice()));
+        }
+
+        #[test]
+        fn short_inner() {
+            let bytes = [1, 2, 3, 4].as_slice();
+            let mut empty = LimitReader {
+                inner: &mut &bytes[..],
+                remaining: 5,
+            };
+            assert_eq!(empty.read(5), Ok(bytes));
+        }
+
+        #[test]
+        fn read_more_than_remaining() {
+            let bytes = [1, 2, 3, 4].as_slice();
+            let mut empty = LimitReader {
+                inner: &mut &bytes[..],
+                remaining: 3,
+            };
+            assert_eq!(empty.read(5), Ok(&bytes[..3]));
+        }
+    }
 
     #[test]
     fn extract_single_string() {

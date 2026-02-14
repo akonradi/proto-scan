@@ -5,7 +5,11 @@ pub trait ReadError {
 }
 
 pub trait ReadTypes: ReadError {
-    type Buffer: AsRef<[u8]>;
+    type Buffer: ReadBuffer;
+}
+
+pub trait ReadBuffer: AsRef<[u8]> {
+    fn into_bytes(self) -> Box<[u8]>;
 }
 
 pub trait Read: ReadTypes {
@@ -31,11 +35,17 @@ impl<'a> ReadTypes for &'a [u8] {
     type Buffer = Self;
 }
 
+impl ReadBuffer for &[u8] {
+    fn into_bytes(self) -> Box<[u8]> {
+        self.to_owned().into_boxed_slice()
+    }
+}
+
 impl<'a> Read for &'a [u8] {
     fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
         let (bytes, after) = match self.split_at_checked(bytes as usize) {
             Some(split) => split,
-            None => return Ok(&[]),
+            None => return Ok(std::mem::take(self))
         };
 
         *self = after;
