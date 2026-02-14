@@ -1,6 +1,6 @@
 use crate::DecodeError;
-use crate::visitor::{VisitMessage, ScalarField, Visitor};
-use crate::wire::FieldNumber;
+use crate::visitor::{ScalarField, VisitMessage, Visitor};
+use crate::wire::{FieldNumber, I32, I64, Varint};
 
 pub struct Builder<T> {
     state: T,
@@ -11,13 +11,25 @@ pub struct Builder<T> {
     on_group_end: Box<dyn FnMut(&mut T, FieldNumber)>,
 }
 
-pub trait DynLengthDelimited {
+pub trait DynLengthDelimited<'a> {
     fn as_bytes(self: Box<Self>) -> Result<Vec<u8>, DecodeError<Box<dyn std::error::Error>>>;
+
+    fn as_packed_varints(
+        self: Box<Self>,
+    ) -> Box<dyn Iterator<Item = Result<u64, DecodeError<Box<dyn std::error::Error>>>> + 'a>;
+
+    fn as_packed_i32s(
+        self: Box<Self>,
+    ) -> Box<dyn Iterator<Item = Result<u32, DecodeError<Box<dyn std::error::Error>>>> + 'a>;
+
+    fn as_packed_i64s(
+        self: Box<Self>,
+    ) -> Box<dyn Iterator<Item = Result<u64, DecodeError<Box<dyn std::error::Error>>>> + 'a>;
 }
 
 struct DynLengthDelimitedImpl<L>(L);
 
-impl<L: VisitMessage + crate::wire::LengthDelimited> DynLengthDelimited
+impl<'a, L: VisitMessage + crate::wire::LengthDelimited + 'a> DynLengthDelimited<'a>
     for DynLengthDelimitedImpl<L>
 {
     fn as_bytes(self: Box<Self>) -> Result<Vec<u8>, DecodeError<Box<dyn std::error::Error>>> {
@@ -31,6 +43,36 @@ impl<L: VisitMessage + crate::wire::LengthDelimited> DynLengthDelimited
             DecodeError::TooLargeLengthDelimited(l) => DecodeError::TooLargeLengthDelimited(l),
         })?;
         Ok(buffer.as_ref().into())
+    }
+
+    fn as_packed_varints(
+        self: Box<Self>,
+    ) -> Box<dyn Iterator<Item = Result<u64, DecodeError<Box<dyn std::error::Error>>>> + 'a> {
+        Box::new(
+            self.0
+                .as_packed::<Varint>()
+                .map(move |r| r.map_err(|e| DecodeError::map_read(e, |e| Box::new(e) as Box<_>))),
+        )
+    }
+
+    fn as_packed_i32s(
+        self: Box<Self>,
+    ) -> Box<dyn Iterator<Item = Result<u32, DecodeError<Box<dyn std::error::Error>>>> + 'a> {
+        Box::new(
+            self.0
+                .as_packed::<I32>()
+                .map(move |r| r.map_err(|e| DecodeError::map_read(e, |e| Box::new(e) as Box<_>))),
+        )
+    }
+
+    fn as_packed_i64s(
+        self: Box<Self>,
+    ) -> Box<dyn Iterator<Item = Result<u64, DecodeError<Box<dyn std::error::Error>>>> + 'a> {
+        Box::new(
+            self.0
+                .as_packed::<I64>()
+                .map(move |r| r.map_err(|e| DecodeError::map_read(e, |e| Box::new(e) as Box<_>))),
+        )
     }
 }
 

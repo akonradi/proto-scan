@@ -299,6 +299,7 @@ dependencies = [
 name = "proto-lens-tests"
 version = "0.1.0"
 dependencies = [
+ "either",
  "prost",
  "prost-build",
  "prost-types",
