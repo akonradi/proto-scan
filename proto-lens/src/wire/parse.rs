@@ -138,7 +138,6 @@ impl<'a, R: Read> ParseEventReader for Impl<'a, R> {
             wire_type,
             field_number,
         } = tag;
-        let field_number = FieldNumber(field_number);
 
         Some(
             match wire_type {
@@ -409,14 +408,14 @@ mod test {
     fn drop_packed_iter_advances() {
         let input = [
             Tag {
-                field_number: 1,
+                field_number: FieldNumber(1),
                 wire_type: WireType::LengthDelimited,
             }
             .serialized(),
             serialize_base128_varint(3u32),
             vec![0, 1, 2].into_boxed_slice(),
             Tag {
-                field_number: 2,
+                field_number: FieldNumber(2),
                 wire_type: WireType::I32,
             }
             .serialized(),
@@ -463,27 +462,27 @@ mod test {
     fn drop_embedded_message_advance() {
         let input = [
             Tag {
-                field_number: 1,
+                field_number: FieldNumber(1),
                 wire_type: WireType::LengthDelimited,
             }
             .serialized(),
             serialize_base128_varint(4u32),
             // Embedded message begin
             Tag {
-                field_number: 6,
+                field_number: FieldNumber(6),
                 wire_type: WireType::Varint,
             }
             .serialized(),
             serialize_base128_varint(1u32),
             Tag {
-                field_number: 7,
+                field_number: FieldNumber(7),
                 wire_type: WireType::Varint,
             }
             .serialized(),
             serialize_base128_varint(2u32),
             // Embedded message end
             Tag {
-                field_number: 2,
+                field_number: FieldNumber(2),
                 wire_type: WireType::I32,
             }
             .serialized(),

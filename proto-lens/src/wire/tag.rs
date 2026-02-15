@@ -1,10 +1,11 @@
 use crate::DecodeError;
 use crate::read::Read;
+use crate::wire::FieldNumber;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct Tag {
     pub(crate) wire_type: WireType,
-    pub(crate) field_number: u32,
+    pub(crate) field_number: FieldNumber,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, derive_more::TryFrom)]
@@ -28,7 +29,7 @@ impl Tag {
             .map_err(|_| DecodeError::<R::Error>::InvalidWireType(wire_type))?;
 
         Ok(Self {
-            field_number,
+            field_number: FieldNumber(field_number),
             wire_type,
         })
     }
@@ -38,7 +39,7 @@ impl Tag {
             wire_type,
             field_number,
         } = *self;
-        let value = (field_number << 3) | u32::from(wire_type as u8);
+        let value = (u32::from(field_number) << 3) | u32::from(wire_type as u8);
         super::serialize_base128_varint(value)
     }
 }
@@ -55,7 +56,7 @@ mod test {
         assert_eq!(
             tag,
             Ok(Tag {
-                field_number: 1,
+                field_number: FieldNumber(1),
                 wire_type: WireType::Varint
             })
         )
@@ -70,7 +71,7 @@ mod test {
         assert_eq!(
             tag,
             Ok(Tag {
-                field_number: 7,
+                field_number: FieldNumber(7),
                 wire_type: WireType::I32
             })
         );
