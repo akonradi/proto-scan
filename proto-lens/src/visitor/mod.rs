@@ -1,11 +1,11 @@
 use crate::DecodeError;
-use crate::read::{ReadError, ReadTypes};
-use crate::wire::{
-    FieldNumber, LengthDelimited, ParseEvent, ParseEventReader, ScalarField, ScalarWireType,
-};
+use crate::wire::{FieldNumber, LengthDelimited, ParseEvent, ParseEventReader, ScalarField};
 
 mod build;
 pub use build::Builder;
+
+mod visit_message;
+use visit_message::VisitMessageImpl;
 
 /// Visitor for a serialized protobuf message.
 ///
@@ -52,7 +52,7 @@ pub fn visit_message<P: ParseEventReader>(
                 let mut result = Ok(());
                 visitor.on_length_delimited(
                     field_number,
-                    LengthDelimitedImpl {
+                    VisitMessageImpl {
                         inner: length_delimited,
                         result: &mut result,
                     },
@@ -62,46 +62,6 @@ pub fn visit_message<P: ParseEventReader>(
         }
     }
     Ok(())
-}
-
-struct LengthDelimitedImpl<'a, L: ReadError> {
-    inner: L,
-    result: &'a mut Result<(), DecodeError<L::Error>>,
-}
-
-impl<L: ReadError> ReadError for LengthDelimitedImpl<'_, L> {
-    type Error = L::Error;
-}
-
-impl<L: ReadTypes> ReadTypes for LengthDelimitedImpl<'_, L> {
-    type Buffer = L::Buffer;
-}
-
-impl<L: LengthDelimited> LengthDelimited for LengthDelimitedImpl<'_, L> {
-    fn len(&self) -> u32 {
-        self.inner.len()
-    }
-
-    fn as_packed<W: ScalarWireType>(
-        self,
-    ) -> impl Iterator<Item = Result<W::Repr, DecodeError<Self::Error>>> {
-        self.inner.as_packed::<W>()
-    }
-
-    fn as_bytes(self) -> Result<Self::Buffer, DecodeError<Self::Error>> {
-        self.inner.as_bytes()
-    }
-
-    fn as_events(self) -> impl ParseEventReader<Error = Self::Error> {
-        self.inner.as_events()
-    }
-}
-
-impl<L: LengthDelimited> VisitMessage for LengthDelimitedImpl<'_, L> {
-    fn visit_message(self, visitor: impl Visitor) {
-        let reader = self.inner.as_events();
-        *self.result = visit_message(reader, visitor);
-    }
 }
 
 #[cfg(test)]

@@ -2,6 +2,8 @@ use std::convert::Infallible as Never;
 
 use either::Either;
 
+pub(crate) mod count_reader;
+
 pub trait ReadError {
     type Error: std::error::Error + 'static;
 }
@@ -99,3 +101,4 @@ impl<R: Read, L: Read<Error = R::Error, Buffer = R::Buffer>> Read for Either<L, 
             .into_inner()
     }
 }
+
