@@ -32,6 +32,15 @@ impl Tag {
             wire_type,
         })
     }
+
+    pub(crate) fn serialized(&self) -> Box<[u8]> {
+        let Self {
+            wire_type,
+            field_number,
+        } = *self;
+        let value = (field_number << 3) | u32::from(wire_type as u8);
+        super::serialize_base128_varint(value)
+    }
 }
 
 #[cfg(test)]
@@ -58,6 +67,12 @@ mod test {
 
         let tag = Tag::read_from(&mut bytes.as_slice());
 
-        assert_eq!(tag, Ok(Tag {field_number: 7, wire_type: WireType::I32}));
+        assert_eq!(
+            tag,
+            Ok(Tag {
+                field_number: 7,
+                wire_type: WireType::I32
+            })
+        );
     }
 }
