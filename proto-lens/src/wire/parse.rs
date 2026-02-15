@@ -51,7 +51,10 @@ pub trait ParseEventReader: ReadError {
         &mut self,
     ) -> Option<
         Result<
-            ParseEvent<impl LengthDelimited<Error = <Self as ReadError>::Error>>,
+            (
+                FieldNumber,
+                ParseEvent<impl LengthDelimited<Error = <Self as ReadError>::Error>>,
+            ),
             DecodeError<<Self as ReadError>::Error>,
         >,
     >;
@@ -61,13 +64,13 @@ pub trait ParseEventReader: ReadError {
 #[derive(Debug)]
 pub enum ParseEvent<L> {
     /// A scalar field was encountered.
-    Scalar(FieldNumber, ScalarField),
+    Scalar(ScalarField),
     /// An group was opened.
-    StartGroup(FieldNumber),
+    StartGroup,
     /// A group was closed.
-    EndGroup(FieldNumber),
+    EndGroup,
     /// A length-delimited field was encountered.
-    LengthDelimited(FieldNumber, L),
+    LengthDelimited(L),
 }
 
 pub fn parse<'a, R: Read + 'a>(r: R) -> impl ParseEventReader<Error = R::Error> + 'a {
@@ -98,7 +101,13 @@ impl<'a, R: Read> ParseEventReader for Impl<'a, R> {
     fn next(
         &mut self,
     ) -> Option<
-        Result<ParseEvent<impl LengthDelimited<Error = Self::Error>>, DecodeError<Self::Error>>,
+        Result<
+            (
+                FieldNumber,
+                ParseEvent<impl LengthDelimited<Error = Self::Error>>,
+            ),
+            DecodeError<Self::Error>,
+        >,
     > {
         let Self { inner, do_before } = self;
 
@@ -131,37 +140,37 @@ impl<'a, R: Read> ParseEventReader for Impl<'a, R> {
         } = tag;
         let field_number = FieldNumber(field_number);
 
-        Some(match wire_type {
-            WireType::Varint => Varint::read_from(&mut self.inner)
-                .map(|value| ParseEvent::Scalar(field_number, ScalarField::Varint(value))),
-            WireType::I64 => I64::read_from(&mut &mut self.inner)
-                .map(|value| ParseEvent::Scalar(field_number, ScalarField::I64(value))),
-            WireType::I32 => I32::read_from(&mut &mut self.inner)
-                .map(|value| ParseEvent::Scalar(field_number, ScalarField::I32(value))),
-            WireType::Sgroup => Ok(ParseEvent::StartGroup(field_number)),
-            WireType::Egroup => Ok(ParseEvent::EndGroup(field_number)),
-            WireType::LengthDelimited => {
-                let to_skip = match (|| {
-                    let length = Varint::read_from(&mut self.inner)?;
-                    u32::try_from(length)
-                        .map_err(|_| DecodeError::<R::Error>::TooLargeLengthDelimited(length))
-                })() {
-                    Err(e) => return Some(Err(e)),
-                    Ok(l) => l,
-                };
+        Some(
+            match wire_type {
+                WireType::Varint => Varint::read_from(&mut self.inner)
+                    .map(|value| ParseEvent::Scalar(ScalarField::Varint(value))),
+                WireType::I64 => I64::read_from(&mut &mut self.inner)
+                    .map(|value| ParseEvent::Scalar(ScalarField::I64(value))),
+                WireType::I32 => I32::read_from(&mut &mut self.inner)
+                    .map(|value| ParseEvent::Scalar(ScalarField::I32(value))),
+                WireType::Sgroup => Ok(ParseEvent::StartGroup),
+                WireType::Egroup => Ok(ParseEvent::EndGroup),
+                WireType::LengthDelimited => {
+                    let to_skip = match (|| {
+                        let length = Varint::read_from(&mut self.inner)?;
+                        u32::try_from(length)
+                            .map_err(|_| DecodeError::<R::Error>::TooLargeLengthDelimited(length))
+                    })() {
+                        Err(e) => return Some(Err(e)),
+                        Ok(l) => l,
+                    };
 
-                Ok(ParseEvent::LengthDelimited(
-                    field_number,
-                    LengthDelimitedImpl {
+                    Ok(ParseEvent::LengthDelimited(LengthDelimitedImpl {
                         reader: LimitReader {
                             inner: &mut self.inner,
                             remaining: to_skip,
                         },
                         write_back_to: do_before,
-                    },
-                ))
+                    }))
+                }
             }
-        })
+            .map(|field| (field_number, field)),
+        )
     }
 }
 
@@ -389,7 +398,7 @@ mod test {
 
         let event = reader.next().unwrap();
         let length_delimited = match event.unwrap() {
-            ParseEvent::LengthDelimited(FieldNumber(2), l) => l,
+            (FieldNumber(2), ParseEvent::LengthDelimited(l)) => l,
             _ => panic!("invalid"),
         };
 
@@ -411,7 +420,7 @@ mod test {
                 wire_type: WireType::I32,
             }
             .serialized(),
-            vec![1, 2, 3, 4].into_boxed_slice(),
+            ScalarField::I32(0x04030201).serialize(),
         ]
         .concat();
 
@@ -419,13 +428,14 @@ mod test {
         let mut parse = parse(&mut read);
 
         let mut iter = match parse.next().unwrap().unwrap() {
-            ParseEvent::LengthDelimited(field_number, value) => {
+            (field_number, ParseEvent::LengthDelimited(value)) => {
                 assert_eq!(field_number, 1);
                 value.as_packed::<Varint>()
             }
-            ParseEvent::Scalar(field_number, _)
-            | ParseEvent::StartGroup(field_number)
-            | ParseEvent::EndGroup(field_number) => {
+            (
+                field_number,
+                ParseEvent::Scalar(_) | ParseEvent::StartGroup | ParseEvent::EndGroup,
+            ) => {
                 panic!("wrong event; field = {field_number:?}")
             }
         };
@@ -436,13 +446,14 @@ mod test {
 
         let next = parse.next().unwrap().unwrap();
         match next {
-            ParseEvent::Scalar(field_number, scalar_field) => {
+            (field_number, ParseEvent::Scalar(scalar_field)) => {
                 assert_eq!(field_number, 2);
                 assert_eq!(scalar_field, ScalarField::I32(0x04030201))
             }
-            ParseEvent::StartGroup(field_number)
-            | ParseEvent::EndGroup(field_number)
-            | ParseEvent::LengthDelimited(field_number, _) => {
+            (
+                field_number,
+                ParseEvent::StartGroup | ParseEvent::EndGroup | ParseEvent::LengthDelimited(_),
+            ) => {
                 panic!("wrong event field {field_number:?}")
             }
         }
@@ -476,7 +487,7 @@ mod test {
                 wire_type: WireType::I32,
             }
             .serialized(),
-            vec![1, 2, 3, 4].into_boxed_slice(),
+            ScalarField::I32(0x04030201).serialize(),
         ]
         .concat();
 
@@ -484,24 +495,28 @@ mod test {
         let mut parse = parse(&mut read);
 
         let embedded = match parse.next().unwrap().unwrap() {
-            ParseEvent::LengthDelimited(field_number, value) => {
+            (field_number, ParseEvent::LengthDelimited(value)) => {
                 assert_eq!(field_number, 1);
                 value
             }
-            ParseEvent::Scalar(field_number, _)
-            | ParseEvent::StartGroup(field_number)
-            | ParseEvent::EndGroup(field_number) => {
+            (
+                field_number,
+                ParseEvent::Scalar(_) | ParseEvent::StartGroup | ParseEvent::EndGroup,
+            ) => {
                 panic!("wrong event; field = {field_number:?}")
             }
         };
         {
             let mut embedded_events = embedded.as_events();
             match embedded_events.next().unwrap().unwrap() {
-                ParseEvent::Scalar(FieldNumber(6), ScalarField::Varint(1)) => {}
-                ParseEvent::Scalar(field_number, _)
-                | ParseEvent::StartGroup(field_number)
-                | ParseEvent::EndGroup(field_number)
-                | ParseEvent::LengthDelimited(field_number, _) => {
+                (FieldNumber(6), ParseEvent::Scalar(ScalarField::Varint(1))) => {}
+                (
+                    field_number,
+                    ParseEvent::Scalar(_)
+                    | ParseEvent::StartGroup
+                    | ParseEvent::EndGroup
+                    | ParseEvent::LengthDelimited(_),
+                ) => {
                     panic!("wrong event field {field_number:?}")
                 }
             }
@@ -513,13 +528,14 @@ mod test {
 
         let next = parse.next().unwrap().unwrap();
         match next {
-            ParseEvent::Scalar(field_number, scalar_field) => {
+            (field_number, ParseEvent::Scalar(scalar_field)) => {
                 assert_eq!(field_number, 2);
                 assert_eq!(scalar_field, ScalarField::I32(0x04030201))
             }
-            ParseEvent::StartGroup(field_number)
-            | ParseEvent::EndGroup(field_number)
-            | ParseEvent::LengthDelimited(field_number, _) => {
+            (
+                field_number,
+                ParseEvent::StartGroup | ParseEvent::EndGroup | ParseEvent::LengthDelimited(_),
+            ) => {
                 panic!("wrong event field {field_number:?}")
             }
         }

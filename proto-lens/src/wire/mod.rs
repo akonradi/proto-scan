@@ -76,6 +76,16 @@ impl ParseVarint for u32 {
     }
 }
 
+impl ScalarField {
+    pub(crate) fn serialize(&self) -> Box<[u8]> {
+        match self {
+            ScalarField::Varint(v) => serialize_base128_varint(*v),
+            ScalarField::I64(v) => v.to_le_bytes().into(),
+            ScalarField::I32(v) => v.to_le_bytes().into(),
+        }
+    }
+}
+
 fn parse_base128_varint<R: Read, V: ParseVarint>(r: &mut R) -> Result<V, DecodeError<R::Error>> {
     let mut value = V::zero();
     for i in 0..V::MAX_BYTES {
@@ -98,7 +108,7 @@ fn serialize_base128_varint<V: ParseVarint>(mut value: V) -> Box<[u8]> {
     let mut bytes = Vec::with_capacity(V::MAX_BYTES.into());
 
     loop {
-        let mut v: u8 = value.low_byte() & 0x7f ;
+        let mut v: u8 = value.low_byte() & 0x7f;
         value >>= 7.into();
 
         if value == V::zero() {

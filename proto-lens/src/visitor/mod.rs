@@ -1,14 +1,14 @@
 use crate::DecodeError;
+use crate::read::{ReadError, ReadTypes};
 use crate::wire::{
     FieldNumber, LengthDelimited, ParseEvent, ParseEventReader, ScalarField, ScalarWireType,
 };
-use crate::read::{ReadError, ReadTypes};
 
 mod build;
 pub use build::Builder;
 
 /// Visitor for a serialized protobuf message.
-/// 
+///
 /// Implementers can be passed as an argument to [`visit_message`] to receive
 /// callbacks for each field in the message.
 pub trait Visitor {
@@ -16,7 +16,7 @@ pub trait Visitor {
     fn on_scalar(&mut self, field_number: FieldNumber, field: ScalarField);
 
     /// Called when a length-delimited field is parsed.
-    /// 
+    ///
     /// Implementations can use the provided handler argument to access the
     /// contents of the field.
     fn on_length_delimited<'s>(
@@ -43,11 +43,12 @@ pub fn visit_message<P: ParseEventReader>(
     mut visitor: impl Visitor,
 ) -> Result<(), DecodeError<P::Error>> {
     while let Some(event) = reader.next() {
-        match event? {
-            ParseEvent::Scalar(field_number, value) => visitor.on_scalar(field_number, value),
-            ParseEvent::StartGroup(field_number) => visitor.on_group_begin(field_number),
-            ParseEvent::EndGroup(field_number) => visitor.on_group_end(field_number),
-            ParseEvent::LengthDelimited(field_number, length_delimited) => {
+        let (field_number, event) = event?;
+        match event {
+            ParseEvent::Scalar(value) => visitor.on_scalar(field_number, value),
+            ParseEvent::StartGroup => visitor.on_group_begin(field_number),
+            ParseEvent::EndGroup => visitor.on_group_end(field_number),
+            ParseEvent::LengthDelimited(length_delimited) => {
                 let mut result = Ok(());
                 visitor.on_length_delimited(
                     field_number,

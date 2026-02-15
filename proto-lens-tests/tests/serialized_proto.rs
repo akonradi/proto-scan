@@ -95,14 +95,10 @@ fn extract_scalars_parse() {
     let mut read = bytes.as_slice();
     let mut reader = proto_lens::wire::parse(&mut read);
     while let Some(event) = reader.next() {
-        let event = event.unwrap();
+        let (field_number, event) = event.unwrap();
         match event {
-            ParseEvent::Scalar(field_number, value) => {
-                events.entry(field_number).or_default().push(value)
-            }
-            ParseEvent::StartGroup(_field_number)
-            | ParseEvent::EndGroup(_field_number)
-            | ParseEvent::LengthDelimited(_field_number, _) => {}
+            ParseEvent::Scalar(value) => events.entry(field_number).or_default().push(value),
+            ParseEvent::StartGroup | ParseEvent::EndGroup | ParseEvent::LengthDelimited(_) => {}
         }
     }
 
@@ -147,24 +143,25 @@ fn extract_packed_fields_parse() {
     let mut read = bytes.as_slice();
     let mut reader = proto_lens::wire::parse(&mut read);
     while let Some(event) = reader.next() {
-        let (field_number, values) = match event.unwrap() {
-            ParseEvent::LengthDelimited(field_number, value) => match field_number.into() {
+        let (field_number, event) = event.unwrap();
+        let values = match event {
+            ParseEvent::LengthDelimited(value) => match field_number.into() {
                 2 | 3 | 4 => {
                     let it = value
                         .as_packed::<Varint>()
                         .map(|r| ScalarField::Varint(r.unwrap()));
-                    (field_number, Either::Left(it))
+                    Either::Left(it)
                 }
                 6 => {
                     let it = value
                         .as_packed::<I32>()
                         .map(|r| ScalarField::I32(r.unwrap()));
-                    (field_number, Either::Right(it))
+                    Either::Right(it)
                 }
                 1 => continue,
                 field_number => panic!("unknown field {field_number}"),
             },
-            ParseEvent::Scalar(_, _) | ParseEvent::StartGroup(_) | ParseEvent::EndGroup(_) => {
+            ParseEvent::Scalar(_) | ParseEvent::StartGroup | ParseEvent::EndGroup => {
                 continue;
             }
         };
@@ -180,15 +177,16 @@ fn extract_string() {
     let mut read = bytes.as_slice();
     let mut reader = proto_lens::wire::parse(&mut read);
     while let Some(event) = reader.next() {
-        let event = event.unwrap();
+        let (field_number, event) = event.unwrap();
         match event {
-            ParseEvent::LengthDelimited(field_number, l) => {
+            ParseEvent::LengthDelimited(l) => {
                 if field_number == 1 {
                     let mut reader = l.as_events();
                     while let Some(event) = reader.next() {
-                        match event.unwrap() {
-                            ParseEvent::LengthDelimited(f, l) => {
-                                if f == 1 {
+                        let (_field_number, event) = event.unwrap();
+                        match event {
+                            ParseEvent::LengthDelimited(l) => {
+                                if field_number == 1 {
                                     let bytes = l.as_bytes().unwrap();
                                     let bytes = bytes.as_ref();
                                     assert_eq!(bytes, b"ABC");
@@ -199,9 +197,9 @@ fn extract_string() {
                     }
                 }
             }
-            ParseEvent::Scalar(_, _) => {}
-            ParseEvent::StartGroup(_) => {}
-            ParseEvent::EndGroup(_) => {}
+            ParseEvent::Scalar(_) => {}
+            ParseEvent::StartGroup => {}
+            ParseEvent::EndGroup => {}
         }
     }
 }
