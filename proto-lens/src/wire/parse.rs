@@ -1,5 +1,9 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::num::NonZeroU32;
+
+use assert_matches::debug_assert_matches;
+use either::Either;
 
 use crate::DecodeError;
 use crate::read::{Read, ReadError, ReadTypes};
@@ -66,39 +70,24 @@ pub enum ParseEvent<L> {
     LengthDelimited(FieldNumber, L),
 }
 
-pub fn parse<R: Read>(r: R) -> impl ParseEventReader<Error = R::Error> {
+pub fn parse<'a, R: Read + 'a>(r: R) -> impl ParseEventReader<Error = R::Error> + 'a {
     Impl {
-        reader: r,
-        error: OwnedOrMut::Owned(false),
-    }
-}
-
-enum OwnedOrMut<'a, T> {
-    Owned(T),
-    Mut(&'a mut T),
-}
-
-impl<T> AsRef<T> for OwnedOrMut<'_, T> {
-    fn as_ref(&self) -> &T {
-        match self {
-            OwnedOrMut::Owned(t) => &t,
-            OwnedOrMut::Mut(t) => &*t,
-        }
-    }
-}
-
-impl<T> AsMut<T> for OwnedOrMut<'_, T> {
-    fn as_mut(&mut self) -> &mut T {
-        match self {
-            OwnedOrMut::Owned(t) => t,
-            OwnedOrMut::Mut(t) => t,
-        }
+        inner: Either::Left(r),
+        do_before: DoBeforeNext::DoNothing,
     }
 }
 
 struct Impl<'a, R> {
-    reader: R,
-    error: OwnedOrMut<'a, bool>,
+    inner: Either<R, LengthDelimitedImpl<'a, R>>,
+    do_before: DoBeforeNext,
+}
+
+#[derive(Debug, Default)]
+enum DoBeforeNext {
+    #[default]
+    DoNothing,
+    Skip(NonZeroU32),
+    Error,
 }
 
 impl<R: ReadError> ReadError for Impl<'_, R> {
@@ -111,12 +100,22 @@ impl<'a, R: Read> ParseEventReader for Impl<'a, R> {
     ) -> Option<
         Result<ParseEvent<impl LengthDelimited<Error = Self::Error>>, DecodeError<Self::Error>>,
     > {
-        if *self.error.as_ref() {
-            return None;
+        let Self { inner, do_before } = self;
+
+        let reader = inner;
+
+        match std::mem::take(do_before) {
+            DoBeforeNext::Skip(to_skip) => {
+                if let Err(e) = reader.skip(to_skip.get()) {
+                    return Some(Err(DecodeError::Read(e)));
+                }
+            }
+            DoBeforeNext::Error => return Some(Err(DecodeError::UnexpectedEnd)),
+            DoBeforeNext::DoNothing => {}
         }
 
         let mut tag_reader = CountReader {
-            inner: &mut self.reader,
+            inner: reader,
             count: 0,
         };
 
@@ -125,6 +124,7 @@ impl<'a, R: Read> ParseEventReader for Impl<'a, R> {
             Err(DecodeError::UnexpectedEnd) if tag_reader.count == 0 => return None,
             Err(e) => return Some(Err(e)),
         };
+
         let Tag {
             wire_type,
             field_number,
@@ -132,17 +132,17 @@ impl<'a, R: Read> ParseEventReader for Impl<'a, R> {
         let field_number = FieldNumber(field_number);
 
         Some(match wire_type {
-            WireType::Varint => Varint::read_from(&mut &mut self.reader)
+            WireType::Varint => Varint::read_from(&mut self.inner)
                 .map(|value| ParseEvent::Scalar(field_number, ScalarField::Varint(value))),
-            WireType::I64 => I64::read_from(&mut &mut self.reader)
+            WireType::I64 => I64::read_from(&mut &mut self.inner)
                 .map(|value| ParseEvent::Scalar(field_number, ScalarField::I64(value))),
-            WireType::I32 => I32::read_from(&mut &mut self.reader)
+            WireType::I32 => I32::read_from(&mut &mut self.inner)
                 .map(|value| ParseEvent::Scalar(field_number, ScalarField::I32(value))),
             WireType::Sgroup => Ok(ParseEvent::StartGroup(field_number)),
             WireType::Egroup => Ok(ParseEvent::EndGroup(field_number)),
             WireType::LengthDelimited => {
-                let length = match (|| {
-                    let length = Varint::read_from(&mut self.reader)?;
+                let to_skip = match (|| {
+                    let length = Varint::read_from(&mut self.inner)?;
                     u32::try_from(length)
                         .map_err(|_| DecodeError::<R::Error>::TooLargeLengthDelimited(length))
                 })() {
@@ -153,11 +153,11 @@ impl<'a, R: Read> ParseEventReader for Impl<'a, R> {
                 Ok(ParseEvent::LengthDelimited(
                     field_number,
                     LengthDelimitedImpl {
-                        reader: Some(LimitReader {
-                            inner: &mut self.reader,
-                            remaining: length,
-                        }),
-                        error: OwnedOrMut::Mut(self.error.as_mut()),
+                        reader: LimitReader {
+                            inner: &mut self.inner,
+                            remaining: to_skip,
+                        },
+                        write_back_to: do_before,
                     },
                 ))
             }
@@ -165,35 +165,51 @@ impl<'a, R: Read> ParseEventReader for Impl<'a, R> {
     }
 }
 
-struct LengthDelimitedImpl<'a, R: Read> {
-    reader: Option<LimitReader<&'a mut R>>,
-    error: OwnedOrMut<'a, bool>,
-}
-
-impl<'a, R: Read> Drop for LengthDelimitedImpl<'a, R> {
-    fn drop(&mut self) {
-        let Self { reader, error } = self;
-        let reader = reader.take().unwrap();
-        let Ok(_) = reader.inner.skip(reader.remaining) else {
-            *error.as_mut() = true;
-            return;
-        };
-    }
+struct LengthDelimitedImpl<'a, R> {
+    reader: LimitReader<&'a mut R>,
+    write_back_to: &'a mut DoBeforeNext,
 }
 
 impl<R: Read> ReadError for LengthDelimitedImpl<'_, R> {
     type Error = R::Error;
 }
 
+impl<R: Read> ReadTypes for LengthDelimitedImpl<'_, R> {
+    type Buffer = R::Buffer;
+}
+
+impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
+    fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
+        match self.reader.read(bytes) {
+            Ok(b) => Ok(b),
+            Err(e) => {
+                *self.write_back_to = DoBeforeNext::Error;
+                Err(e)
+            }
+        }
+    }
+
+    fn skip(&mut self, bytes: u32) -> Result<u32, Self::Error> {
+        match self.reader.skip(bytes) {
+            Ok(b) => Ok(b),
+            Err(e) => {
+                *self.write_back_to = DoBeforeNext::Error;
+                Err(e)
+            }
+        }
+    }
+}
+
 impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedImpl<'a, R> {
     fn len(&self) -> u32 {
-        self.reader.as_ref().unwrap().remaining
+        self.reader.remaining
     }
 
     fn as_bytes(mut self) -> Result<R::Buffer, DecodeError<R::Error>> {
-        let remaining = self.reader.as_ref().unwrap().remaining;
-        let bytes = self.read(remaining).map_err(DecodeError::Read)?;
+        let remaining = self.reader.remaining;
+        let bytes = self.reader.read(remaining).map_err(DecodeError::Read)?;
         if bytes.as_ref().len() != remaining as usize {
+            *self.write_back_to = DoBeforeNext::Error;
             return Err(DecodeError::UnexpectedEnd);
         }
         Ok(bytes)
@@ -203,41 +219,39 @@ impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedI
         self,
     ) -> impl Iterator<Item = Result<W::Repr, DecodeError<R::Error>>> {
         ScalarIter {
-            reader: self,
+            inner: self,
             _wire_type: PhantomData::<W>,
         }
     }
 
-    fn as_events(mut self) -> impl ParseEventReader<Error = Self::Error> {
+    fn as_events(self) -> impl ParseEventReader<Error = Self::Error> {
         Impl {
-            error: std::mem::replace(&mut self.error, OwnedOrMut::Owned(false)),
-            reader: self,
+            inner: Either::Right(self),
+            do_before: DoBeforeNext::DoNothing,
         }
     }
 }
 
-impl<R: Read> ReadTypes for LengthDelimitedImpl<'_, R> {
-    type Buffer = R::Buffer;
-}
-
-impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
-    fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
-        let reader = self.reader.as_mut().unwrap();
-        let buffer = reader.read(bytes)?;
-
-        if buffer.as_ref().len() != bytes as usize {
-            *self.error.as_mut() = true;
+impl<'a, R> Drop for LengthDelimitedImpl<'a, R> {
+    fn drop(&mut self) {
+        let Self {
+            reader,
+            write_back_to,
+        } = self;
+        if let Some(remaining) = NonZeroU32::new(reader.remaining) {
+            debug_assert_matches!(write_back_to, DoBeforeNext::DoNothing | DoBeforeNext::Error);
+            match write_back_to {
+                DoBeforeNext::DoNothing | DoBeforeNext::Skip(_) => {
+                    **write_back_to = DoBeforeNext::Skip(remaining)
+                }
+                DoBeforeNext::Error => {}
+            }
         }
-        Ok(buffer)
-    }
-
-    fn skip(&mut self, bytes: u32) -> Result<u32, Self::Error> {
-        self.reader.as_mut().unwrap().skip(bytes)
     }
 }
 
-struct ScalarIter<R, W> {
-    reader: R,
+struct ScalarIter<'a, R, W> {
+    inner: LengthDelimitedImpl<'a, R>,
     _wire_type: PhantomData<W>,
 }
 
@@ -298,19 +312,26 @@ impl<R: Read> Read for CountReader<R> {
     }
 }
 
-impl<R: Read, W: ScalarWireType> Iterator for ScalarIter<LengthDelimitedImpl<'_, R>, W> {
+impl<'a, R: Read, W: ScalarWireType> Iterator for ScalarIter<'a, R, W> {
     type Item = Result<W::Repr, DecodeError<R::Error>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.reader.reader.as_ref().unwrap().remaining == 0 {
+        let Self { inner, _wire_type } = self;
+        if inner.reader.remaining == 0 {
             return None;
         }
 
-        Some(W::read_from(&mut self.reader).map_err(Into::into))
+        Some(match W::read_from(inner) {
+            Ok(r) => Ok(r),
+            Err(e) => {
+                *self.inner.write_back_to = DoBeforeNext::Error;
+                Err(e)
+            }
+        })
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self.reader.reader.as_ref().unwrap().remaining;
+        let remaining = self.inner.reader.remaining;
         let (min, max) = W::BYTE_LEN.into_inner();
 
         (
@@ -322,6 +343,8 @@ impl<R: Read, W: ScalarWireType> Iterator for ScalarIter<LengthDelimitedImpl<'_,
 
 #[cfg(test)]
 mod test {
+    use crate::wire::serialize_base128_varint;
+
     use super::*;
 
     mod limit_reader {
@@ -371,5 +394,134 @@ mod test {
         };
 
         assert_eq!(length_delimited.as_bytes().unwrap().as_ref(), b"testing");
+    }
+
+    #[test]
+    fn drop_packed_iter_advances() {
+        let input = [
+            Tag {
+                field_number: 1,
+                wire_type: WireType::LengthDelimited,
+            }
+            .serialized(),
+            serialize_base128_varint(3u32),
+            vec![0, 1, 2].into_boxed_slice(),
+            Tag {
+                field_number: 2,
+                wire_type: WireType::I32,
+            }
+            .serialized(),
+            vec![1, 2, 3, 4].into_boxed_slice(),
+        ]
+        .concat();
+
+        let mut read = &input[..];
+        let mut parse = parse(&mut read);
+
+        let mut iter = match parse.next().unwrap().unwrap() {
+            ParseEvent::LengthDelimited(field_number, value) => {
+                assert_eq!(field_number, 1);
+                value.as_packed::<Varint>()
+            }
+            ParseEvent::Scalar(field_number, _)
+            | ParseEvent::StartGroup(field_number)
+            | ParseEvent::EndGroup(field_number) => {
+                panic!("wrong event; field = {field_number:?}")
+            }
+        };
+        assert_eq!(iter.next(), Some(Ok(0)));
+        // If the iterator is dropped without exhausting it, the remaining
+        // values are still skipped.
+        drop(iter);
+
+        let next = parse.next().unwrap().unwrap();
+        match next {
+            ParseEvent::Scalar(field_number, scalar_field) => {
+                assert_eq!(field_number, 2);
+                assert_eq!(scalar_field, ScalarField::I32(0x04030201))
+            }
+            ParseEvent::StartGroup(field_number)
+            | ParseEvent::EndGroup(field_number)
+            | ParseEvent::LengthDelimited(field_number, _) => {
+                panic!("wrong event field {field_number:?}")
+            }
+        }
+    }
+
+    #[test]
+    fn drop_embedded_message_advance() {
+        let input = [
+            Tag {
+                field_number: 1,
+                wire_type: WireType::LengthDelimited,
+            }
+            .serialized(),
+            serialize_base128_varint(4u32),
+            // Embedded message begin
+            Tag {
+                field_number: 6,
+                wire_type: WireType::Varint,
+            }
+            .serialized(),
+            serialize_base128_varint(1u32),
+            Tag {
+                field_number: 7,
+                wire_type: WireType::Varint,
+            }
+            .serialized(),
+            serialize_base128_varint(2u32),
+            // Embedded message end
+            Tag {
+                field_number: 2,
+                wire_type: WireType::I32,
+            }
+            .serialized(),
+            vec![1, 2, 3, 4].into_boxed_slice(),
+        ]
+        .concat();
+
+        let mut read = &input[..];
+        let mut parse = parse(&mut read);
+
+        let embedded = match parse.next().unwrap().unwrap() {
+            ParseEvent::LengthDelimited(field_number, value) => {
+                assert_eq!(field_number, 1);
+                value
+            }
+            ParseEvent::Scalar(field_number, _)
+            | ParseEvent::StartGroup(field_number)
+            | ParseEvent::EndGroup(field_number) => {
+                panic!("wrong event; field = {field_number:?}")
+            }
+        };
+        {
+            let mut embedded_events = embedded.as_events();
+            match embedded_events.next().unwrap().unwrap() {
+                ParseEvent::Scalar(FieldNumber(6), ScalarField::Varint(1)) => {}
+                ParseEvent::Scalar(field_number, _)
+                | ParseEvent::StartGroup(field_number)
+                | ParseEvent::EndGroup(field_number)
+                | ParseEvent::LengthDelimited(field_number, _) => {
+                    panic!("wrong event field {field_number:?}")
+                }
+            }
+
+            // If the iterator is dropped without exhausting it, the remaining
+            // values are still skipped.
+            drop(embedded_events);
+        }
+
+        let next = parse.next().unwrap().unwrap();
+        match next {
+            ParseEvent::Scalar(field_number, scalar_field) => {
+                assert_eq!(field_number, 2);
+                assert_eq!(scalar_field, ScalarField::I32(0x04030201))
+            }
+            ParseEvent::StartGroup(field_number)
+            | ParseEvent::EndGroup(field_number)
+            | ParseEvent::LengthDelimited(field_number, _) => {
+                panic!("wrong event field {field_number:?}")
+            }
+        }
     }
 }

@@ -1,5 +1,7 @@
 use std::convert::Infallible as Never;
 
+use either::Either;
+
 pub trait ReadError {
     type Error: std::error::Error + 'static;
 }
@@ -45,7 +47,7 @@ impl<'a> Read for &'a [u8] {
     fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
         let (bytes, after) = match self.split_at_checked(bytes as usize) {
             Some(split) => split,
-            None => return Ok(std::mem::take(self))
+            None => return Ok(std::mem::take(self)),
         };
 
         *self = after;
@@ -73,5 +75,27 @@ impl<R: Read> Read for &mut R {
 
     fn skip(&mut self, bytes: u32) -> Result<u32, Self::Error> {
         (*self).skip(bytes)
+    }
+}
+
+impl<R: ReadError, L: ReadError<Error = R::Error>> ReadError for Either<L, R> {
+    type Error = L::Error;
+}
+
+impl<R: ReadTypes, L: ReadTypes<Error = R::Error, Buffer = R::Buffer>> ReadTypes for Either<L, R> {
+    type Buffer = L::Buffer;
+}
+
+impl<R: Read, L: Read<Error = R::Error, Buffer = R::Buffer>> Read for Either<L, R> {
+    fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
+        self.as_mut()
+            .map_either(|r| r.read(bytes), |r| r.read(bytes))
+            .into_inner()
+    }
+
+    fn skip(&mut self, bytes: u32) -> Result<u32, Self::Error> {
+        self.as_mut()
+            .map_either(|r| r.skip(bytes), |r| r.skip(bytes))
+            .into_inner()
     }
 }
