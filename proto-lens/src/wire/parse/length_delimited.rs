@@ -44,6 +44,8 @@ impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
 }
 
 impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedImpl<'a, R> {
+    type PackedIter<W: ScalarWireType> = ScalarIter<'a, R, W>;
+
     fn len(&self) -> u32 {
         self.reader.remaining()
     }
@@ -58,9 +60,7 @@ impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedI
         Ok(bytes)
     }
 
-    fn into_packed<W: ScalarWireType>(
-        self,
-    ) -> impl Iterator<Item = Result<W::Repr, DecodeError<R::Error>>> {
+    fn into_packed<W: ScalarWireType>(self) -> Self::PackedIter<W> {
         ScalarIter::<_, W>::new(self)
     }
 

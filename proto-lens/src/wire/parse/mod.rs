@@ -30,15 +30,15 @@ pub trait LengthDelimited: ReadTypes {
     /// Returns the number of bytes in the field.
     fn len(&self) -> u32;
 
+    type PackedIter<W: ScalarWireType>: Iterator<Item = Result<W::Repr, DecodeError<Self::Error>>>;
+
     /// Interprets the contents of a field as packed values.
     ///
     /// Consumes the contents of the field and returns an iterator that, on `next()`,
     /// returns the next value or an error if it cannot be decoded. If the
     /// iterator is dropped before it is exhausted, the remaining values and/or
     /// read errors are dropped.
-    fn into_packed<W: ScalarWireType>(
-        self,
-    ) -> impl Iterator<Item = Result<W::Repr, DecodeError<Self::Error>>>;
+    fn into_packed<W: ScalarWireType>(self) -> Self::PackedIter<W>;
 
     /// Reads the contents of the delimited field as bytes.
     fn into_bytes(self) -> Result<Self::Buffer, DecodeError<Self::Error>>;

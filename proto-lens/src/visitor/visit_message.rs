@@ -17,13 +17,13 @@ impl<L: ReadTypes> ReadTypes for VisitMessageImpl<'_, L> {
 }
 
 impl<L: LengthDelimited> LengthDelimited for VisitMessageImpl<'_, L> {
+    type PackedIter<W: ScalarWireType> = L::PackedIter<W>;
+
     fn len(&self) -> u32 {
         self.inner.len()
     }
 
-    fn into_packed<W: ScalarWireType>(
-        self,
-    ) -> impl Iterator<Item = Result<W::Repr, DecodeError<Self::Error>>> {
+    fn into_packed<W: ScalarWireType>(self) -> Self::PackedIter<W> {
         self.inner.into_packed::<W>()
     }
 

@@ -3,8 +3,12 @@ name = "proto-lens"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+builder = ["dep:bon"]
+
 [dependencies]
 assert_matches = "1.5.0"
+bon = { version = "3.9.0", optional = true }
 derive_more = { version = "2.1.1", features = ["from", "into", "try_from"] }
 either = "1.15.0"
 num-traits = "0.2.19"

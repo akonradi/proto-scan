@@ -72,11 +72,12 @@ fn extract_scalars_visitor() {
     let bytes = with_repeats().encode_to_vec();
     let mut events = HashMap::<_, Vec<_>>::new();
 
-    let builder = proto_lens::visitor::Builder::new(&mut events).set_on_scalar(
-        |events, field_number, value| {
+    let builder = proto_lens::visitor::BuiltVisitor::builder(&mut events)
+        .on_scalar(|events, field_number, value| {
             events.entry(field_number).or_default().push(value);
-        },
-    );
+        })
+        .on_group_op(|_, _, _| ())
+        .on_length_delimited(|_, _, _| ());
 
     let r = proto_lens::visitor::visit_message(
         proto_lens::wire::parse(&mut bytes.as_slice()),
@@ -110,8 +111,8 @@ fn extract_packed_fields_visitor() {
     let bytes = with_repeats().encode_to_vec();
     let mut events = HashMap::<_, Vec<_>>::new();
 
-    let builder = proto_lens::visitor::Builder::new(&mut events).set_on_length_delimited(
-        |events, field_number, value| {
+    let builder = proto_lens::visitor::BuiltVisitor::builder(&mut events)
+        .on_length_delimited(|events, field_number, value| {
             let iter = match field_number.into() {
                 1 => return,
                 2 | 3 | 4 => Either::Left(
@@ -119,12 +120,17 @@ fn extract_packed_fields_visitor() {
                         .into_packed_varints()
                         .map(|r| ScalarField::Varint(r.unwrap())),
                 ),
-                6 => Either::Right(value.into_packed_i32s().map(|r| ScalarField::I32(r.unwrap()))),
+                6 => Either::Right(
+                    value
+                        .into_packed_i32s()
+                        .map(|r| ScalarField::I32(r.unwrap())),
+                ),
                 x => panic!("unexpected length-delimited field {x}"),
             };
             events.entry(field_number).or_default().extend(iter);
-        },
-    );
+        })
+        .on_scalar(|_, _, _| ())
+        .on_group_op(|_, _, _| ());
 
     let r = proto_lens::visitor::visit_message(
         proto_lens::wire::parse(&mut bytes.as_slice()),

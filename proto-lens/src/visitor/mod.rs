@@ -1,8 +1,10 @@
 use crate::DecodeError;
 use crate::wire::{FieldNumber, LengthDelimited, ParseEvent, ParseEventReader, ScalarField};
+#[cfg(feature = "builder")]
+pub use build::{BuiltVisitor, GroupOp, PackedWireType};
 
+#[cfg(feature = "builder")]
 mod build;
-pub use build::Builder;
 
 mod visit_message;
 use visit_message::VisitMessageImpl;
@@ -62,31 +64,4 @@ pub fn visit_message<P: ParseEventReader>(
         }
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod test {
-    use assert_matches::assert_matches;
-
-    use super::*;
-
-    #[test]
-    fn extract_single_string() {
-        let input = [0x12, 0x07, 0x74, 0x65, 0x73, 0x74, 0x69, 0x6e, 0x67];
-
-        let mut extracted = None;
-
-        let visitor = Builder::new(&mut extracted)
-            .set_on_length_delimited(|extracted, _field_number, delimited| {
-                assert_matches!(
-                    extracted.replace(delimited.into_bytes().expect("can read")),
-                    None
-                );
-            })
-            .build();
-
-        let result = visit_message(crate::wire::parse(&mut input.as_slice()), visitor);
-        assert_matches!(result, Ok(()));
-        assert_eq!(extracted, Some("testing".to_string().into()))
-    }
 }

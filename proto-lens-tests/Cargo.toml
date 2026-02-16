@@ -7,7 +7,7 @@ edition = "2024"
 either = "1.15.0"
 prost = "0.14.3"
 prost-types = "0.14.3"
-proto-lens = { path = "../proto-lens" }
+proto-lens = { path = "../proto-lens", features = ["builder"]}
 
 [build-dependencies]
 prost-build = "0.14.3"
