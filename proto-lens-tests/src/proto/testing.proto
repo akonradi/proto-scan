@@ -30,3 +30,16 @@ message WithRepeats {
   repeated fixed64 packed_fixed64 = 8;
   repeated fixed64 unpacked_fixed64 = 9 [packed = false];
 }
+
+
+message ScanExample {
+  repeated MultiFieldMessage repeated_msg = 1;
+  MultiFieldMessage single_msg = 2;
+  repeated bool repeated_bool = 3;
+  optional bool single_bool = 4;
+  oneof oneof_group{
+    bool oneof_bool = 5;
+    fixed32 oneof_fixed32 = 6;
+    MultiFieldMessage oneof_message = 7;
+  }
+}
