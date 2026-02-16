@@ -4,12 +4,13 @@ use std::sync::LazyLock;
 use either::Either;
 use prost::Message;
 use proto_lens::wire::{
-    FieldNumber, I32, LengthDelimited, ParseEvent, ParseEventReader, ScalarField, Varint,
+    FieldNumber, I32, I64, LengthDelimited, ParseEvent, ParseEventReader, ScalarField, Varint,
 };
 use proto_lens_tests::proto;
 
 const VARINT_VALUES: [u64; 3] = [19488045, 173485432435, 894];
 const FIXED32_VALUES: [u32; 4] = [4, 5, 819491, 48];
+const FIXED64_VALUES: [u64; 4] = [19483, 8584939584, u64::MAX, 0];
 const BOOL_VALUES: [bool; 5] = [true, true, false, false, true];
 const ENUM_VALUES: [proto::with_repeats::EnumType; 3] = {
     use proto::with_repeats::EnumType;
@@ -25,6 +26,10 @@ static SCALAR_FIELDS: LazyLock<HashMap<FieldNumber, Vec<ScalarField>>> = LazyLoc
         (
             FieldNumber::try_from(7).unwrap(),
             FIXED32_VALUES.map(ScalarField::I32).into(),
+        ),
+        (
+            FieldNumber::try_from(9).unwrap(),
+            FIXED64_VALUES.map(ScalarField::I64).into(),
         ),
     ])
 });
@@ -49,6 +54,10 @@ static PACKED_FIELDS: LazyLock<HashMap<FieldNumber, Vec<ScalarField>>> = LazyLoc
             FieldNumber::try_from(6).unwrap(),
             FIXED32_VALUES.map(|b| ScalarField::I32(b.into())).into(),
         ),
+        (
+            FieldNumber::try_from(8).unwrap(),
+            FIXED64_VALUES.map(|b| ScalarField::I64(b.into())).into(),
+        ),
     ])
 });
 
@@ -64,6 +73,8 @@ fn with_repeats() -> proto::WithRepeats {
         unpacked_varint: VARINT_VALUES.into(),
         packed_fixed32: FIXED32_VALUES.into(),
         unpacked_fixed32: FIXED32_VALUES.into(),
+        packed_fixed64: FIXED64_VALUES.into(),
+        unpacked_fixed64: FIXED64_VALUES.into(),
     }
 }
 
@@ -120,11 +131,16 @@ fn extract_packed_fields_visitor() {
                         .into_packed_varints()
                         .map(|r| ScalarField::Varint(r.unwrap())),
                 ),
-                6 => Either::Right(
+                6 => Either::Right(Either::Left(
                     value
                         .into_packed_i32s()
                         .map(|r| ScalarField::I32(r.unwrap())),
-                ),
+                )),
+                8 => Either::Right(Either::Right(
+                    value
+                        .into_packed_i64s()
+                        .map(|r| ScalarField::I64(r.unwrap())),
+                )),
                 x => panic!("unexpected length-delimited field {x}"),
             };
             events.entry(field_number).or_default().extend(iter);
@@ -162,7 +178,13 @@ fn extract_packed_fields_parse() {
                     let it = value
                         .into_packed::<I32>()
                         .map(|r| ScalarField::I32(r.unwrap()));
-                    Either::Right(it)
+                    Either::Right(Either::Left(it))
+                }
+                8 => {
+                    let it = value
+                        .into_packed::<I64>()
+                        .map(|r| ScalarField::I64(r.unwrap()));
+                    Either::Right(Either::Right(it))
                 }
                 1 => continue,
                 field_number => panic!("unknown field {field_number}"),

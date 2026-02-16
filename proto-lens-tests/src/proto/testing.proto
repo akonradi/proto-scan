@@ -22,9 +22,11 @@ message WithRepeats {
   repeated bool packed_bool = 3;
 
   repeated uint64 packed_varint = 4;
-
   repeated uint64 unpacked_varint = 5 [packed = false];
 
   repeated fixed32 packed_fixed32 = 6;
   repeated fixed32 unpacked_fixed32 = 7 [packed = false];
+  
+  repeated fixed64 packed_fixed64 = 8;
+  repeated fixed64 unpacked_fixed64 = 9 [packed = false];
 }
