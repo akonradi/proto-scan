@@ -12,17 +12,17 @@ pub struct Builder<T> {
 }
 
 pub trait DynLengthDelimited<'a> {
-    fn as_bytes(self: Box<Self>) -> Result<Vec<u8>, DecodeError<Box<dyn std::error::Error>>>;
+    fn into_bytes(self: Box<Self>) -> Result<Vec<u8>, DecodeError<Box<dyn std::error::Error>>>;
 
-    fn as_packed_varints(
+    fn into_packed_varints(
         self: Box<Self>,
     ) -> Box<dyn Iterator<Item = Result<u64, DecodeError<Box<dyn std::error::Error>>>> + 'a>;
 
-    fn as_packed_i32s(
+    fn into_packed_i32s(
         self: Box<Self>,
     ) -> Box<dyn Iterator<Item = Result<u32, DecodeError<Box<dyn std::error::Error>>>> + 'a>;
 
-    fn as_packed_i64s(
+    fn into_packed_i64s(
         self: Box<Self>,
     ) -> Box<dyn Iterator<Item = Result<u64, DecodeError<Box<dyn std::error::Error>>>> + 'a>;
 }
@@ -32,10 +32,10 @@ struct DynLengthDelimitedImpl<L>(L);
 impl<'a, L: VisitMessage + crate::wire::LengthDelimited + 'a> DynLengthDelimited<'a>
     for DynLengthDelimitedImpl<L>
 {
-    fn as_bytes(self: Box<Self>) -> Result<Vec<u8>, DecodeError<Box<dyn std::error::Error>>> {
+    fn into_bytes(self: Box<Self>) -> Result<Vec<u8>, DecodeError<Box<dyn std::error::Error>>> {
         let DynLengthDelimitedImpl(inner) = *self;
 
-        let buffer = inner.as_bytes().map_err(|e| match e {
+        let buffer = inner.into_bytes().map_err(|e| match e {
             DecodeError::Read(e) => DecodeError::Read(Box::new(e) as Box<dyn std::error::Error>),
             DecodeError::UnexpectedEnd => DecodeError::UnexpectedEnd,
             DecodeError::UnterminatedVarint => DecodeError::UnterminatedVarint,
@@ -45,32 +45,32 @@ impl<'a, L: VisitMessage + crate::wire::LengthDelimited + 'a> DynLengthDelimited
         Ok(buffer.as_ref().into())
     }
 
-    fn as_packed_varints(
+    fn into_packed_varints(
         self: Box<Self>,
     ) -> Box<dyn Iterator<Item = Result<u64, DecodeError<Box<dyn std::error::Error>>>> + 'a> {
         Box::new(
             self.0
-                .as_packed::<Varint>()
+                .into_packed::<Varint>()
                 .map(move |r| r.map_err(|e| DecodeError::map_read(e, |e| Box::new(e) as Box<_>))),
         )
     }
 
-    fn as_packed_i32s(
+    fn into_packed_i32s(
         self: Box<Self>,
     ) -> Box<dyn Iterator<Item = Result<u32, DecodeError<Box<dyn std::error::Error>>>> + 'a> {
         Box::new(
             self.0
-                .as_packed::<I32>()
+                .into_packed::<I32>()
                 .map(move |r| r.map_err(|e| DecodeError::map_read(e, |e| Box::new(e) as Box<_>))),
         )
     }
 
-    fn as_packed_i64s(
+    fn into_packed_i64s(
         self: Box<Self>,
     ) -> Box<dyn Iterator<Item = Result<u64, DecodeError<Box<dyn std::error::Error>>>> + 'a> {
         Box::new(
             self.0
-                .as_packed::<I64>()
+                .into_packed::<I64>()
                 .map(move |r| r.map_err(|e| DecodeError::map_read(e, |e| Box::new(e) as Box<_>))),
         )
     }

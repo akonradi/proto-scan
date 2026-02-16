@@ -116,10 +116,10 @@ fn extract_packed_fields_visitor() {
                 1 => return,
                 2 | 3 | 4 => Either::Left(
                     value
-                        .as_packed_varints()
+                        .into_packed_varints()
                         .map(|r| ScalarField::Varint(r.unwrap())),
                 ),
-                6 => Either::Right(value.as_packed_i32s().map(|r| ScalarField::I32(r.unwrap()))),
+                6 => Either::Right(value.into_packed_i32s().map(|r| ScalarField::I32(r.unwrap()))),
                 x => panic!("unexpected length-delimited field {x}"),
             };
             events.entry(field_number).or_default().extend(iter);
@@ -148,13 +148,13 @@ fn extract_packed_fields_parse() {
             ParseEvent::LengthDelimited(value) => match field_number.into() {
                 2 | 3 | 4 => {
                     let it = value
-                        .as_packed::<Varint>()
+                        .into_packed::<Varint>()
                         .map(|r| ScalarField::Varint(r.unwrap()));
                     Either::Left(it)
                 }
                 6 => {
                     let it = value
-                        .as_packed::<I32>()
+                        .into_packed::<I32>()
                         .map(|r| ScalarField::I32(r.unwrap()));
                     Either::Right(it)
                 }
@@ -181,13 +181,13 @@ fn extract_string() {
         match event {
             ParseEvent::LengthDelimited(l) => {
                 if field_number == 1 {
-                    let mut reader = l.as_events();
+                    let mut reader = l.into_events();
                     while let Some(event) = reader.next() {
                         let (_field_number, event) = event.unwrap();
                         match event {
                             ParseEvent::LengthDelimited(l) => {
                                 if field_number == 1 {
-                                    let bytes = l.as_bytes().unwrap();
+                                    let bytes = l.into_bytes().unwrap();
                                     let bytes = bytes.as_ref();
                                     assert_eq!(bytes, b"ABC");
                                 }

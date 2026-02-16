@@ -79,7 +79,7 @@ mod test {
         let visitor = Builder::new(&mut extracted)
             .set_on_length_delimited(|extracted, _field_number, delimited| {
                 assert_matches!(
-                    extracted.replace(delimited.as_bytes().expect("can read")),
+                    extracted.replace(delimited.into_bytes().expect("can read")),
                     None
                 );
             })

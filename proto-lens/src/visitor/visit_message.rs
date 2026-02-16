@@ -21,24 +21,24 @@ impl<L: LengthDelimited> LengthDelimited for VisitMessageImpl<'_, L> {
         self.inner.len()
     }
 
-    fn as_packed<W: ScalarWireType>(
+    fn into_packed<W: ScalarWireType>(
         self,
     ) -> impl Iterator<Item = Result<W::Repr, DecodeError<Self::Error>>> {
-        self.inner.as_packed::<W>()
+        self.inner.into_packed::<W>()
     }
 
-    fn as_bytes(self) -> Result<Self::Buffer, DecodeError<Self::Error>> {
-        self.inner.as_bytes()
+    fn into_bytes(self) -> Result<Self::Buffer, DecodeError<Self::Error>> {
+        self.inner.into_bytes()
     }
 
-    fn as_events(self) -> impl ParseEventReader<Error = Self::Error> {
-        self.inner.as_events()
+    fn into_events(self) -> impl ParseEventReader<Error = Self::Error> {
+        self.inner.into_events()
     }
 }
 
 impl<L: LengthDelimited> VisitMessage for VisitMessageImpl<'_, L> {
     fn visit_message(self, visitor: impl Visitor) {
-        let reader = self.inner.as_events();
+        let reader = self.inner.into_events();
         *self.result = super::visit_message(reader, visitor);
     }
 }

@@ -36,16 +36,16 @@ pub trait LengthDelimited: ReadTypes {
     /// returns the next value or an error if it cannot be decoded. If the
     /// iterator is dropped before it is exhausted, the remaining values and/or
     /// read errors are dropped.
-    fn as_packed<W: ScalarWireType>(
+    fn into_packed<W: ScalarWireType>(
         self,
     ) -> impl Iterator<Item = Result<W::Repr, DecodeError<Self::Error>>>;
 
     /// Reads the contents of the delimited field as bytes.
-    fn as_bytes(self) -> Result<Self::Buffer, DecodeError<Self::Error>>;
+    fn into_bytes(self) -> Result<Self::Buffer, DecodeError<Self::Error>>;
 
     /// Consumes the contents of the field as a sequence of [`ParseEvent`]s in
     /// the form of a [`ParseEventReader`].
-    fn as_events(self) -> impl ParseEventReader<Error = Self::Error>;
+    fn into_events(self) -> impl ParseEventReader<Error = Self::Error>;
 }
 
 /// Protobuf parser that interprets a message as a sequence of events.
@@ -117,7 +117,7 @@ mod test {
             _ => panic!("invalid"),
         };
 
-        assert_eq!(length_delimited.as_bytes().unwrap().as_ref(), b"testing");
+        assert_eq!(length_delimited.into_bytes().unwrap().as_ref(), b"testing");
     }
 
     #[test]
@@ -145,7 +145,7 @@ mod test {
         let mut iter = match parse.next().unwrap().unwrap() {
             (field_number, ParseEvent::LengthDelimited(value)) => {
                 assert_eq!(field_number, 1);
-                value.as_packed::<Varint>()
+                value.into_packed::<Varint>()
             }
             (
                 field_number,
@@ -222,7 +222,7 @@ mod test {
             }
         };
         {
-            let mut embedded_events = embedded.as_events();
+            let mut embedded_events = embedded.into_events();
             match embedded_events.next().unwrap().unwrap() {
                 (FieldNumber(6), ParseEvent::Scalar(ScalarField::Varint(1))) => {}
                 (

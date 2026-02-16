@@ -48,7 +48,7 @@ impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedI
         self.reader.remaining()
     }
 
-    fn as_bytes(mut self) -> Result<R::Buffer, DecodeError<R::Error>> {
+    fn into_bytes(mut self) -> Result<R::Buffer, DecodeError<R::Error>> {
         let remaining = self.reader.remaining();
         let bytes = self.reader.read(remaining).map_err(DecodeError::Read)?;
         if bytes.as_ref().len() != remaining as usize {
@@ -58,13 +58,13 @@ impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedI
         Ok(bytes)
     }
 
-    fn as_packed<W: ScalarWireType>(
+    fn into_packed<W: ScalarWireType>(
         self,
     ) -> impl Iterator<Item = Result<W::Repr, DecodeError<R::Error>>> {
         ScalarIter::<_, W>::new(self)
     }
 
-    fn as_events(self) -> impl ParseEventReader<Error = Self::Error> {
+    fn into_events(self) -> impl ParseEventReader<Error = Self::Error> {
         EventReader {
             inner: Either::Right(self),
             do_before: DoBeforeNext::DoNothing,
