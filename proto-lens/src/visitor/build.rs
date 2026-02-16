@@ -18,6 +18,7 @@ where
     on_group_op: G,
 }
 
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum GroupOp {
     Start,
     End,

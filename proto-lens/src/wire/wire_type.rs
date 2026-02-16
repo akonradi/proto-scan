@@ -2,12 +2,15 @@ use std::convert::Infallible as Never;
 
 use crate::DecodeError;
 use crate::read::Read;
+use crate::wire::ScalarField;
 
-pub trait ScalarWireType {
+pub trait ScalarWireType: sealed::Sealed {
     type Repr;
     const BYTE_LEN: std::ops::RangeInclusive<u8>;
 
     fn read_from<R: Read>(r: &mut R) -> Result<Self::Repr, DecodeError<R::Error>>;
+
+    fn from_value(s: ScalarField) -> Option<Self::Repr>;
 }
 
 pub struct Varint(Never);
@@ -17,7 +20,6 @@ pub struct I64(Never);
 pub struct I32(Never);
 
 mod sealed {
-    #[allow(dead_code)]
     pub trait Sealed {}
 
     impl Sealed for super::Varint {}
@@ -25,13 +27,19 @@ mod sealed {
     impl Sealed for super::I32 {}
 }
 
-
 impl ScalarWireType for Varint {
     type Repr = u64;
     const BYTE_LEN: std::ops::RangeInclusive<u8> = 1..=10;
 
     fn read_from<R: Read>(r: &mut R) -> Result<Self::Repr, DecodeError<R::Error>> {
         super::parse_base128_varint(r)
+    }
+
+    fn from_value(s: ScalarField) -> Option<Self::Repr> {
+        match s {
+            ScalarField::Varint(v) => Some(v),
+            ScalarField::I64(_) | ScalarField::I32(_) => None,
+        }
     }
 }
 
@@ -58,6 +66,13 @@ impl ScalarWireType for I64 {
     fn read_from<R: Read>(r: &mut R) -> Result<Self::Repr, DecodeError<R::Error>> {
         read_fixed_from(r)
     }
+
+    fn from_value(s: ScalarField) -> Option<Self::Repr> {
+        match s {
+            ScalarField::I64(i) => Some(i),
+            ScalarField::Varint(_) | ScalarField::I32(_) => None,
+        }
+    }
 }
 
 impl ScalarWireType for I32 {
@@ -66,6 +81,13 @@ impl ScalarWireType for I32 {
 
     fn read_from<R: Read>(r: &mut R) -> Result<Self::Repr, DecodeError<R::Error>> {
         read_fixed_from(r)
+    }
+
+    fn from_value(s: ScalarField) -> Option<Self::Repr> {
+        match s {
+            ScalarField::I32(i) => Some(i),
+            ScalarField::Varint(_) | ScalarField::I64(_) => None,
+        }
     }
 }
 
