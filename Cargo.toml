@@ -1,4 +1,9 @@
 [workspace]
-members = ["proto-lens", "proto-lens-tests"]
-default-members = ["proto-lens", "proto-lens-tests"]
+members = [
+    "proto-lens",
+    "proto-lens-protoc-ext",
+    "proto-lens-protoc-tests",
+    "proto-lens-scan",
+    "proto-lens-tests",
+]
 resolver = "3"

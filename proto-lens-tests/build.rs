@@ -5,4 +5,6 @@ fn main() -> Result<()> {
         .protoc_arg("--experimental_allow_proto3_optional")
         .compile_protos(&["src/proto/testing.proto"], &["src/proto/"])?;
     Ok(())
+
+    
 }
