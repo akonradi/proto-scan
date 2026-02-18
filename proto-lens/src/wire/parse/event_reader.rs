@@ -5,7 +5,7 @@ use crate::read::count_reader::CountReader;
 use crate::read::{Read, ReadError};
 use crate::wire::parse::{DoBeforeNext, LengthDelimitedImpl, LimitReader};
 use crate::wire::{
-    FieldNumber, I32, I64, LengthDelimited, ParseEvent, ParseEventReader, ScalarField,
+    FieldNumber, GroupOp, I32, I64, LengthDelimited, ParseEvent, ParseEventReader, ScalarField,
     ScalarWireType, Tag, Varint, WireType,
 };
 
@@ -65,8 +65,8 @@ impl<'a, R: Read> ParseEventReader for EventReader<'a, R> {
                     .map(|value| ParseEvent::Scalar(ScalarField::I64(value))),
                 WireType::I32 => I32::read_from(&mut &mut self.inner)
                     .map(|value| ParseEvent::Scalar(ScalarField::I32(value))),
-                WireType::Sgroup => Ok(ParseEvent::StartGroup),
-                WireType::Egroup => Ok(ParseEvent::EndGroup),
+                WireType::Sgroup => Ok(ParseEvent::Group(GroupOp::Start)),
+                WireType::Egroup => Ok(ParseEvent::Group(GroupOp::End)),
                 WireType::LengthDelimited => {
                     let to_skip = match (|| {
                         let length = Varint::read_from(&mut self.inner)?;

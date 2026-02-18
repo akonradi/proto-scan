@@ -4,12 +4,14 @@ use crate::DecodeError;
 use crate::read::Read;
 
 pub use field_number::{FieldNumber, InvalidFieldNumber};
+pub use group_op::GroupOp;
 pub use parse::{LengthDelimited, ParseEvent, ParseEventReader, parse};
 pub use scalar_field::ScalarField;
 pub(crate) use tag::{Tag, WireType};
 pub use wire_type::{I32, I64, ScalarWireType, Varint};
 
 mod field_number;
+mod group_op;
 mod parse;
 mod scalar_field;
 mod tag;

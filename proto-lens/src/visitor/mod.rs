@@ -1,7 +1,9 @@
 use crate::DecodeError;
-use crate::wire::{FieldNumber, LengthDelimited, ParseEvent, ParseEventReader, ScalarField};
+use crate::wire::{
+    FieldNumber, GroupOp, LengthDelimited, ParseEvent, ParseEventReader, ScalarField,
+};
 #[cfg(feature = "builder")]
-pub use build::{BuiltVisitor, GroupOp, PackedWireType};
+pub use build::{BuiltVisitor, PackedWireType};
 
 #[cfg(feature = "builder")]
 mod build;
@@ -27,11 +29,8 @@ pub trait Visitor {
         handler: impl VisitMessage + LengthDelimited + 's,
     );
 
-    /// Called when a SGROUP tag is found.
-    fn on_group_begin(&mut self, field_number: FieldNumber);
-
-    /// Called when a EGROUP tag is found.
-    fn on_group_end(&mut self, field_number: FieldNumber);
+    /// Called when a SGROUP or EGROUP tag is found.
+    fn on_group(&mut self, field_number: FieldNumber, op: GroupOp);
 }
 
 /// Allows visiting the contents of a length-delimited message with a
@@ -48,8 +47,7 @@ pub fn visit_message<P: ParseEventReader>(
         let (field_number, event) = event?;
         match event {
             ParseEvent::Scalar(value) => visitor.on_scalar(field_number, value),
-            ParseEvent::StartGroup => visitor.on_group_begin(field_number),
-            ParseEvent::EndGroup => visitor.on_group_end(field_number),
+            ParseEvent::Group(group_op) => visitor.on_group(field_number, group_op),
             ParseEvent::LengthDelimited(length_delimited) => {
                 let mut result = Ok(());
                 visitor.on_length_delimited(

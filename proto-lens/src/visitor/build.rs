@@ -2,7 +2,7 @@ use either::Either;
 
 use crate::DecodeError;
 use crate::visitor::{ScalarField, VisitMessage, Visitor};
-use crate::wire::{FieldNumber, I32, I64, LengthDelimited, ScalarWireType, Varint};
+use crate::wire::{FieldNumber, GroupOp, I32, I64, LengthDelimited, ScalarWireType, Varint};
 
 #[derive(bon::Builder)]
 pub struct BuiltVisitor<T, S, L, G>
@@ -16,12 +16,6 @@ where
     on_scalar: S,
     on_length_delimited: L,
     on_group_op: G,
-}
-
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
-pub enum GroupOp {
-    Start,
-    End,
 }
 
 pub trait DynLengthDelimited<'a> {
@@ -144,12 +138,8 @@ where
         )
     }
 
-    fn on_group_begin(&mut self, field_number: FieldNumber) {
-        (self.on_group_op)(&mut self.state, field_number, GroupOp::Start)
-    }
-
-    fn on_group_end(&mut self, field_number: FieldNumber) {
-        (self.on_group_op)(&mut self.state, field_number, GroupOp::End)
+    fn on_group(&mut self, field_number: FieldNumber, group_op: GroupOp) {
+        (self.on_group_op)(&mut self.state, field_number, group_op)
     }
 }
 

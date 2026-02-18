@@ -5,7 +5,7 @@ use either::Either;
 
 use crate::DecodeError;
 use crate::read::{Read, ReadError, ReadTypes};
-use crate::wire::{FieldNumber, ScalarField, ScalarWireType};
+use crate::wire::{FieldNumber, GroupOp, ScalarField, ScalarWireType};
 
 use event_reader::EventReader;
 use length_delimited::LengthDelimitedImpl;
@@ -73,10 +73,8 @@ pub trait ParseEventReader: ReadError {
 pub enum ParseEvent<L> {
     /// A scalar field was encountered.
     Scalar(ScalarField),
-    /// An group was opened.
-    StartGroup,
-    /// A group was closed.
-    EndGroup,
+    /// An group was opened or closed.
+    Group(GroupOp),
     /// A length-delimited field was encountered.
     LengthDelimited(L),
 }
@@ -147,10 +145,7 @@ mod test {
                 assert_eq!(field_number, 1);
                 value.into_packed::<Varint>()
             }
-            (
-                field_number,
-                ParseEvent::Scalar(_) | ParseEvent::StartGroup | ParseEvent::EndGroup,
-            ) => {
+            (field_number, ParseEvent::Scalar(_) | ParseEvent::Group(_)) => {
                 panic!("wrong event; field = {field_number:?}")
             }
         };
@@ -165,10 +160,7 @@ mod test {
                 assert_eq!(field_number, 2);
                 assert_eq!(scalar_field, ScalarField::I32(0x04030201))
             }
-            (
-                field_number,
-                ParseEvent::StartGroup | ParseEvent::EndGroup | ParseEvent::LengthDelimited(_),
-            ) => {
+            (field_number, ParseEvent::Group(_) | ParseEvent::LengthDelimited(_)) => {
                 panic!("wrong event field {field_number:?}")
             }
         }
@@ -214,10 +206,7 @@ mod test {
                 assert_eq!(field_number, 1);
                 value
             }
-            (
-                field_number,
-                ParseEvent::Scalar(_) | ParseEvent::StartGroup | ParseEvent::EndGroup,
-            ) => {
+            (field_number, ParseEvent::Scalar(_) | ParseEvent::Group(_)) => {
                 panic!("wrong event; field = {field_number:?}")
             }
         };
@@ -227,10 +216,7 @@ mod test {
                 (FieldNumber(6), ParseEvent::Scalar(ScalarField::Varint(1))) => {}
                 (
                     field_number,
-                    ParseEvent::Scalar(_)
-                    | ParseEvent::StartGroup
-                    | ParseEvent::EndGroup
-                    | ParseEvent::LengthDelimited(_),
+                    ParseEvent::Scalar(_) | ParseEvent::Group(_) | ParseEvent::LengthDelimited(_),
                 ) => {
                     panic!("wrong event field {field_number:?}")
                 }
@@ -247,10 +233,7 @@ mod test {
                 assert_eq!(field_number, 2);
                 assert_eq!(scalar_field, ScalarField::I32(0x04030201))
             }
-            (
-                field_number,
-                ParseEvent::StartGroup | ParseEvent::EndGroup | ParseEvent::LengthDelimited(_),
-            ) => {
+            (field_number, ParseEvent::Group(_) | ParseEvent::LengthDelimited(_)) => {
                 panic!("wrong event field {field_number:?}")
             }
         }

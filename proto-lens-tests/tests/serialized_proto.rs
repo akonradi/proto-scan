@@ -110,7 +110,7 @@ fn extract_scalars_parse() {
         let (field_number, event) = event.unwrap();
         match event {
             ParseEvent::Scalar(value) => events.entry(field_number).or_default().push(value),
-            ParseEvent::StartGroup | ParseEvent::EndGroup | ParseEvent::LengthDelimited(_) => {}
+            ParseEvent::Group(_) | ParseEvent::LengthDelimited(_) => {}
         }
     }
 
@@ -189,7 +189,7 @@ fn extract_packed_fields_parse() {
                 1 => continue,
                 field_number => panic!("unknown field {field_number}"),
             },
-            ParseEvent::Scalar(_) | ParseEvent::StartGroup | ParseEvent::EndGroup => {
+            ParseEvent::Scalar(_) | ParseEvent::Group(_) => {
                 continue;
             }
         };
@@ -226,8 +226,7 @@ fn extract_string() {
                 }
             }
             ParseEvent::Scalar(_) => {}
-            ParseEvent::StartGroup => {}
-            ParseEvent::EndGroup => {}
+            ParseEvent::Group(_) => {}
         }
     }
 }
