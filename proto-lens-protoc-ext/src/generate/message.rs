@@ -76,6 +76,33 @@ impl ProtoMessageScanner<'_> {
         }
     }
 
+    fn scan_output_definition(&self) -> TokenStream {
+        let name = format_ident!("{}Output", self.type_name());
+        let scan_types = self.generic_types().collect::<Vec<_>>();
+        let fields = self.field_names();
+        let scan_fields = self.0.message_fields.iter().map(
+            |MessageField {
+                 field_name,
+                 generic,
+                 ..
+             }| quote!(#field_name: ::core::option::Option<#generic>),
+        );
+        quote! {
+            #[derive(Copy, Clone, Debug, PartialEq, Hash)]
+            pub struct #name <#(#scan_types),*> {
+                #(pub #scan_fields ),*
+            }
+
+            impl<#(#scan_types),*> ::core::default::Default for #name <#(#scan_types),*> {
+                fn default() -> Self {
+                    Self {
+                        #(#fields: ::core::option::Option::None),*
+                    }
+                }
+            }
+        }
+    }
+
     fn field_names(&self) -> impl Iterator<Item = &Ident> + Clone {
         self.fields().map(|m| &m.field.field_name)
     }
@@ -96,12 +123,16 @@ impl ProtoMessageScanner<'_> {
 
     fn scan_callbacks_impl(&self) -> TokenStream {
         let scanner_name = self.type_name();
+        let output_name = format_ident!("{scanner_name}Output");
         let scan_event_name = self.scan_event_name();
         let generics = self.generic_types().collect::<Vec<_>>();
         let generics_on_scan_bounds = generics
             .iter()
             .map(|g| quote!(#g: ::proto_lens_scan::OnScanField));
-        let generics_scan_event = generics.iter().map(|g| quote!(#g::ScanEvent));
+        let generics_scan_event = generics
+            .iter()
+            .map(|g| quote!(#g::ScanEvent))
+            .collect::<Vec<_>>();
         let field_arms = |fn_name: &str| {
             let scan_event_name = &scan_event_name;
             let fn_name = format_ident!("{fn_name}");
@@ -119,6 +150,7 @@ impl ProtoMessageScanner<'_> {
         quote! {
             impl <#(#generics_on_scan_bounds,)*> ::proto_lens_scan::ScanCallbacks for #scanner_name<#(#generics,)*> {
                 type ScanEvent = Option<#scan_event_name<#(#generics_scan_event),*>>;
+                type ScanOutput = #output_name<#(#generics_scan_event),*>;
 
                 fn on_scalar(
                     &mut self,
@@ -164,7 +196,10 @@ impl ProtoMessageScanner<'_> {
                 pub fn scan<'r>(
                     self,
                     read: impl ::proto_lens_scan::Read + 'r,
-                ) -> impl ::proto_lens_scan::Scan<Output = <Self as ::proto_lens_scan::ScanCallbacks>::ScanEvent> + 'r
+                ) -> impl ::proto_lens_scan::Scan<
+                        Event = <Self as ::proto_lens_scan::ScanCallbacks>::ScanEvent,
+                        Output = <Self as ::proto_lens_scan::ScanCallbacks>::ScanOutput,
+                    > + 'r
                 where
                     #(#generics_lifetime_bounds,)*
                 {
@@ -177,6 +212,38 @@ impl ProtoMessageScanner<'_> {
     fn scan_event_name(&self) -> Ident {
         let scanner_name = self.type_name();
         Ident::new(&format!("{scanner_name}Event"), Span::call_site())
+    }
+
+    fn output_impl_extend_event(&self) -> TokenStream {
+        let output_name = format_ident!("{}Output", self.type_name());
+        let scan_event_name = self.scan_event_name();
+        let generics = self.generic_types().collect::<Vec<_>>();
+        let item_type = quote! {
+            ::core::option::Option<
+                #scan_event_name<#(#generics),*>
+            >
+        };
+        let field_arms = {
+            self.fields().map(move |MessageScannerField { parent, index, field: MessageField { field_name, generic, field_number, field_type } }| {
+                let event_variant_name = format_ident!("Event{index}");
+                quote! {
+                    #scan_event_name::#event_variant_name(t) => self.#field_name = Some(t),                }
+            })
+        };
+        quote! {
+            impl <
+            #(#generics),*
+            > ::core::iter::Extend<#item_type> for #output_name<#(#generics),*> {
+                fn extend<I: ::core::iter::IntoIterator<Item=#item_type>>(&mut self, items: I) {
+                    for item in items {
+                        let Some(item) = item else {continue};
+                        match item {
+                            #(#field_arms)*
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -261,8 +328,10 @@ pub fn generate_message(message: &DescriptorProto) -> Result<String> {
         type_defn,
         scanner.type_definition(),
         scanner.scan_event_defn(),
+        scanner.scan_output_definition(),
         message.impl_scan_message(),
         scanner.scan_callbacks_impl(),
+        scanner.output_impl_extend_event(),
     ]
     .into_iter()
     .chain(scan_field_impls)

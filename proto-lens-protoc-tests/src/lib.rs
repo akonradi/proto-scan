@@ -102,7 +102,94 @@ mod test {
                     let mut scan = scanner.scan(message.as_slice());
                     while let Some(event) = scan.next() {
                         match event.unwrap() {
-                            Some(proto::testing::ScanScanExampleEvent::Event3(b)) => save_to = Some(b),
+                            Some(proto::testing::ScanScanExampleEvent::Event3(b)) => {
+                                save_to = Some(b)
+                            }
+                            None => {}
+                        }
+                    }
+                }
+
+                assert_eq!(save_to, example_msg().single_bool);
+            }
+        }
+    }
+
+    mod read_all {
+        use super::*;
+
+        #[test]
+        fn empty() {
+            let scanner = proto::testing::ScanExample::scanner().emit_single_bool();
+            let scan = scanner.scan([].as_slice());
+            let read_all = scan.read_all();
+            let proto::testing::ScanScanExampleOutput {
+                single_bool,
+                repeated_msg: None,
+                single_msg: None,
+                repeated_bool: None,
+                oneof_bool: None,
+                oneof_fixed32: None,
+                oneof_message: None,
+            } = read_all.unwrap();
+
+            assert_eq!(single_bool, None);
+        }
+
+        #[test]
+        fn with_field() {
+            let mut save_to = None;
+
+            let scanner = proto::testing::ScanExample::scanner().save_single_bool(&mut save_to);
+            {
+                let message = example_msg().encode_to_vec();
+                let mut scan = scanner.scan(message.as_slice());
+                while let Some(event) = scan.next() {
+                    match event.unwrap() {
+                        None => {}
+                    }
+                }
+            }
+
+            assert_eq!(save_to, example_msg().single_bool);
+        }
+
+        mod emit_single_bool {
+            use super::*;
+
+            #[test]
+            fn empty() {
+                let mut save_to = None::<bool>;
+
+                let scanner = proto::testing::ScanExample::scanner().emit_single_bool();
+                {
+                    let mut scan = scanner.scan([].as_slice());
+                    while let Some(event) = scan.next() {
+                        match event.unwrap() {
+                            Some(proto::testing::ScanScanExampleEvent::Event3(b)) => {
+                                save_to = Some(b);
+                            }
+                            None => {}
+                        }
+                    }
+                }
+
+                assert_eq!(save_to, None);
+            }
+
+            #[test]
+            fn with_field() {
+                let mut save_to = None;
+
+                let scanner = proto::testing::ScanExample::scanner().emit_single_bool();
+                {
+                    let message = example_msg().encode_to_vec();
+                    let mut scan = scanner.scan(message.as_slice());
+                    while let Some(event) = scan.next() {
+                        match event.unwrap() {
+                            Some(proto::testing::ScanScanExampleEvent::Event3(b)) => {
+                                save_to = Some(b)
+                            }
                             None => {}
                         }
                     }

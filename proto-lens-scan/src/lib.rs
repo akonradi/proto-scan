@@ -2,7 +2,9 @@ use std::convert::Infallible as Never;
 use std::marker::PhantomData;
 
 pub use proto_lens::read::Read;
-pub use proto_lens::wire::{FieldNumber, GroupOp, I32, I64, LengthDelimited, ScalarField, Varint, parse};
+pub use proto_lens::wire::{
+    FieldNumber, GroupOp, I32, I64, LengthDelimited, ScalarField, Varint, parse,
+};
 use proto_lens::wire::{ParseEvent, ParseEventReader, ScalarWireType};
 
 pub trait ScanMessage {
@@ -12,13 +14,17 @@ pub trait ScanMessage {
 }
 
 pub trait Scan {
+    type Event;
     type Output;
 
-    fn next(&mut self) -> Option<Result<Self::Output, StopScan>>;
+    fn next(&mut self) -> Option<Result<Self::Event, StopScan>>;
+
+    fn read_all(self) -> Result<Self::Output, StopScan>;
 }
 
 pub trait ScanCallbacks {
     type ScanEvent;
+    type ScanOutput: Default + Extend<Self::ScanEvent>;
 
     fn on_scalar(
         &mut self,
@@ -44,7 +50,8 @@ impl<P, S> ScanWith<P, S> {
 }
 
 impl<P: ParseEventReader, S: ScanCallbacks> Scan for ScanWith<P, S> {
-    type Output = S::ScanEvent;
+    type Event = S::ScanEvent;
+    type Output = S::ScanOutput;
 
     fn next(&mut self) -> Option<Result<S::ScanEvent, StopScan>> {
         let Self(parse, fields) = self;
@@ -60,6 +67,14 @@ impl<P: ParseEventReader, S: ScanCallbacks> Scan for ScanWith<P, S> {
             ParseEvent::LengthDelimited(l) => fields.on_length_delimited(field_number, l),
         };
         Some(output)
+    }
+
+    fn read_all(mut self) -> Result<Self::Output, StopScan> {
+        let mut output = Self::Output::default();
+        while let Some(event) = self.next() {
+            output.extend(Some(event?));
+        }
+        Ok(output)
     }
 }
 
@@ -149,7 +164,7 @@ impl<A: OnScanField, B: OnScanField, C: OnScanField, D: OnScanField> ScanExample
     fn scan<'r>(
         self,
         read: impl Read + 'r,
-    ) -> impl Scan<Output = <Self as ScanCallbacks>::ScanEvent> + 'r
+    ) -> impl Scan<Event = <Self as ScanCallbacks>::ScanEvent> + 'r
     where
         A: 'r,
         B: 'r,
@@ -164,6 +179,12 @@ impl<A: OnScanField, B: OnScanField, C: OnScanField, D: OnScanField> ScanCallbac
     for ScanExampleScan<A, B, C, D>
 {
     type ScanEvent = Option<ScanEvent4<A::ScanEvent, B::ScanEvent, C::ScanEvent, D::ScanEvent>>;
+    type ScanOutput = ScanExampleScan<
+        Option<A::ScanEvent>,
+        Option<B::ScanEvent>,
+        Option<C::ScanEvent>,
+        Option<D::ScanEvent>,
+    >;
 
     fn on_scalar(
         &mut self,
@@ -213,6 +234,28 @@ impl<A: OnScanField, B: OnScanField, C: OnScanField, D: OnScanField> ScanCallbac
                 .map(ScanEvent4::Event3),
             _ => None,
         })
+    }
+}
+
+impl<A, B, C, D> Extend<Option<ScanEvent4<A, B, C, D>>>
+    for ScanExampleScan<Option<A>, Option<B>, Option<C>, Option<D>>
+{
+    fn extend<T: IntoIterator<Item = Option<ScanEvent4<A, B, C, D>>>>(&mut self, iter: T) {
+        let Self {
+            repeated_msg,
+            single_msg,
+            repeated_bool,
+            single_bool,
+        } = self;
+        for event in iter {
+            let Some(event) = event else { continue };
+            match event {
+                ScanEvent4::Event0(e) => *repeated_msg = Some(e),
+                ScanEvent4::Event1(e) => *single_msg = Some(e),
+                ScanEvent4::Event2(e) => *repeated_bool = Some(e),
+                ScanEvent4::Event3(e) => *single_bool = Some(e),
+            }
+        }
     }
 }
 

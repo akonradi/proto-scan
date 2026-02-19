@@ -57,6 +57,10 @@ impl CompileScan for prost_build::Config {
 
             println!("writing to {output_path:?}: {}", content.len());
             write_file_if_changed(&output_path, content.as_bytes())?;
+
+            if let Ok(p) = std::env::var("RUSTFMT")
+                && !p.is_empty()
+            {}
         }
 
         Ok(())
