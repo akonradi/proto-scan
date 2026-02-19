@@ -1,6 +1,8 @@
 use proc_macro2::TokenStream;
-use prost_types::field_descriptor_proto::Type;
+use prost_types::FieldDescriptorProto;
+use prost_types::field_descriptor_proto::{Label, Type};
 use quote::{format_ident, quote};
+use syn::parse_quote;
 
 use crate::generate::message::{MessageField, ProtoMessage};
 
@@ -8,6 +10,63 @@ pub struct MessageScannerField<'m> {
     pub parent: &'m ProtoMessage,
     pub index: usize,
     pub field: &'m MessageField,
+}
+
+pub enum FieldType {
+    Single(SingleFieldType),
+    Unsupported,
+}
+
+pub enum SingleFieldType {
+    Bool,
+    FixedU64,
+}
+impl SingleFieldType {
+    
+    fn repr_type(&self) -> syn::Path {
+        match self {
+            SingleFieldType::Bool => parse_quote!(::core::primitive::bool),
+            SingleFieldType::FixedU64 => parse_quote!(::core::primitive::u64),
+        }
+    }
+    
+    fn encoding_type(&self) -> syn::Path {
+        match self {
+            SingleFieldType::Bool => parse_quote!(::proto_lens_scan::encoding::Varint<::core::primitive::bool>),
+            SingleFieldType::FixedU64 => parse_quote!(::proto_lens_scan::encoding::Fixed<::core::primitive::u64>),
+        }
+    }
+}
+
+impl From<&FieldDescriptorProto> for FieldType {
+    fn from(value: &FieldDescriptorProto) -> Self {
+        let label = value.label();
+        match (value.r#type(), label) {
+            (Type::Bool, Label::Optional | Label::Required) => Self::Single(SingleFieldType::Bool),
+            (Type::Fixed64, Label::Optional | Label::Required) => Self::Single(SingleFieldType::FixedU64),
+            (
+                Type::Double
+                | Type::Float
+                | Type::Int64
+                | Type::Uint64
+                | Type::Int32
+                | Type::Fixed64
+                | Type::Fixed32
+                | Type::Bool
+                | Type::String
+                | Type::Group
+                | Type::Message
+                | Type::Bytes
+                | Type::Uint32
+                | Type::Enum
+                | Type::Sfixed32
+                | Type::Sfixed64
+                | Type::Sint32
+                | Type::Sint64,
+                Label::Optional | Label::Repeated | Label::Required,
+            ) => Self::Unsupported,
+        }
+    }
 }
 
 impl MessageScannerField<'_> {
@@ -31,19 +90,22 @@ impl MessageScannerField<'_> {
         let after_no_op = generic_types.skip(*index + 1).collect::<Vec<_>>();
 
         let impl_fns = match field_type {
-            Type::Bool => {
+            FieldType::Single(single) => {
+                let encoding_type = single.encoding_type();
+                let repr_type = single.repr_type();
+
                 let save_fn = format_ident!("save_{field_name}");
                 let save_fn = quote! {
                     pub fn #save_fn <'t>(
                         self,
-                        to: &'t mut impl From<bool>,
+                        to: &'t mut impl From<#repr_type>,
                     ) -> #scanner_name<
                             #(#before_no_op,)*
                             impl ::proto_lens_scan::OnScanField<ScanEvent = ::core::convert::Infallible> + 't,
                             #(#after_no_op,)*
                     > {
                         let Self { #(#scanner_fields,)* } = self;
-                        let #field_name = ::proto_lens_scan::SaveField::<'_, ::proto_lens_scan::Varint, bool, _>::new(to);
+                        let #field_name = ::proto_lens_scan::SaveField::<'_, #encoding_type, _>::new(to);
                         #scanner_name { #(#scanner_fields,)* }
                     }
                 };
@@ -53,33 +115,17 @@ impl MessageScannerField<'_> {
                         self,
                     ) -> #scanner_name<
                             #(#before_no_op,)*
-                            impl ::proto_lens_scan::OnScanField<ScanEvent = bool> + 't,
+                            impl ::proto_lens_scan::OnScanField<ScanEvent = #repr_type> + 't,
                             #(#after_no_op,)*
                     > {
                         let Self { #(#scanner_fields,)* } = self;
-                        let #field_name = ::proto_lens_scan::EmitScalarField::<::proto_lens_scan::Varint, bool>::new();
+                        let #field_name = ::proto_lens_scan::EmitScalarField::<#encoding_type>::new();
                         #scanner_name { #(#scanner_fields,)* }
                     }
                 };
                 vec![save_fn, emit_fn]
             }
-            Type::Double
-            | Type::Float
-            | Type::Int64
-            | Type::Uint64
-            | Type::Int32
-            | Type::Fixed64
-            | Type::Fixed32
-            | Type::String
-            | Type::Group
-            | Type::Message
-            | Type::Bytes
-            | Type::Uint32
-            | Type::Enum
-            | Type::Sfixed32
-            | Type::Sfixed64
-            | Type::Sint32
-            | Type::Sint64 => Vec::<TokenStream>::new(),
+            FieldType::Unsupported => Vec::<TokenStream>::new(),
         };
 
         let before_no_op2 = before_no_op.clone();

@@ -4,7 +4,7 @@ use quote::{ToTokens, format_ident, quote};
 use std::io::Result;
 use syn::Ident;
 
-use crate::generate::message::field::MessageScannerField;
+use crate::generate::message::field::{FieldType, MessageScannerField};
 
 pub mod field;
 
@@ -251,9 +251,8 @@ struct MessageField {
     field_name: Ident,
     generic: Ident,
     field_number: u32,
-    field_type: prost_types::field_descriptor_proto::Type,
+    field_type: FieldType,
 }
-
 impl TryFrom<&DescriptorProto> for ProtoMessage {
     type Error = std::io::Error;
 
@@ -286,7 +285,7 @@ impl TryFrom<&DescriptorProto> for ProtoMessage {
                         .number()
                         .try_into()
                         .map_err(|_| std::io::Error::other("invalid field number"))?,
-                    field_type: f.r#type(),
+                    field_type: f.into(),
                     generic,
                 })
             })

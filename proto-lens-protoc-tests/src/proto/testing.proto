@@ -42,4 +42,5 @@ message ScanExample {
     fixed32 oneof_fixed32 = 6;
     MultiFieldMessage oneof_message = 7;
   }
+  optional fixed64 single_fixed64 = 8;
 }

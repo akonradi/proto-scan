@@ -81,6 +81,12 @@ impl<P: ParseEventReader, S: ScanCallbacks> Scan for ScanWith<P, S> {
 #[derive(Debug)]
 pub struct StopScan;
 
+impl From<Never> for StopScan {
+    fn from(value: Never) -> Self {
+        match value {}
+    }
+}
+
 pub struct ScanSingleImpl<T>(T);
 
 /// Implemented by a visitor for a fixed [`FieldNumber`].
@@ -274,7 +280,7 @@ impl<A, B, C> ScanExampleScan<A, B, C, NoOp> {
             repeated_msg,
             single_msg,
             repeated_bool,
-            single_bool: SaveField::<'t, Varint, bool, _>(to, PhantomData),
+            single_bool: SaveField::<'t, encoding::Varint<bool>, _>(to, PhantomData),
         }
     }
 
@@ -289,59 +295,98 @@ impl<A, B, C> ScanExampleScan<A, B, C, NoOp> {
             repeated_msg,
             single_msg,
             repeated_bool,
-            single_bool: EmitScalarField::<Varint, bool>(PhantomData),
+            single_bool: EmitScalarField::<encoding::Varint<bool>>(PhantomData),
         }
     }
 }
 
-pub struct EmitScalarField<W, T>(PhantomData<(W, T)>);
+pub struct EmitScalarField<E>(PhantomData<E>);
 
-impl OnScanField for EmitScalarField<Varint, bool> {
-    type ScanEvent = bool;
+pub mod encoding {
+    use std::convert::Infallible;
+    use std::marker::PhantomData;
 
-    fn on_scalar(&mut self, value: ScalarField) -> Result<Option<bool>, StopScan> {
-        match value {
-            ScalarField::Varint(0) => Ok(Some(false)),
-            ScalarField::Varint(1) => Ok(Some(true)),
-            _ => Err(StopScan),
+    use proto_lens::wire::ScalarWireType;
+
+    pub struct Varint<T>(PhantomData<T>);
+    pub struct Fixed<T>(PhantomData<T>);
+    pub struct ZigZag<T>(PhantomData<T>);
+
+    pub trait Encoding {
+        type Wire: ScalarWireType;
+        type Repr;
+        type Error: Into<super::StopScan>;
+
+        fn decode(wire: <Self::Wire as ScalarWireType>::Repr) -> Result<Self::Repr, Self::Error>;
+    }
+
+    impl Encoding for Varint<bool> {
+        type Wire = super::Varint;
+
+        type Repr = bool;
+        type Error = super::StopScan;
+
+        fn decode(wire: <Self::Wire as ScalarWireType>::Repr) -> Result<bool, super::StopScan> {
+            match wire {
+                0 => Ok(false),
+                1 => Ok(true),
+                _ => Err(super::StopScan),
+            }
         }
     }
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<bool>, StopScan> {
+    impl Encoding for Fixed<u64> {
+        type Wire = super::I64;
+
+        type Repr = u64;
+        type Error = Infallible;
+
+        fn decode(wire: u64) -> Result<u64, Infallible> {
+            Ok(wire)
+        }
+    }
+}
+
+impl<E: encoding::Encoding> OnScanField for EmitScalarField<E> {
+    type ScanEvent = E::Repr;
+
+    fn on_scalar(&mut self, value: ScalarField) -> Result<Option<Self::ScanEvent>, StopScan> {
+        let value = <E::Wire as ScalarWireType>::from_value(value).ok_or(StopScan)?;
+        E::decode(value).map(Some).map_err(Into::into)
+    }
+
+    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
     }
 
     fn on_length_delimited(
         &mut self,
         _delimited: impl LengthDelimited,
-    ) -> Result<Option<bool>, StopScan> {
+    ) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
     }
 }
 
-impl<W, T> EmitScalarField<W, T> {
+impl<T> EmitScalarField<T> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
 }
 
-pub struct SaveField<'t, W, T, D>(&'t mut D, PhantomData<(W, T)>);
+pub struct SaveField<'t, E, D>(&'t mut D, PhantomData<E>);
 
-impl<'t, W, T, D> SaveField<'t, W, T, D> {
+impl<'t, E, D> SaveField<'t, E, D> {
     pub fn new(to: &'t mut D) -> Self {
         Self(to, PhantomData)
     }
 }
 
-impl<'t, D: From<bool>> OnScanField for SaveField<'t, Varint, bool, D> {
+impl<'t, E: encoding::Encoding, D: From<E::Repr>> OnScanField for SaveField<'t, E, D> {
     type ScanEvent = Never;
 
     fn on_scalar(&mut self, value: ScalarField) -> Result<Option<Never>, StopScan> {
-        match value {
-            ScalarField::Varint(0) => *self.0 = false.into(),
-            ScalarField::Varint(1) => *self.0 = true.into(),
-            _ => return Err(StopScan),
-        }
+        let value = <E::Wire as ScalarWireType>::from_value(value).ok_or(StopScan)?;
+        *self.0 = E::decode(value).map_err(Into::into)?.into();
         Ok(None)
     }
 
