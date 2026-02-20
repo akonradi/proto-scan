@@ -1,7 +1,0 @@
-[package]
-name = "proto-lens-scan"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-proto-lens = { path = "../proto-lens" }

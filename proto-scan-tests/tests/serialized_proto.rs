@@ -3,17 +3,17 @@ use std::sync::LazyLock;
 
 use either::Either;
 use prost::Message;
-use proto_lens::wire::{
+use proto_scan::wire::{
     FieldNumber, I32, I64, LengthDelimited, ParseEvent, ParseEventReader, ScalarField, Varint,
 };
-use proto_lens_tests::proto;
+use proto_scan_tests::{proto, prost_proto};
 
 const VARINT_VALUES: [u64; 3] = [19488045, 173485432435, 894];
 const FIXED32_VALUES: [u32; 4] = [4, 5, 819491, 48];
 const FIXED64_VALUES: [u64; 4] = [19483, 8584939584, u64::MAX, 0];
 const BOOL_VALUES: [bool; 5] = [true, true, false, false, true];
-const ENUM_VALUES: [proto::with_repeats::EnumType; 3] = {
-    use proto::with_repeats::EnumType;
+const ENUM_VALUES: [prost_proto::with_repeats::EnumType; 3] = {
+    use prost_proto::with_repeats::EnumType;
     [EnumType::A, EnumType::B, EnumType::C]
 };
 
@@ -61,9 +61,9 @@ static PACKED_FIELDS: LazyLock<HashMap<FieldNumber, Vec<ScalarField>>> = LazyLoc
     ])
 });
 
-fn with_repeats() -> proto::WithRepeats {
-    proto::WithRepeats {
-        messages: vec![proto::MultiFieldMessage {
+fn with_repeats() -> prost_proto::WithRepeats {
+    prost_proto::WithRepeats {
+        messages: vec![prost_proto::MultiFieldMessage {
             id: 1,
             name: "ABC".to_string(),
         }],
@@ -83,15 +83,15 @@ fn extract_scalars_visitor() {
     let bytes = with_repeats().encode_to_vec();
     let mut events = HashMap::<_, Vec<_>>::new();
 
-    let builder = proto_lens::visitor::BuiltVisitor::builder(&mut events)
+    let builder = proto_scan::visitor::BuiltVisitor::builder(&mut events)
         .on_scalar(|events, field_number, value| {
             events.entry(field_number).or_default().push(value);
         })
         .on_group_op(|_, _, _| ())
         .on_length_delimited(|_, _, _| ());
 
-    let r = proto_lens::visitor::visit_message(
-        proto_lens::wire::parse(&mut bytes.as_slice()),
+    let r = proto_scan::visitor::visit_message(
+        proto_scan::wire::parse(&mut bytes.as_slice()),
         builder.build(),
     );
     assert_eq!(r, Ok(()));
@@ -105,7 +105,7 @@ fn extract_scalars_parse() {
 
     let bytes = with_repeats().encode_to_vec();
     let mut read = bytes.as_slice();
-    let mut reader = proto_lens::wire::parse(&mut read);
+    let mut reader = proto_scan::wire::parse(&mut read);
     while let Some(event) = reader.next() {
         let (field_number, event) = event.unwrap();
         match event {
@@ -122,7 +122,7 @@ fn extract_packed_fields_visitor() {
     let bytes = with_repeats().encode_to_vec();
     let mut events = HashMap::<_, Vec<_>>::new();
 
-    let builder = proto_lens::visitor::BuiltVisitor::builder(&mut events)
+    let builder = proto_scan::visitor::BuiltVisitor::builder(&mut events)
         .on_length_delimited(|events, field_number, value| {
             let iter = match field_number.into() {
                 1 => return,
@@ -148,8 +148,8 @@ fn extract_packed_fields_visitor() {
         .on_scalar(|_, _, _| ())
         .on_group_op(|_, _, _| ());
 
-    let r = proto_lens::visitor::visit_message(
-        proto_lens::wire::parse(&mut bytes.as_slice()),
+    let r = proto_scan::visitor::visit_message(
+        proto_scan::wire::parse(&mut bytes.as_slice()),
         builder.build(),
     );
     assert_eq!(r, Ok(()));
@@ -163,7 +163,7 @@ fn extract_packed_fields_parse() {
     let mut events = HashMap::<_, Vec<_>>::new();
 
     let mut read = bytes.as_slice();
-    let mut reader = proto_lens::wire::parse(&mut read);
+    let mut reader = proto_scan::wire::parse(&mut read);
     while let Some(event) = reader.next() {
         let (field_number, event) = event.unwrap();
         let values = match event {
@@ -203,7 +203,7 @@ fn extract_packed_fields_parse() {
 fn extract_string() {
     let bytes = with_repeats().encode_to_vec();
     let mut read = bytes.as_slice();
-    let mut reader = proto_lens::wire::parse(&mut read);
+    let mut reader = proto_scan::wire::parse(&mut read);
     while let Some(event) = reader.next() {
         let (field_number, event) = event.unwrap();
         match event {

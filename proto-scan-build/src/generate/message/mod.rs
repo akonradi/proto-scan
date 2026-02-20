@@ -21,10 +21,10 @@ impl ProtoMessage {
     fn impl_scan_message(&self) -> TokenStream {
         let name = &self.message_name;
         let scanner_name = self.scanner().type_name();
-        let no_op = quote!(::proto_lens_scan::NoOp);
+        let no_op = quote!(::proto_scan::scan::field::NoOp);
         let no_ops = std::iter::repeat_n(&no_op, self.message_fields.len());
         quote! {
-            impl ::proto_lens_scan::ScanMessage for #name {
+            impl ::proto_scan::scan::ScanMessage for #name {
                 type Scanner = #scanner_name <#(#no_ops),*>;
 
                 fn scanner() -> Self::Scanner {
@@ -128,7 +128,7 @@ impl ProtoMessageScanner<'_> {
         let generics = self.generic_types().collect::<Vec<_>>();
         let generics_on_scan_bounds = generics
             .iter()
-            .map(|g| quote!(#g: ::proto_lens_scan::OnScanField));
+            .map(|g| quote!(#g: ::proto_scan::scan::field::OnScanField));
         let generics_scan_event = generics
             .iter()
             .map(|g| quote!(#g::ScanEvent))
@@ -148,22 +148,22 @@ impl ProtoMessageScanner<'_> {
         let on_group_arms = field_arms("on_group");
         let on_length_delimited_arms = field_arms("on_length_delimited");
         quote! {
-            impl <#(#generics_on_scan_bounds,)*> ::proto_lens_scan::ScanCallbacks for #scanner_name<#(#generics,)*> {
+            impl <#(#generics_on_scan_bounds,)*> ::proto_scan::scan::ScanCallbacks for #scanner_name<#(#generics,)*> {
                 type ScanEvent = Option<#scan_event_name<#(#generics_scan_event),*>>;
                 type ScanOutput = #output_name<#(#generics_scan_event),*>;
 
                 fn on_scalar(
                     &mut self,
-                    field: ::proto_lens_scan::FieldNumber,
-                    value: ::proto_lens_scan::ScalarField,
-                ) -> Result<Self::ScanEvent, ::proto_lens_scan::StopScan> {
+                    field: ::proto_scan::wire::FieldNumber,
+                    value: ::proto_scan::wire::ScalarField,
+                ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
                     Ok(match u32::from(field) {
                         #(#on_scalar_arms,)*
                         _ => None,
                     })
                 }
 
-                fn on_group(&mut self, field: ::proto_lens_scan::FieldNumber, value: ::proto_lens_scan::GroupOp) -> Result<Self::ScanEvent, ::proto_lens_scan::StopScan> {
+                fn on_group(&mut self, field: ::proto_scan::wire::FieldNumber, value: ::proto_scan::wire::GroupOp) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
                     Ok(match u32::from(field) {
                         #(#on_group_arms,)*
                         _ => None,
@@ -172,9 +172,9 @@ impl ProtoMessageScanner<'_> {
 
                 fn on_length_delimited(
                     &mut self,
-                    field: ::proto_lens_scan::FieldNumber,
-                    value: impl ::proto_lens_scan::LengthDelimited,
-                ) -> Result<Self::ScanEvent, ::proto_lens_scan::StopScan> {
+                    field: ::proto_scan::wire::FieldNumber,
+                    value: impl ::proto_scan::wire::LengthDelimited,
+                ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
                     Ok(match u32::from(field) {
                         #(#on_length_delimited_arms,)*
                         _ => None,
@@ -189,21 +189,21 @@ impl ProtoMessageScanner<'_> {
         let generics = self.generic_types().collect::<Vec<_>>();
         let generics_on_scan_bounds = generics
             .iter()
-            .map(|g| quote!(#g: ::proto_lens_scan::OnScanField));
+            .map(|g| quote!(#g: ::proto_scan::scan::field::OnScanField));
         let generics_lifetime_bounds = generics.iter().map(|g| quote!(#g: 'r));
         quote! {
             impl<#(#generics_on_scan_bounds,)*> #scanner_name <#(#generics,)*> {
                 pub fn scan<'r>(
                     self,
-                    read: impl ::proto_lens_scan::Read + 'r,
-                ) -> impl ::proto_lens_scan::Scan<
-                        Event = <Self as ::proto_lens_scan::ScanCallbacks>::ScanEvent,
-                        Output = <Self as ::proto_lens_scan::ScanCallbacks>::ScanOutput,
+                    read: impl ::proto_scan::read::Read + 'r,
+                ) -> impl ::proto_scan::scan::Scan<
+                        Event = <Self as ::proto_scan::scan::ScanCallbacks>::ScanEvent,
+                        Output = <Self as ::proto_scan::scan::ScanCallbacks>::ScanOutput,
                     > + 'r
                 where
                     #(#generics_lifetime_bounds,)*
                 {
-                    ::proto_lens_scan::ScanWith::new(::proto_lens_scan::parse(read), self)
+                    ::proto_scan::scan::ScanWith::new(::proto_scan::wire::parse(read), self)
                 }
             }
         }

@@ -1,6 +1,6 @@
 use std::io::Result;
 
-use proto_lens_protoc_ext::CompileScan as _;
+use proto_scan_build::CompileScan as _;
 
 fn main() -> Result<()> {
     let mut config = prost_build::Config::new();

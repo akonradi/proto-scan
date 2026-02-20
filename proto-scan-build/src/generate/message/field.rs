@@ -32,8 +32,8 @@ impl SingleFieldType {
     
     fn encoding_type(&self) -> syn::Path {
         match self {
-            SingleFieldType::Bool => parse_quote!(::proto_lens_scan::encoding::Varint<::core::primitive::bool>),
-            SingleFieldType::FixedU64 => parse_quote!(::proto_lens_scan::encoding::Fixed<::core::primitive::u64>),
+            SingleFieldType::Bool => parse_quote!(::proto_scan::scan::encoding::Varint<::core::primitive::bool>),
+            SingleFieldType::FixedU64 => parse_quote!(::proto_scan::scan::encoding::Fixed<::core::primitive::u64>),
         }
     }
 }
@@ -101,11 +101,11 @@ impl MessageScannerField<'_> {
                         to: &'t mut impl From<#repr_type>,
                     ) -> #scanner_name<
                             #(#before_no_op,)*
-                            impl ::proto_lens_scan::OnScanField<ScanEvent = ::core::convert::Infallible> + 't,
+                            impl ::proto_scan::scan::field::OnScanField<ScanEvent = ::core::convert::Infallible> + 't,
                             #(#after_no_op,)*
                     > {
                         let Self { #(#scanner_fields,)* } = self;
-                        let #field_name = ::proto_lens_scan::SaveField::<'_, #encoding_type, _>::new(to);
+                        let #field_name = ::proto_scan::scan::field::Save::<'_, #encoding_type, _>::new(to);
                         #scanner_name { #(#scanner_fields,)* }
                     }
                 };
@@ -115,11 +115,11 @@ impl MessageScannerField<'_> {
                         self,
                     ) -> #scanner_name<
                             #(#before_no_op,)*
-                            impl ::proto_lens_scan::OnScanField<ScanEvent = #repr_type> + 't,
+                            impl ::proto_scan::scan::field::OnScanField<ScanEvent = #repr_type> + 't,
                             #(#after_no_op,)*
                     > {
                         let Self { #(#scanner_fields,)* } = self;
-                        let #field_name = ::proto_lens_scan::EmitScalarField::<#encoding_type>::new();
+                        let #field_name = ::proto_scan::scan::field::EmitScalar::<#encoding_type>::new();
                         #scanner_name { #(#scanner_fields,)* }
                     }
                 };
@@ -132,7 +132,7 @@ impl MessageScannerField<'_> {
         let after_no_op2 = after_no_op.clone();
 
         quote! {
-            impl< #(#before_no_op,)* #(#after_no_op),* > #scanner_name< #(#before_no_op2,)* ::proto_lens_scan::NoOp, #(#after_no_op2),*> {
+            impl< #(#before_no_op,)* #(#after_no_op),* > #scanner_name< #(#before_no_op2,)* ::proto_scan::scan::field::NoOp, #(#after_no_op2),*> {
                 #(#impl_fns)*
             }
         }

@@ -1,9 +1,7 @@
 [workspace]
 members = [
-    "proto-lens",
-    "proto-lens-protoc-ext",
-    "proto-lens-protoc-tests",
-    "proto-lens-scan",
-    "proto-lens-tests",
+    "proto-scan",
+    "proto-scan-build",
+    "proto-scan-tests",
 ]
 resolver = "3"

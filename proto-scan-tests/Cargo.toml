@@ -1,5 +1,5 @@
 [package]
-name = "proto-lens-protoc-tests"
+name = "proto-scan-tests"
 version = "0.1.0"
 edition = "2024"
 
@@ -7,9 +7,8 @@ edition = "2024"
 either = "1.15.0"
 prost = "0.14.3"
 prost-types = "0.14.3"
-proto-lens-scan = { path = "../proto-lens-scan" }
+proto-scan = { path = "../proto-scan", features = ["builder"]}
 
 [build-dependencies]
 prost-build = "0.14.3"
-protoc = "2.28"
-proto-lens-protoc-ext = { path = "../proto-lens-protoc-ext"}
+proto-scan-build = { path = "../proto-scan-build" }

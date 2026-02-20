@@ -1,5 +1,5 @@
 [package]
-name = "proto-lens"
+name = "proto-scan"
 version = "0.1.0"
 edition = "2024"
 
