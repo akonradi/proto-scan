@@ -1,4 +1,4 @@
-use proto_scan_tests::{proto, prost_proto};
+use proto_scan_tests::{prost_proto, proto};
 
 use prost::Message as _;
 use proto_scan::scan::{Scan as _, ScanMessage as _};
@@ -31,10 +31,8 @@ mod save_single_bool {
 
         let scanner = proto::testing::ScanExample::scanner().save_single_bool(&mut save_to);
         {
-            let mut scan = scanner.scan([].as_slice());
-            while let Some(event) = scan.next() {
-                let event = event.unwrap();
-                match event {
+            for event in scanner.scan([].as_slice()) {
+                match Result::unwrap(event) {
                     None => {}
                 }
             }
@@ -50,9 +48,8 @@ mod save_single_bool {
         let scanner = proto::testing::ScanExample::scanner().save_single_bool(&mut save_to);
         {
             let message = example_msg().encode_to_vec();
-            let mut scan = scanner.scan(message.as_slice());
-            while let Some(event) = scan.next() {
-                match event.unwrap() {
+            for event in scanner.scan(message.as_slice()) {
+                match Result::unwrap(event) {
                     None => {}
                 }
             }
@@ -71,9 +68,8 @@ mod emit_single_bool {
 
         let scanner = proto::testing::ScanExample::scanner().emit_single_bool();
         {
-            let mut scan = scanner.scan([].as_slice());
-            while let Some(event) = scan.next() {
-                match event.unwrap() {
+            for event in scanner.scan([].as_slice()) {
+                match Result::unwrap(event) {
                     Some(proto::testing::ScanScanExampleEvent::Event3(b)) => {
                         save_to = Some(b);
                     }
@@ -92,9 +88,8 @@ mod emit_single_bool {
         let scanner = proto::testing::ScanExample::scanner().emit_single_bool();
         {
             let message = example_msg().encode_to_vec();
-            let mut scan = scanner.scan(message.as_slice());
-            while let Some(event) = scan.next() {
-                match event.unwrap() {
+            for event in scanner.scan(message.as_slice()) {
+                match Result::unwrap(event) {
                     Some(proto::testing::ScanScanExampleEvent::Event3(b)) => save_to = Some(b),
                     None => {}
                 }

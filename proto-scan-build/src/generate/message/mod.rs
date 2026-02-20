@@ -137,11 +137,11 @@ impl ProtoMessageScanner<'_> {
             let scan_event_name = &scan_event_name;
             let fn_name = format_ident!("{fn_name}");
             self.fields().map(move |MessageScannerField { parent: _, index, field: MessageField { field_name, generic: _, field_number, field_type: _ } }| {
-                 let event_variant_name = format_ident!("Event{index}");
-                 quote! {
-                     #field_number => self.#field_name.#fn_name(value)?.map(#scan_event_name::#event_variant_name)
-                 }
-             })
+                let event_variant_name = format_ident!("Event{index}");
+                quote! {
+                    #field_number => self.#field_name.#fn_name(value)?.map(#scan_event_name::#event_variant_name)
+                }
+            })
         };
 
         let on_scalar_arms = field_arms("on_scalar");
@@ -225,22 +225,24 @@ impl ProtoMessageScanner<'_> {
         };
         let field_arms = {
             self.fields().map(move |MessageScannerField { parent: _, index, field: MessageField { field_name, .. } }| {
-                 let event_variant_name = format_ident!("Event{index}");
-                 quote! {
-                     #scan_event_name::#event_variant_name(t) => self.#field_name = Some(t),                }
-             })
+                let event_variant_name = format_ident!("Event{index}");
+                quote! {
+                    #scan_event_name::#event_variant_name(t) => state.#field_name = Some(t),                }
+            })
         };
         quote! {
             impl <
             #(#generics),*
-            > ::core::iter::Extend<#item_type> for #output_name<#(#generics),*> {
-                fn extend<I: ::core::iter::IntoIterator<Item=#item_type>>(&mut self, items: I) {
+            > ::core::iter::FromIterator<#item_type> for #output_name<#(#generics),*> {
+                fn from_iter<I: ::core::iter::IntoIterator<Item=#item_type>>(items: I) -> Self {
+                    let mut state = Self::default();
                     for item in items {
                         let Some(item) = item else {continue};
                         match item {
                             #(#field_arms)*
                         }
                     }
+                    state
                 }
             }
         }

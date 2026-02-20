@@ -12,18 +12,16 @@ pub trait ScanMessage {
     fn scanner() -> Self::Scanner;
 }
 
-pub trait Scan {
+pub trait Scan: IntoIterator<Item = Result<Self::Event, StopScan>> {
     type Event;
     type Output;
-
-    fn next(&mut self) -> Option<Result<Self::Event, StopScan>>;
 
     fn read_all(self) -> Result<Self::Output, StopScan>;
 }
 
 pub trait ScanCallbacks {
     type ScanEvent;
-    type ScanOutput: Default + Extend<Self::ScanEvent>;
+    type ScanOutput: FromIterator<Self::ScanEvent>;
 
     fn on_scalar(
         &mut self,
@@ -48,10 +46,19 @@ impl<P, S> ScanWith<P, S> {
     }
 }
 
-impl<P: ParseEventReader, S: ScanCallbacks> Scan for ScanWith<P, S> {
-    type Event = S::ScanEvent;
-    type Output = S::ScanOutput;
+pub struct IntoIter<P, S>(P, S);
 
+impl<P: ParseEventReader, S: ScanCallbacks> IntoIterator for ScanWith<P, S> {
+    type Item = Result<S::ScanEvent, StopScan>;
+    type IntoIter = IntoIter<P, S>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter(self.0, self.1)
+    }
+}
+
+impl<P: ParseEventReader, S: ScanCallbacks> Iterator for IntoIter<P, S> {
+    type Item = Result<S::ScanEvent, StopScan>;
     fn next(&mut self) -> Option<Result<S::ScanEvent, StopScan>> {
         let Self(parse, fields) = self;
         let (field_number, event) = match parse.next() {
@@ -67,13 +74,14 @@ impl<P: ParseEventReader, S: ScanCallbacks> Scan for ScanWith<P, S> {
         };
         Some(output)
     }
+}
 
-    fn read_all(mut self) -> Result<Self::Output, StopScan> {
-        let mut output = Self::Output::default();
-        while let Some(event) = self.next() {
-            output.extend(Some(event?));
-        }
-        Ok(output)
+impl<P: ParseEventReader, S: ScanCallbacks> Scan for ScanWith<P, S> {
+    type Event = S::ScanEvent;
+    type Output = S::ScanOutput;
+
+    fn read_all(self) -> Result<Self::Output, StopScan> {
+        self.into_iter().collect()
     }
 }
 
