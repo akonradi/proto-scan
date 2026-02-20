@@ -6,6 +6,7 @@ use crate::scan::field::OnScanField;
 use crate::scan::{GroupOp, ScalarField, StopScan};
 use crate::wire::{LengthDelimited, ScalarWireType};
 
+/// [`OnScanField`] that writes the decoded value to the provided location.
 pub struct Save<'t, E, D>(&'t mut D, PhantomData<E>);
 
 impl<'t, E, D> Save<'t, E, D> {

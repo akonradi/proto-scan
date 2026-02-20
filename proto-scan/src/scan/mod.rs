@@ -6,31 +6,43 @@ use crate::wire::{LengthDelimited, ParseEvent, ParseEventReader};
 pub mod encoding;
 pub mod field;
 
+/// A message that can be scanned.
 pub trait ScanMessage {
+    /// The scanner for the message.
     type Scanner;
 
+    /// Creates a new scanner.
     fn scanner() -> Self::Scanner;
 }
 
+/// A scan in progress.
 pub trait Scan: IntoIterator<Item = Result<Self::Event, StopScan>> {
     type Event;
     type Output;
 
+    /// Performs a complete scan, returning the result.
     fn read_all(self) -> Result<Self::Output, StopScan>;
 }
 
+/// Callbacks for parse inputs encountered during a scan.
 pub trait ScanCallbacks {
+    /// Output on processing a parse event.
     type ScanEvent;
+
+    /// Result of collecting a sequence of parse events.
     type ScanOutput: FromIterator<Self::ScanEvent>;
 
+    /// Called when a scalar field is parsed.
     fn on_scalar(
         &mut self,
         field: FieldNumber,
         value: ScalarField,
     ) -> Result<Self::ScanEvent, StopScan>;
 
+    /// Called when a SGROUP or EGROUP tag is read.
     fn on_group(&mut self, field: FieldNumber, op: GroupOp) -> Result<Self::ScanEvent, StopScan>;
 
+    /// Called when a length-delimited field tag is encountered.
     fn on_length_delimited(
         &mut self,
         field: FieldNumber,
@@ -38,6 +50,8 @@ pub trait ScanCallbacks {
     ) -> Result<Self::ScanEvent, StopScan>;
 }
 
+/// A [`Scan`] implementation that takes events from a [`ParseEventReader`] and
+/// applies them to a [`ScanCallbacks`].
 pub struct ScanWith<P, S>(P, S);
 
 impl<P, S> ScanWith<P, S> {
@@ -46,6 +60,11 @@ impl<P, S> ScanWith<P, S> {
     }
 }
 
+/// [`IntoIterator::IntoIter`] type for [`ScanWith`].
+/// 
+/// Implements [`Iterator`] by applying events from a [`ParseEventReader`] to a
+/// [`ScanCallbacks`] and yielding the resulting [`ScanCallbacks::ScanEvent`] or
+/// an error.
 pub struct IntoIter<P, S>(P, S);
 
 impl<P: ParseEventReader, S: ScanCallbacks> IntoIterator for ScanWith<P, S> {
@@ -85,6 +104,10 @@ impl<P: ParseEventReader, S: ScanCallbacks> Scan for ScanWith<P, S> {
     }
 }
 
+/// Sentinel type indicating that a scan completed unsuccessfully.
+/// 
+/// TODO: make this an enum that provides some detail about why the scan was
+/// unsuccessful.
 #[derive(Debug)]
 pub struct StopScan;
 

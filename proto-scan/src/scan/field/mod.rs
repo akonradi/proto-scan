@@ -1,4 +1,6 @@
 use crate::scan::StopScan;
+#[cfg(doc)]
+use crate::wire::FieldNumber;
 use crate::wire::{GroupOp, LengthDelimited, ScalarField};
 
 mod emit_scalar;
@@ -13,12 +15,16 @@ pub use save::Save;
 
 /// Implemented by a visitor for a fixed [`FieldNumber`].
 pub trait OnScanField {
+    /// Output event when a callback is invoked (and succeeds).
     type ScanEvent;
 
+    /// Called when a scalar tag is read.
     fn on_scalar(&mut self, value: ScalarField) -> Result<Option<Self::ScanEvent>, StopScan>;
 
+    /// Called when a SGROUP or EGROUP tag is read.
     fn on_group(&mut self, op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan>;
 
+    /// Called when a length-delimited tag is read.
     fn on_length_delimited(
         &mut self,
         delimited: impl LengthDelimited,

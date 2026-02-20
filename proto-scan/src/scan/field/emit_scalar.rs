@@ -5,6 +5,9 @@ use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
 use crate::wire::{GroupOp, LengthDelimited, ScalarField, ScalarWireType};
 
+/// [`OnScanField`] implementation that produces the read value as the event output.
+///
+/// Deserializes according to the [`Encoding`] type parameter.
 pub struct EmitScalar<E>(PhantomData<E>);
 
 impl<E: Encoding> OnScanField for EmitScalar<E> {
