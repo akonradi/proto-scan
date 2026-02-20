@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 
 pub use crate::wire::{FieldNumber, GroupOp, I32, I64, ScalarField, Varint};
-use crate::wire::{LengthDelimited, ParseEvent, ParseEventReader, ScalarWireType};
+use crate::wire::{LengthDelimited, ParseEvent, ParseEventReader};
 
 pub mod encoding;
 pub mod field;
@@ -85,4 +85,3 @@ impl From<Infallible> for StopScan {
         match value {}
     }
 }
-

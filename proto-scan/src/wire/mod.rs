@@ -30,11 +30,13 @@ trait ParseVarint:
 {
     const MAX_BYTES: u8;
 
+    #[cfg(test)]
     fn low_byte(&self) -> u8;
 }
 
 impl ParseVarint for u64 {
     const MAX_BYTES: u8 = 10;
+    #[cfg(test)]
     fn low_byte(&self) -> u8 {
         *self as u8
     }
@@ -42,6 +44,7 @@ impl ParseVarint for u64 {
 
 impl ParseVarint for u32 {
     const MAX_BYTES: u8 = 5;
+    #[cfg(test)]
     fn low_byte(&self) -> u8 {
         *self as u8
     }
@@ -65,6 +68,7 @@ fn parse_base128_varint<R: Read, V: ParseVarint>(r: &mut R) -> Result<V, DecodeE
     Err(DecodeError::UnterminatedVarint)
 }
 
+#[cfg(test)]
 fn serialize_base128_varint<V: ParseVarint>(mut value: V) -> Box<[u8]> {
     let mut bytes = Vec::with_capacity(V::MAX_BYTES.into());
 

@@ -6,7 +6,7 @@ use prost::Message;
 use proto_scan::wire::{
     FieldNumber, I32, I64, LengthDelimited, ParseEvent, ParseEventReader, ScalarField, Varint,
 };
-use proto_scan_tests::{proto, prost_proto};
+use proto_scan_tests::prost_proto;
 
 const VARINT_VALUES: [u64; 3] = [19488045, 173485432435, 894];
 const FIXED32_VALUES: [u32; 4] = [4, 5, 819491, 48];

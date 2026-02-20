@@ -6,6 +6,7 @@ pub enum ScalarField {
 }
 
 impl ScalarField {
+    #[cfg(test)]
     pub(crate) fn serialize(&self) -> Box<[u8]> {
         match self {
             ScalarField::Varint(v) => super::serialize_base128_varint(*v),

@@ -1,16 +1,11 @@
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs;
-use std::io::Read;
 use std::io::Result;
 use std::path::Path;
 
 use log::trace;
-use proc_macro2::TokenStream;
-use prost::Message;
 use prost_build::Module;
-use prost_types::{DescriptorProto, FileDescriptorProto, FileDescriptorSet, compiler::*};
-use quote::{ToTokens, format_ident, quote};
+use prost_types::FileDescriptorProto;
 
 pub(crate) mod generate;
 

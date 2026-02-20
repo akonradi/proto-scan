@@ -6,18 +6,18 @@ pub(crate) mod message;
 
 pub(crate) fn generate_module(module: &Module, fd: FileDescriptorProto) -> Result<String> {
     let FileDescriptorProto {
-        name,
-        package,
-        dependency,
-        public_dependency,
-        weak_dependency,
+        name: _,
+        package: _,
+        dependency: _,
+        public_dependency: _,
+        weak_dependency: _,
         message_type,
-        enum_type,
-        service,
-        extension,
-        options,
-        source_code_info,
-        syntax,
+        enum_type: _,
+        service: _,
+        extension: _,
+        options: _,
+        source_code_info: _,
+        syntax: _,
     } = fd;
 
     let messages = message_type

@@ -136,12 +136,12 @@ impl ProtoMessageScanner<'_> {
         let field_arms = |fn_name: &str| {
             let scan_event_name = &scan_event_name;
             let fn_name = format_ident!("{fn_name}");
-            self.fields().map(move |MessageScannerField { parent, index, field: MessageField { field_name, generic, field_number, field_type } }| {
-                let event_variant_name = format_ident!("Event{index}");
-                quote! {
-                    #field_number => self.#field_name.#fn_name(value)?.map(#scan_event_name::#event_variant_name)
-                }
-            })
+            self.fields().map(move |MessageScannerField { parent: _, index, field: MessageField { field_name, generic: _, field_number, field_type: _ } }| {
+                 let event_variant_name = format_ident!("Event{index}");
+                 quote! {
+                     #field_number => self.#field_name.#fn_name(value)?.map(#scan_event_name::#event_variant_name)
+                 }
+             })
         };
 
         let on_scalar_arms = field_arms("on_scalar");
@@ -224,11 +224,11 @@ impl ProtoMessageScanner<'_> {
             >
         };
         let field_arms = {
-            self.fields().map(move |MessageScannerField { parent, index, field: MessageField { field_name, generic, field_number, field_type } }| {
-                let event_variant_name = format_ident!("Event{index}");
-                quote! {
-                    #scan_event_name::#event_variant_name(t) => self.#field_name = Some(t),                }
-            })
+            self.fields().map(move |MessageScannerField { parent: _, index, field: MessageField { field_name, .. } }| {
+                 let event_variant_name = format_ident!("Event{index}");
+                 quote! {
+                     #scan_event_name::#event_variant_name(t) => self.#field_name = Some(t),                }
+             })
         };
         quote! {
             impl <
@@ -247,12 +247,13 @@ impl ProtoMessageScanner<'_> {
     }
 }
 
-struct MessageField {
+pub struct MessageField {
     field_name: Ident,
     generic: Ident,
     field_number: u32,
     field_type: FieldType,
 }
+
 impl TryFrom<&DescriptorProto> for ProtoMessage {
     type Error = std::io::Error;
 
@@ -260,14 +261,14 @@ impl TryFrom<&DescriptorProto> for ProtoMessage {
         let DescriptorProto {
             name,
             field,
-            extension,
-            nested_type,
-            enum_type,
-            extension_range,
-            oneof_decl,
-            options,
-            reserved_range,
-            reserved_name,
+            extension: _,
+            nested_type: _,
+            enum_type: _,
+            extension_range: _,
+            oneof_decl: _,
+            options: _,
+            reserved_range: _,
+            reserved_name: _,
         } = message;
         let name = name
             .as_deref()

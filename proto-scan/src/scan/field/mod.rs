@@ -1,9 +1,5 @@
-use std::convert::Infallible;
-use std::marker::PhantomData;
-
 use crate::scan::StopScan;
-use crate::scan::encoding::Encoding;
-use crate::wire::{GroupOp, LengthDelimited, ScalarField, ScalarWireType};
+use crate::wire::{GroupOp, LengthDelimited, ScalarField};
 
 mod emit_scalar;
 mod invoke_on;

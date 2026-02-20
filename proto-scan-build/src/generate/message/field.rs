@@ -22,18 +22,21 @@ pub enum SingleFieldType {
     FixedU64,
 }
 impl SingleFieldType {
-    
     fn repr_type(&self) -> syn::Path {
         match self {
             SingleFieldType::Bool => parse_quote!(::core::primitive::bool),
             SingleFieldType::FixedU64 => parse_quote!(::core::primitive::u64),
         }
     }
-    
+
     fn encoding_type(&self) -> syn::Path {
         match self {
-            SingleFieldType::Bool => parse_quote!(::proto_scan::scan::encoding::Varint<::core::primitive::bool>),
-            SingleFieldType::FixedU64 => parse_quote!(::proto_scan::scan::encoding::Fixed<::core::primitive::u64>),
+            SingleFieldType::Bool => {
+                parse_quote!(::proto_scan::scan::encoding::Varint<::core::primitive::bool>)
+            }
+            SingleFieldType::FixedU64 => {
+                parse_quote!(::proto_scan::scan::encoding::Fixed<::core::primitive::u64>)
+            }
         }
     }
 }
@@ -43,7 +46,9 @@ impl From<&FieldDescriptorProto> for FieldType {
         let label = value.label();
         match (value.r#type(), label) {
             (Type::Bool, Label::Optional | Label::Required) => Self::Single(SingleFieldType::Bool),
-            (Type::Fixed64, Label::Optional | Label::Required) => Self::Single(SingleFieldType::FixedU64),
+            (Type::Fixed64, Label::Optional | Label::Required) => {
+                Self::Single(SingleFieldType::FixedU64)
+            }
             (
                 Type::Double
                 | Type::Float
@@ -77,8 +82,8 @@ impl MessageScannerField<'_> {
             field:
                 MessageField {
                     field_name,
-                    generic,
-                    field_number,
+                    generic: _,
+                    field_number: _,
                     field_type,
                 },
         } = self;
@@ -105,6 +110,7 @@ impl MessageScannerField<'_> {
                             #(#after_no_op,)*
                     > {
                         let Self { #(#scanner_fields,)* } = self;
+                        let _ = #field_name;
                         let #field_name = ::proto_scan::scan::field::Save::<'_, #encoding_type, _>::new(to);
                         #scanner_name { #(#scanner_fields,)* }
                     }
@@ -119,6 +125,7 @@ impl MessageScannerField<'_> {
                             #(#after_no_op,)*
                     > {
                         let Self { #(#scanner_fields,)* } = self;
+                        let _ = #field_name;
                         let #field_name = ::proto_scan::scan::field::EmitScalar::<#encoding_type>::new();
                         #scanner_name { #(#scanner_fields,)* }
                     }

@@ -34,6 +34,7 @@ impl Tag {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn serialized(&self) -> Box<[u8]> {
         let Self {
             wire_type,
