@@ -3,15 +3,15 @@ use crate::scan::{ScanTypes, StopScan};
 use crate::wire::FieldNumber;
 use crate::wire::{GroupOp, LengthDelimited, ScalarField};
 
-mod emit_scalar;
+mod emit;
 mod invoke_on;
 mod no_op;
 mod save;
 
-pub use emit_scalar::EmitScalar;
+pub use emit::{EmitScalar, EmitRepeated};
 pub use invoke_on::InvokeOn;
 pub use no_op::NoOp;
-pub use save::Save;
+pub use save::{SaveScalar, SaveRepeated};
 
 /// Implemented by a visitor for a fixed [`FieldNumber`].
 pub trait OnScanField: ScanTypes<ScanOutput: Default> {

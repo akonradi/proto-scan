@@ -79,7 +79,7 @@ impl MessageScannerField<'_> {
                     > {
                         let Self { #(#scanner_fields,)* } = self;
                         let _ = #field_name;
-                        let #field_name = ::proto_scan::scan::field::Save::<'_, #encoding_type, _>::new(to);
+                        let #field_name = ::proto_scan::scan::field::SaveScalar::<'_, #encoding_type, _>::new(to);
                         #scanner_name { #(#scanner_fields,)* }
                     }
                 };
