@@ -214,6 +214,17 @@ impl MessageScanner<'_> {
             .collect::<Vec<_>>();
         quote! {
             impl<'r, #(#generics_on_scan_bounds,)*> ::proto_scan::scan::Scanner<'r> for #scanner_name <#(#generics,)*> {
+                fn scan_events(
+                    self,
+                    read: impl ::proto_scan::wire::ParseEventReader + 'r,
+                ) -> impl ::proto_scan::scan::Scan<
+                        ScanEvent = <Self as ::proto_scan::scan::ScanTypes>::ScanEvent,
+                        ScanOutput = <Self as ::proto_scan::scan::ScanTypes>::ScanOutput,
+                    > + 'r
+                {
+                    ::proto_scan::scan::ScanWith::new(read, self)
+                }
+
                 fn scan(
                     self,
                     read: impl ::proto_scan::read::Read + 'r,
@@ -222,7 +233,7 @@ impl MessageScanner<'_> {
                         ScanOutput = <Self as ::proto_scan::scan::ScanTypes>::ScanOutput,
                     > + 'r
                 {
-                    ::proto_scan::scan::ScanWith::new(::proto_scan::wire::parse(read), self)
+                    self.scan_events(::proto_scan::wire::parse(read))
                 }
             }
         }

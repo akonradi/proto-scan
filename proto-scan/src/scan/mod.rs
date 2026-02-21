@@ -28,6 +28,13 @@ pub trait Scanner<'r>: ScanTypes {
     /// Starts a scan over the provided input.
     ///
     /// Consumes `self` and produces a [`Scan`] over the input stream.
+    fn scan_events(
+        self,
+        read: impl ParseEventReader + 'r,
+    ) -> impl Scan<ScanEvent = Self::ScanEvent, ScanOutput = Self::ScanOutput> + 'r;
+    /// Starts a scan over the provided input.
+    ///
+    /// Consumes `self` and produces a [`Scan`] over the input stream.
     fn scan(
         self,
         read: impl Read + 'r,
