@@ -42,9 +42,9 @@ impl<'t, E: Encoding, D: From<E::Repr>> OnScanField for SaveScalar<'t, E, D> {
 }
 
 /// [`OnScanField`] that writes the decoded values to the provided location.
-pub struct SaveRepeated<'t, E: Encoding, D>(&'t mut D, PhantomData<E>);
+pub struct SaveRepeated<'t, E, D>(&'t mut D, PhantomData<E>);
 
-impl<'t, E: Encoding, D> SaveRepeated<'t, E, D> {
+impl<'t, E, D> SaveRepeated<'t, E, D> {
     pub fn new(to: &'t mut D) -> Self {
         Self(to, PhantomData)
     }

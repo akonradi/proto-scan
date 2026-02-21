@@ -2,8 +2,8 @@ use crate::proto;
 
 mod custom_field_scanner;
 mod read_all;
-mod single_scalar;
 mod repeated_scalar;
+mod single_scalar;
 
 pub(super) fn example_msg() -> crate::prost_proto::ScanExample {
     use crate::prost_proto::*;

@@ -1,15 +1,15 @@
 use std::marker::PhantomData;
 
-use core::convert::Infallible;
 use crate::scan::field::OnScanField;
 use crate::scan::{ScanTypes, StopScan};
 use crate::wire::{GroupOp, LengthDelimited, ScalarField, ScalarWireType};
+use core::convert::Infallible;
 
 /// Invokes the provided callback for each scalar value.
 ///
 /// [`OnScanField::on_scalar`] returns an error if the encoded value has the
 /// wrong wire type.
-pub struct InvokeOn<W: ScalarWireType, F>(F, PhantomData<W>);
+pub struct InvokeOn<W, F>(F, PhantomData<W>);
 
 impl<'a, W: ScalarWireType, F: FnMut(W::Repr) -> Result<(), StopScan>> ScanTypes
     for InvokeOn<W, F>
@@ -31,7 +31,10 @@ impl<'a, W: ScalarWireType, F: FnMut(W::Repr) -> Result<(), StopScan>> OnScanFie
     fn on_group(&mut self, _: GroupOp) -> Result<Option<Infallible>, StopScan> {
         Ok(None)
     }
-    fn on_length_delimited(&mut self, _: impl LengthDelimited) -> Result<Option<Infallible>, StopScan> {
+    fn on_length_delimited(
+        &mut self,
+        _: impl LengthDelimited,
+    ) -> Result<Option<Infallible>, StopScan> {
         Ok(None)
     }
 }

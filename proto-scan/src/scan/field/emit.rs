@@ -15,6 +15,12 @@ impl<E: Encoding> ScanTypes for EmitScalar<E> {
     type ScanOutput = Option<E::Repr>;
 }
 
+impl<T: Encoding> EmitScalar<T> {
+    pub fn new() -> Self {
+        Self(None)
+    }
+}
+
 impl<E: Encoding> OnScanField for EmitScalar<E> {
     fn into_output(self) -> Self::ScanOutput {
         self.0
@@ -38,12 +44,6 @@ impl<E: Encoding> OnScanField for EmitScalar<E> {
     }
 }
 
-impl<T: Encoding> EmitScalar<T> {
-    pub fn new() -> Self {
-        Self(None)
-    }
-}
-
 /// [`OnScanField`] implementation that produces the read values as the scan output.
 ///
 /// Deserializes according to the [`Encoding`] type parameter.
@@ -52,6 +52,12 @@ pub struct EmitRepeated<E: Encoding>(Vec<E::Repr>);
 impl<E: Encoding> ScanTypes for EmitRepeated<E> {
     type ScanEvent = Infallible;
     type ScanOutput = Vec<E::Repr>;
+}
+
+impl<T: Encoding> EmitRepeated<T> {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
 }
 
 impl<E: Encoding> OnScanField for EmitRepeated<E> {
@@ -82,11 +88,5 @@ impl<E: Encoding> OnScanField for EmitRepeated<E> {
 
     fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
-    }
-}
-
-impl<T: Encoding> EmitRepeated<T> {
-    pub fn new() -> Self {
-        Self(Vec::new())
     }
 }
