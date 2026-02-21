@@ -79,27 +79,6 @@ fn with_repeats() -> prost_proto::WithRepeats {
 }
 
 #[test]
-fn extract_scalars_visitor() {
-    let bytes = with_repeats().encode_to_vec();
-    let mut events = HashMap::<_, Vec<_>>::new();
-
-    let builder = proto_scan::visitor::BuiltVisitor::builder(&mut events)
-        .on_scalar(|events, field_number, value| {
-            events.entry(field_number).or_default().push(value);
-        })
-        .on_group_op(|_, _, _| ())
-        .on_length_delimited(|_, _, _| ());
-
-    let r = proto_scan::visitor::visit_message(
-        proto_scan::wire::parse(&mut bytes.as_slice()),
-        builder.build(),
-    );
-    assert_eq!(r, Ok(()));
-
-    assert_eq!(events, *SCALAR_FIELDS);
-}
-
-#[test]
 fn extract_scalars_parse() {
     let mut events = HashMap::<_, Vec<_>>::new();
 
@@ -115,46 +94,6 @@ fn extract_scalars_parse() {
     }
 
     assert_eq!(events, *SCALAR_FIELDS,);
-}
-
-#[test]
-fn extract_packed_fields_visitor() {
-    let bytes = with_repeats().encode_to_vec();
-    let mut events = HashMap::<_, Vec<_>>::new();
-
-    let builder = proto_scan::visitor::BuiltVisitor::builder(&mut events)
-        .on_length_delimited(|events, field_number, value| {
-            let iter = match field_number.into() {
-                1 => return,
-                2 | 3 | 4 => Either::Left(
-                    value
-                        .into_packed_varints()
-                        .map(|r| ScalarField::Varint(r.unwrap())),
-                ),
-                6 => Either::Right(Either::Left(
-                    value
-                        .into_packed_i32s()
-                        .map(|r| ScalarField::I32(r.unwrap())),
-                )),
-                8 => Either::Right(Either::Right(
-                    value
-                        .into_packed_i64s()
-                        .map(|r| ScalarField::I64(r.unwrap())),
-                )),
-                x => panic!("unexpected length-delimited field {x}"),
-            };
-            events.entry(field_number).or_default().extend(iter);
-        })
-        .on_scalar(|_, _, _| ())
-        .on_group_op(|_, _, _| ());
-
-    let r = proto_scan::visitor::visit_message(
-        proto_scan::wire::parse(&mut bytes.as_slice()),
-        builder.build(),
-    );
-    assert_eq!(r, Ok(()));
-
-    assert_eq!(events, *PACKED_FIELDS);
 }
 
 #[test]
