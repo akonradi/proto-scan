@@ -107,30 +107,33 @@ mod read_all {
     fn empty() {
         let scanner = proto::testing::ScanExample::scanner()
             .emit_single_bool()
-            .emit_single_fixed64();
+            .emit_single_fixed64()
+            .emit_repeated_bool();
         let scan = scanner.scan([].as_slice());
         let read_all = scan.read_all();
         let proto::testing::ScanScanExampleOutput {
             single_bool,
             repeated_msg: (),
             single_msg: (),
-            repeated_bool: (),
+            repeated_bool,
             oneof_group: (),
             single_fixed64,
         } = read_all.unwrap();
 
         assert_eq!(single_bool, None);
         assert_eq!(single_fixed64, None);
+        assert_eq!(repeated_bool, vec![]);
     }
 
     #[test]
     fn with_field() {
         let message = example_msg();
-        let mut save_to = (None, None);
+        let mut save_to = (None, None, vec![]);
 
         let scanner = proto::testing::ScanExample::scanner()
             .save_single_bool(&mut save_to.0)
-            .save_single_fixed64(&mut save_to.1);
+            .save_single_fixed64(&mut save_to.1)
+            .save_repeated_bool(&mut save_to.2);
         let proto::testing::ScanScanExampleOutput {
             repeated_msg: (),
             single_msg: (),
@@ -143,6 +146,13 @@ mod read_all {
             .read_all()
             .unwrap();
 
-        assert_eq!(save_to, (message.single_bool, message.single_fixed64));
+        assert_eq!(
+            save_to,
+            (
+                message.single_bool,
+                message.single_fixed64,
+                message.repeated_bool
+            )
+        );
     }
 }

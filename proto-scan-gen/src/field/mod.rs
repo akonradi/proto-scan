@@ -110,6 +110,27 @@ impl MessageScannerField<'_> {
                 );
                 vec![save_fn, emit_fn]
             }
+            FieldType::Repeated { ty, number: _ } => {
+                let encoding_type = ty.encoding_type();
+                let repr_type = ty.repr_type();
+
+                let save_fn = swap_single_field_fn(
+                    format_ident!("save_{field_name}"),
+                    vec![quote!(to: &'t mut impl ::core::iter::Extend<#repr_type>)],
+                    (quote!(::core::convert::Infallible), quote!(())),
+                    quote!(::proto_scan::scan::field::SaveRepeated::<'_, #encoding_type, _>::new(to)),
+                );
+                let emit_fn = swap_single_field_fn(
+                    format_ident!("emit_{field_name}"),
+                    vec![],
+                    (
+                        quote!(::core::convert::Infallible),
+                        quote!(::std::vec::Vec<#repr_type>),
+                    ),
+                    quote!(::proto_scan::scan::field::EmitRepeated::<#encoding_type>::new()),
+                );
+                vec![save_fn, emit_fn]
+            }
             FieldType::Unsupported => Vec::<TokenStream>::new(),
         }
     }
@@ -118,6 +139,7 @@ impl MessageScannerField<'_> {
 #[derive(Debug)]
 pub enum FieldType {
     Single { ty: SingleFieldType, number: u32 },
+    Repeated { ty: SingleFieldType, number: u32 },
     Unsupported,
 }
 

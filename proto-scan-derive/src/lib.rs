@@ -129,13 +129,15 @@ impl TryFrom<(Span, Vec<Attribute>)> for ProstAttrs {
             }
         }
 
-        let field_type = if repeated {
-            FieldType::Unsupported
-        } else {
-            match (single_field_type, field_number) {
-                (Some(ty), Some(number)) => FieldType::Single { ty, number },
-                _ => FieldType::Unsupported,
+        let field_type = match (single_field_type, field_number) {
+            (Some(ty), Some(number)) => {
+                if repeated {
+                    FieldType::Repeated { ty, number }
+                } else {
+                    FieldType::Single { ty, number }
+                }
             }
+            _ => FieldType::Unsupported,
         };
 
         Ok(Self { field_type })

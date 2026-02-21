@@ -113,15 +113,21 @@ fn message_from_descriptor(message: &DescriptorProto) -> Result<ScannableMessage
                     ty: SingleFieldType::FixedU64,
                     number: field_number()?,
                 },
+                (Type::Bool, Label::Repeated) => FieldType::Repeated {
+                    ty: SingleFieldType::Bool,
+                    number: field_number()?,
+                },
+                (Type::Fixed64, Label::Repeated) => FieldType::Repeated {
+                    ty: SingleFieldType::FixedU64,
+                    number: field_number()?,
+                },
                 (
                     Type::Double
                     | Type::Float
                     | Type::Int64
                     | Type::Uint64
                     | Type::Int32
-                    | Type::Fixed64
                     | Type::Fixed32
-                    | Type::Bool
                     | Type::String
                     | Type::Group
                     | Type::Message
@@ -154,12 +160,10 @@ fn message_from_descriptor(message: &DescriptorProto) -> Result<ScannableMessage
     let fields = field_types
         .into_iter()
         .enumerate()
-        .map(|(i, (name, field_type))| {
-            MessageField {
-                field_name: name,
-                generic: ident(format!("T{i}")),
-                field_type,
-            }
+        .map(|(i, (name, field_type))| MessageField {
+            field_name: name,
+            generic: ident(format!("T{i}")),
+            field_type,
         })
         .collect();
     Ok(ScannableMessage { name, fields })
