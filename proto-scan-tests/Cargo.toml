@@ -8,6 +8,7 @@ either = "1.15.0"
 prost = "0.14.3"
 prost-types = "0.14.3"
 proto-scan = { path = "../proto-scan", features = ["derive"]}
+test-case = "3"
 
 [build-dependencies]
 prost-build = "0.14.3"
