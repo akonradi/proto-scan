@@ -192,20 +192,17 @@ impl ProtoMessageScanner<'_> {
         let generics = self.generic_types().collect::<Vec<_>>();
         let generics_on_scan_bounds = generics
             .iter()
-            .map(|g| quote!(#g: ::proto_scan::scan::field::OnScanField))
+            .map(|g| quote!(#g: ::proto_scan::scan::field::OnScanField + 'r))
             .collect::<Vec<_>>();
-        let generics_lifetime_bounds = generics.iter().map(|g| quote!(#g: 'r));
         quote! {
-            impl<#(#generics_on_scan_bounds,)*> #scanner_name <#(#generics,)*> {
-                pub fn scan<'r>(
+            impl<'r, #(#generics_on_scan_bounds,)*> ::proto_scan::scan::Scanner<'r> for #scanner_name <#(#generics,)*> {
+                fn scan(
                     self,
                     read: impl ::proto_scan::read::Read + 'r,
                 ) -> impl ::proto_scan::scan::Scan<
                         ScanEvent = <Self as ::proto_scan::scan::ScanTypes>::ScanEvent,
                         ScanOutput = <Self as ::proto_scan::scan::ScanTypes>::ScanOutput,
                     > + 'r
-                where
-                    #(#generics_lifetime_bounds,)*
                 {
                     ::proto_scan::scan::ScanWith::new(::proto_scan::wire::parse(read), self)
                 }

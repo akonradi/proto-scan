@@ -1,5 +1,6 @@
 use std::convert::Infallible;
 
+use crate::read::Read;
 pub use crate::wire::{FieldNumber, GroupOp, I32, I64, ScalarField, Varint};
 use crate::wire::{LengthDelimited, ParseEvent, ParseEventReader};
 
@@ -9,7 +10,7 @@ pub mod field;
 /// A message that can be scanned.
 pub trait ScanMessage {
     /// The scanner for the message.
-    type Scanner;
+    type Scanner: for<'r> Scanner<'r>;
 
     /// Creates a new scanner.
     fn scanner() -> Self::Scanner;
@@ -20,6 +21,17 @@ pub trait ScanTypes {
     type ScanEvent;
     /// Result of collecting a sequence of parse events.
     type ScanOutput;
+}
+
+/// A builder type for a [`Scan`] over a byte stream.
+pub trait Scanner<'r>: ScanTypes {
+    /// Starts a scan over the provided input.
+    ///
+    /// Consumes `self` and produces a [`Scan`] over the input stream.
+    fn scan(
+        self,
+        read: impl Read + 'r,
+    ) -> impl Scan<ScanEvent = Self::ScanEvent, ScanOutput = Self::ScanOutput> + 'r;
 }
 
 /// A scan in progress.
@@ -64,7 +76,7 @@ impl<P: ParseEventReader, S: ScanCallbacks> ScanTypes for ScanWith<P, S> {
 }
 
 /// [`IntoIterator::IntoIter`] type for [`ScanWith`].
-/// 
+///
 /// Implements [`Iterator`] by applying events from a [`ParseEventReader`] to a
 /// [`ScanCallbacks`] and yielding the resulting [`ScanCallbacks::ScanEvent`] or
 /// an error.
@@ -105,7 +117,7 @@ impl<P: ParseEventReader, S: ScanCallbacks> Scan for ScanWith<P, S> {
 }
 
 /// Sentinel type indicating that a scan completed unsuccessfully.
-/// 
+///
 /// TODO: make this an enum that provides some detail about why the scan was
 /// unsuccessful.
 #[derive(Debug)]
