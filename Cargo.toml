@@ -2,6 +2,8 @@
 members = [
     "proto-scan",
     "proto-scan-build",
+    "proto-scan-derive",
+    "proto-scan-gen",
     "proto-scan-tests",
 ]
 resolver = "3"

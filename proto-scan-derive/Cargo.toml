@@ -1,0 +1,11 @@
+[package]
+name = "proto-scan-derive"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proto-scan-gen = { path = "../proto-scan-gen" }
+proc-macro2 = "1.0"

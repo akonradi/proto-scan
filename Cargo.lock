@@ -372,6 +372,24 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-types",
+ "proto-scan-gen",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "proto-scan-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "proto-scan-gen",
+]
+
+[[package]]
+name = "proto-scan-gen"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
  "quote",
  "syn",
 ]

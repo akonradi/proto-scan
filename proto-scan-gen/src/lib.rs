@@ -1,28 +1,26 @@
 use proc_macro2::{Span, TokenStream};
-use prost_types::DescriptorProto;
-use quote::{ToTokens, format_ident, quote};
-use std::io::Result;
+use quote::{format_ident, quote};
 use syn::Ident;
 
-use crate::generate::message::field::{FieldType, MessageScannerField};
+use crate::field::{MessageField, MessageScannerField};
 
 pub mod field;
 
-pub struct ProtoMessage {
-    message_name: Ident,
-    message_fields: Vec<MessageField>,
+pub struct ScannableMessage {
+    pub name: Ident,
+    pub fields: Vec<field::MessageField>,
 }
 
-impl ProtoMessage {
-    fn scanner(&self) -> ProtoMessageScanner<'_> {
-        ProtoMessageScanner(self)
+impl ScannableMessage {
+    pub fn scanner(&self) -> MessageScanner<'_> {
+        MessageScanner(self)
     }
 
-    fn impl_scan_message(&self) -> TokenStream {
-        let name = &self.message_name;
+    pub fn impl_scan_message(&self) -> TokenStream {
+        let name = &self.name;
         let scanner_name = self.scanner().type_name();
         let no_op = quote!(::proto_scan::scan::field::NoOp);
-        let no_ops = std::iter::repeat_n(&no_op, self.message_fields.len());
+        let no_ops = std::iter::repeat_n(&no_op, self.fields.len());
         quote! {
             impl ::proto_scan::scan::ScanMessage for #name {
                 type Scanner = #scanner_name <#(#no_ops),*>;
@@ -35,24 +33,44 @@ impl ProtoMessage {
     }
 }
 
-struct ProtoMessageScanner<'m>(&'m ProtoMessage);
+#[derive(Copy, Clone)]
+pub struct MessageScanner<'m>(&'m ScannableMessage);
 
-impl ProtoMessageScanner<'_> {
+impl MessageScanner<'_> {
+    pub fn generated_code(&self) -> TokenStream {
+        let scan_field_impls = self.fields().map(|m| m.impl_());
+
+        let scanner_inherent_impls = self.inherent_impl();
+
+        [
+            self.type_definition(),
+            self.scan_event_defn(),
+            self.scan_output_definition(),
+            self.0.impl_scan_message(),
+            self.scan_callbacks_impl(),
+            self.output_impl_extend_event(),
+        ]
+        .into_iter()
+        .chain(scan_field_impls)
+        .chain([scanner_inherent_impls])
+        .collect::<TokenStream>()
+    }
+
     fn type_name(&self) -> Ident {
-        Ident::new(&format!("Scan{}", self.0.message_name), Span::call_site())
+        Ident::new(&format!("Scan{}", self.0.name), Span::call_site())
     }
 
     fn generic_types(&self) -> impl Iterator<Item = &Ident> + Clone {
-        self.0.message_fields.iter().map(|f| &f.generic)
+        self.0.fields.iter().map(|f| f.generic())
     }
 
     fn fields(&self) -> impl Iterator<Item = MessageScannerField<'_>> + Clone {
         self.0
-            .message_fields
+            .fields
             .iter()
             .enumerate()
             .map(|(index, field)| MessageScannerField {
-                parent: self.0,
+                parent: *self,
                 index,
                 field,
             })
@@ -61,7 +79,7 @@ impl ProtoMessageScanner<'_> {
     fn type_definition(&self) -> TokenStream {
         let scanner_name = self.type_name();
         let scan_types = self.generic_types();
-        let scan_fields = self.0.message_fields.iter().map(
+        let scan_fields = self.0.fields.iter().map(
             |MessageField {
                  field_name,
                  generic,
@@ -80,7 +98,7 @@ impl ProtoMessageScanner<'_> {
         let name = format_ident!("{}Output", self.type_name());
         let scan_types = self.generic_types().collect::<Vec<_>>();
         let fields = self.field_names();
-        let scan_fields = self.0.message_fields.iter().map(
+        let scan_fields = self.0.fields.iter().map(
             |MessageField {
                  field_name,
                  generic,
@@ -248,97 +266,4 @@ impl ProtoMessageScanner<'_> {
             }
         }
     }
-}
-
-pub struct MessageField {
-    field_name: Ident,
-    generic: Ident,
-    field_number: u32,
-    field_type: FieldType,
-}
-
-impl TryFrom<&DescriptorProto> for ProtoMessage {
-    type Error = std::io::Error;
-
-    fn try_from(message: &DescriptorProto) -> std::result::Result<Self, Self::Error> {
-        let DescriptorProto {
-            name,
-            field,
-            extension: _,
-            nested_type: _,
-            enum_type: _,
-            extension_range: _,
-            oneof_decl: _,
-            options: _,
-            reserved_range: _,
-            reserved_name: _,
-        } = message;
-        let name = name
-            .as_deref()
-            .ok_or_else(|| std::io::Error::other("message has no name"))?;
-
-        let message_fields = field
-            .iter()
-            .enumerate()
-            .map(|(i, f)| {
-                let field_name = Ident::new(f.name(), Span::call_site());
-                let generic = Ident::new(&format!("T{i}"), Span::call_site());
-                Ok(MessageField {
-                    field_name,
-                    field_number: f
-                        .number()
-                        .try_into()
-                        .map_err(|_| std::io::Error::other("invalid field number"))?,
-                    field_type: f.into(),
-                    generic,
-                })
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        Ok(Self {
-            message_name: Ident::new(name, Span::call_site()),
-            message_fields,
-        })
-    }
-}
-
-impl ToTokens for MessageField {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let Self {
-            field_name,
-            generic,
-            ..
-        } = self;
-        let field_name = format_ident!("{field_name}");
-        tokens.extend(quote! { #field_name: #generic });
-    }
-}
-
-pub fn generate_message(message: &DescriptorProto) -> Result<String> {
-    let message = ProtoMessage::try_from(message)?;
-    let scanner = message.scanner();
-
-    let name = &message.message_name;
-    let type_defn = quote! {
-        pub struct #name;
-    };
-
-    let scan_field_impls = scanner.fields().map(|m| m.impl_());
-
-    let scanner_inherent_impls = scanner.inherent_impl();
-
-    Ok([
-        type_defn,
-        scanner.type_definition(),
-        scanner.scan_event_defn(),
-        scanner.scan_output_definition(),
-        message.impl_scan_message(),
-        scanner.scan_callbacks_impl(),
-        scanner.output_impl_extend_event(),
-    ]
-    .into_iter()
-    .chain(scan_field_impls)
-    .chain([scanner_inherent_impls])
-    .collect::<TokenStream>()
-    .to_string())
 }
