@@ -69,7 +69,7 @@ impl<E: Encoding> OnScanField for EmitRepeated<E> {
         delimited: impl LengthDelimited,
     ) -> Result<Option<Self::ScanEvent>, StopScan> {
         let mut packed = delimited.into_packed::<E::Wire>();
-        let mut result = Ok(());
+        let mut result = Ok(None);
         self.0.extend(core::iter::from_fn(|| {
             let value = packed.next()?.ok().and_then(|w| E::decode(w).ok());
             if value.is_none() {
@@ -77,8 +77,7 @@ impl<E: Encoding> OnScanField for EmitRepeated<E> {
             }
             value
         }));
-        result?;
-        Ok(None)
+        result
     }
 
     fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan> {

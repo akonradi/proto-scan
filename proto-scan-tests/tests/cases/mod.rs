@@ -2,6 +2,7 @@ use crate::proto;
 
 mod read_all;
 mod single_scalar;
+mod repeated_scalar;
 
 pub(super) fn example_msg() -> crate::prost_proto::ScanExample {
     use crate::prost_proto::*;

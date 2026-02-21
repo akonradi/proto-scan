@@ -42,11 +42,11 @@ impl<'t, E: Encoding, D: From<E::Repr>> OnScanField for SaveScalar<'t, E, D> {
 }
 
 /// [`OnScanField`] that writes the decoded values to the provided location.
-pub struct SaveRepeated<'t, E: Encoding, D>(&'t mut D, super::EmitRepeated<E>);
+pub struct SaveRepeated<'t, E: Encoding, D>(&'t mut D, PhantomData<E>);
 
 impl<'t, E: Encoding, D> SaveRepeated<'t, E, D> {
     pub fn new(to: &'t mut D) -> Self {
-        Self(to, super::EmitRepeated::new())
+        Self(to, PhantomData)
     }
 }
 
@@ -56,22 +56,32 @@ impl<'t, E: Encoding, D> ScanTypes for SaveRepeated<'t, E, D> {
 }
 
 impl<'t, E: Encoding, D: Extend<E::Repr>> OnScanField for SaveRepeated<'t, E, D> {
-    fn into_output(self) -> Self::ScanOutput {
-        self.0.extend(self.1.into_output())
-    }
+    fn into_output(self) -> Self::ScanOutput {}
 
     fn on_scalar(&mut self, value: ScalarField) -> Result<Option<Infallible>, StopScan> {
-        self.1.on_scalar(value)
+        let value = <E::Wire as ScalarWireType>::from_value(value).ok_or(StopScan)?;
+        let decoded = E::decode(value).map_err(Into::into)?.into();
+        self.0.extend([decoded]);
+        Ok(None)
     }
 
-    fn on_group(&mut self, op: GroupOp) -> Result<Option<Infallible>, StopScan> {
-        self.1.on_group(op)
+    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Infallible>, StopScan> {
+        Err(StopScan)
     }
 
     fn on_length_delimited(
         &mut self,
         delimited: impl LengthDelimited,
     ) -> Result<Option<Infallible>, StopScan> {
-        self.1.on_length_delimited(delimited)
+        let mut packed = delimited.into_packed::<E::Wire>();
+        let mut result = Ok(None);
+        self.0.extend(core::iter::from_fn(|| {
+            let value = packed.next()?.ok().and_then(|w| E::decode(w).ok());
+            if value.is_none() {
+                result = Err(StopScan);
+            }
+            value
+        }));
+        result
     }
 }
