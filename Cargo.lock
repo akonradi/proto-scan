@@ -360,6 +360,7 @@ dependencies = [
  "derive_more",
  "either",
  "num-traits",
+ "proto-scan-derive",
 ]
 
 [[package]]
@@ -383,6 +384,7 @@ version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "proto-scan-gen",
+ "syn",
 ]
 
 [[package]]

@@ -107,6 +107,7 @@ pub enum FieldType {
     Unsupported,
 }
 
+#[derive(Copy, Clone)]
 pub enum SingleFieldType {
     Bool,
     FixedU64,

@@ -1,6 +1,170 @@
-use proc_macro::TokenStream;
+use proc_macro2::{Span, TokenStream};
+use proto_scan_gen::ScannableMessage;
+use proto_scan_gen::field::{FieldType, MessageField, SingleFieldType};
+use syn::punctuated::Punctuated;
+use syn::spanned::Spanned;
+use syn::{Attribute, DataStruct, DeriveInput, Ident, Meta, Result, Token};
 
 #[proc_macro_derive(ScanMessage)]
-pub fn scan_message_derive(input: TokenStream) -> TokenStream {
-    TokenStream::new()
+pub fn scan_message_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+    derive_impl(input)
+        .unwrap_or_else(|e| e.into_compile_error())
+        .into()
+}
+
+fn derive_impl(input: DeriveInput) -> Result<TokenStream> {
+    let DeriveInput {
+        attrs,
+        vis,
+        ident,
+        generics,
+        data,
+    } = input;
+
+    if !generics.params.is_empty() {
+        return Err(syn::Error::new(
+            generics.span(),
+            "generics are not supported",
+        ));
+    }
+
+    match data {
+        syn::Data::Struct(data_struct) => message_impl(ident, data_struct),
+        syn::Data::Enum(data_enum) => todo!(),
+        syn::Data::Union(u) => {
+            return Err(syn::Error::new(
+                u.union_token.span(),
+                "union types are not supported",
+            ));
+        }
+    }
+}
+
+fn message_impl(name: Ident, data_struct: DataStruct) -> Result<TokenStream> {
+    let fields = data_struct
+        .fields
+        .into_iter()
+        .enumerate()
+        .map(|(i, field)| {
+            let span = field.span();
+            let syn::Field {
+                attrs,
+                vis,
+                mutability,
+                ident: field_name,
+                colon_token,
+                ty,
+            } = field;
+
+            let field_name =
+                field_name.ok_or_else(|| syn::Error::new(span, "message fields must be named"))?;
+
+            let ProstAttrs {
+                field_type,
+                field_number,
+            } = (span, attrs).try_into()?;
+
+            let generic = Ident::new(&format!("T{i}"), Span::call_site());
+
+            Ok(MessageField {
+                field_name,
+                field_type,
+                field_number,
+                generic,
+            })
+        })
+        .collect::<Result<_>>()?;
+
+    let message = ScannableMessage { name, fields };
+    Ok([message.scanner().generated_code()].into_iter().collect())
+}
+
+struct ProstAttrs {
+    field_type: FieldType,
+    field_number: u32,
+}
+
+impl TryFrom<(Span, Vec<Attribute>)> for ProstAttrs {
+    type Error = syn::Error;
+
+    fn try_from((span, value): (Span, Vec<Attribute>)) -> std::result::Result<Self, Self::Error> {
+        let attrs = prost_attrs(value)?;
+
+        let mut single_field_type = None;
+        let mut field_number = None;
+        let mut repeated = false;
+
+        let single_field_type_names = [
+            ("bool", SingleFieldType::Bool),
+            ("fixed64", SingleFieldType::FixedU64),
+        ];
+
+        for attr in attrs {
+            for (name, single) in &single_field_type_names {
+                if attr.path().is_ident(name) {
+                    let _ = attr.require_path_only();
+                    if let Some(_) = single_field_type.replace(*single) {
+                        return Err(syn::Error::new(attr.span(), "found more than one type"));
+                    }
+                }
+            }
+            if attr.path().is_ident("repeated") {
+                let _ = attr.require_path_only();
+                repeated = true;
+            }
+            if attr.path().is_ident("tag") {
+                let value = &attr.require_name_value()?.value;
+                let value: u32 = match value {
+                    syn::Expr::Lit(syn::ExprLit {
+                        lit: syn::Lit::Str(value),
+                        ..
+                    }) => value.value().parse().ok(),
+                    _ => None,
+                }
+                .ok_or_else(|| {
+                    syn::Error::new(
+                        attr.span(),
+                        format!("unsupported tag value {:?}", value.span().source_text()),
+                    )
+                })?;
+                if let Some(_) = field_number.replace(value) {
+                    return Err(syn::Error::new(value.span(), "more than one tag number"));
+                }
+            }
+        }
+
+        let field_type = if repeated {
+            FieldType::Unsupported
+        } else {
+            single_field_type
+                .map(FieldType::Single)
+                .unwrap_or(FieldType::Unsupported)
+        };
+
+        let field_number =
+            field_number.ok_or_else(|| syn::Error::new(span, "no field number found"))?;
+
+        Ok(Self {
+            field_type,
+            field_number,
+        })
+    }
+}
+
+/// Get the items belonging to the 'prost' list attribute, e.g. `#[prost(foo, bar="baz")]`.
+fn prost_attrs(attrs: Vec<Attribute>) -> Result<Vec<Meta>> {
+    let mut result = Vec::new();
+    for attr in attrs.iter() {
+        if let Meta::List(meta_list) = &attr.meta {
+            if meta_list.path.is_ident("prost") {
+                result.extend(
+                    meta_list
+                        .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?
+                        .into_iter(),
+                )
+            }
+        }
+    }
+    Ok(result)
 }

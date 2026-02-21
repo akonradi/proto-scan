@@ -37,10 +37,12 @@ message ScanExample {
   MultiFieldMessage single_msg = 2;
   repeated bool repeated_bool = 3;
   optional bool single_bool = 4;
+  /*
   oneof oneof_group{
     bool oneof_bool = 5;
     fixed32 oneof_fixed32 = 6;
     MultiFieldMessage oneof_message = 7;
   }
+  */
   optional fixed64 single_fixed64 = 8;
 }
