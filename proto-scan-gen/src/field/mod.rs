@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::{ToTokens, format_ident, quote};
 use syn::{Ident, parse_quote};
 
 #[derive(Debug)]
@@ -59,48 +59,55 @@ impl MessageScannerField<'_> {
         let generic_types = parent.generic_types();
         let before_no_op = generic_types.clone().take(*index).collect::<Vec<_>>();
         let after_no_op = generic_types.skip(*index + 1).collect::<Vec<_>>();
+
+        let swap_single_field_fn =
+            |fn_name: Ident,
+             args: Vec<TokenStream>,
+             (scan_event_type, scan_output_type): (TokenStream, TokenStream),
+             construct_field: TokenStream| {
+                quote! {
+                    pub fn #fn_name <'t>(
+                        self,
+                        #(#args),*
+                    ) -> #scanner_name<
+                            #(#before_no_op,)*
+                            impl ::proto_scan::scan::field::OnScanField<
+                                ScanEvent = #scan_event_type,
+                                ScanOutput = #scan_output_type
+                            > + 't,
+                            #(#after_no_op,)*
+                    > {
+                        let Self { #(#scanner_fields,)* } = self;
+                        let _ = #field_name;
+                        let #field_name = #construct_field;
+                        #scanner_name { #(#scanner_fields,)* }
+                    }
+                }
+            };
+
         match field_type {
-            FieldType::Single { ty: single, number: _ } => {
+            FieldType::Single {
+                ty: single,
+                number: _,
+            } => {
                 let encoding_type = single.encoding_type();
                 let repr_type = single.repr_type();
 
-                let save_fn = format_ident!("save_{field_name}");
-                let save_fn = quote! {
-                    pub fn #save_fn <'t>(
-                        self,
-                        to: &'t mut impl From<#repr_type>,
-                    ) -> #scanner_name<
-                            #(#before_no_op,)*
-                            impl ::proto_scan::scan::field::OnScanField<
-                                ScanEvent = ::core::convert::Infallible,
-                                ScanOutput = ()
-                            > + 't,
-                            #(#after_no_op,)*
-                    > {
-                        let Self { #(#scanner_fields,)* } = self;
-                        let _ = #field_name;
-                        let #field_name = ::proto_scan::scan::field::SaveScalar::<'_, #encoding_type, _>::new(to);
-                        #scanner_name { #(#scanner_fields,)* }
-                    }
-                };
-                let emit_fn = format_ident!("emit_{field_name}");
-                let emit_fn = quote! {
-                    pub fn #emit_fn<'t>(
-                        self,
-                    ) -> #scanner_name<
-                            #(#before_no_op,)*
-                            impl ::proto_scan::scan::field::OnScanField<
-                                ScanEvent = #repr_type,
-                                ScanOutput=::core::option::Option<#repr_type>
-                            > + 't,
-                            #(#after_no_op,)*
-                    > {
-                        let Self { #(#scanner_fields,)* } = self;
-                        let _ = #field_name;
-                        let #field_name = ::proto_scan::scan::field::EmitScalar::<#encoding_type>::new();
-                        #scanner_name { #(#scanner_fields,)* }
-                    }
-                };
+                let save_fn = swap_single_field_fn(
+                    format_ident!("save_{field_name}"),
+                    vec![quote!(to: &'t mut impl From<#repr_type>)],
+                    (quote!(::core::convert::Infallible), quote!(())),
+                    quote!(::proto_scan::scan::field::SaveScalar::<'_, #encoding_type, _>::new(to)),
+                );
+                let emit_fn = swap_single_field_fn(
+                    format_ident!("emit_{field_name}"),
+                    vec![],
+                    (
+                        repr_type.to_token_stream(),
+                        quote!(::core::option::Option<#repr_type>),
+                    ),
+                    quote!(::proto_scan::scan::field::EmitScalar::<#encoding_type>::new()),
+                );
                 vec![save_fn, emit_fn]
             }
             FieldType::Unsupported => Vec::<TokenStream>::new(),
