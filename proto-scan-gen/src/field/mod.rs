@@ -62,11 +62,12 @@ impl MessageScannerField<'_> {
 
         let swap_single_field_fn =
             |fn_name: Ident,
+             generics: Vec<TokenStream>,
              args: Vec<TokenStream>,
              (scan_event_type, scan_output_type): (TokenStream, TokenStream),
              construct_field: TokenStream| {
                 quote! {
-                    pub fn #fn_name <'t>(
+                    pub fn #fn_name <'t, #(#generics),*>(
                         self,
                         #(#args),*
                     ) -> #scanner_name<
@@ -85,6 +86,16 @@ impl MessageScannerField<'_> {
                 }
             };
 
+        let scan_fn = swap_single_field_fn(
+            format_ident!("scan_{field_name}"),
+            vec![quote!(SE), quote!(SO)],
+            vec![
+                quote!(scanner: impl ::proto_scan::scan::field::OnScanField<ScanEvent=SE, ScanOutput=SO> + 't),
+            ],
+            (quote!(SE), quote!(SO)),
+            quote!(scanner),
+        );
+
         match field_type {
             FieldType::Single {
                 ty: single,
@@ -95,6 +106,7 @@ impl MessageScannerField<'_> {
 
                 let save_fn = swap_single_field_fn(
                     format_ident!("save_{field_name}"),
+                    vec![],
                     vec![quote!(to: &'t mut impl From<#repr_type>)],
                     (quote!(::core::convert::Infallible), quote!(())),
                     quote!(::proto_scan::scan::field::SaveScalar::<'_, #encoding_type, _>::new(to)),
@@ -102,13 +114,14 @@ impl MessageScannerField<'_> {
                 let emit_fn = swap_single_field_fn(
                     format_ident!("emit_{field_name}"),
                     vec![],
+                    vec![],
                     (
                         repr_type.to_token_stream(),
                         quote!(::core::option::Option<#repr_type>),
                     ),
                     quote!(::proto_scan::scan::field::EmitScalar::<#encoding_type>::new()),
                 );
-                vec![save_fn, emit_fn]
+                vec![save_fn, emit_fn, scan_fn]
             }
             FieldType::Repeated { ty, number: _ } => {
                 let encoding_type = ty.encoding_type();
@@ -116,6 +129,7 @@ impl MessageScannerField<'_> {
 
                 let save_fn = swap_single_field_fn(
                     format_ident!("save_{field_name}"),
+                    vec![],
                     vec![quote!(to: &'t mut impl ::core::iter::Extend<#repr_type>)],
                     (quote!(::core::convert::Infallible), quote!(())),
                     quote!(::proto_scan::scan::field::SaveRepeated::<'_, #encoding_type, _>::new(to)),
@@ -123,15 +137,16 @@ impl MessageScannerField<'_> {
                 let emit_fn = swap_single_field_fn(
                     format_ident!("emit_{field_name}"),
                     vec![],
+                    vec![],
                     (
                         quote!(::core::convert::Infallible),
                         quote!(::std::vec::Vec<#repr_type>),
                     ),
                     quote!(::proto_scan::scan::field::EmitRepeated::<#encoding_type>::new()),
                 );
-                vec![save_fn, emit_fn]
+                vec![save_fn, emit_fn, scan_fn]
             }
-            FieldType::Unsupported => Vec::<TokenStream>::new(),
+            FieldType::Unsupported => vec![scan_fn],
         }
     }
 }

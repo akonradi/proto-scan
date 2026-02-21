@@ -1,5 +1,6 @@
 use crate::proto;
 
+mod custom_field_scanner;
 mod read_all;
 mod single_scalar;
 mod repeated_scalar;
