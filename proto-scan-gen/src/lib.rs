@@ -2,7 +2,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::Ident;
 
-use crate::field::{MessageField, MessageScannerField};
+use crate::field::{FieldType, MessageField, MessageScannerField};
 
 pub mod field;
 
@@ -155,10 +155,13 @@ impl MessageScanner<'_> {
         let field_arms = |fn_name: &str| {
             let scan_event_name = &scan_event_name;
             let fn_name = format_ident!("{fn_name}");
-            self.fields().map(move |MessageScannerField { parent: _, index, field: MessageField { field_name, generic: _, field_number, field_type: _ } }| {
+            self.fields().map(move |MessageScannerField { parent: _, index, field: MessageField { field_name, generic: _, field_type } }| {
                 let event_variant_name = format_ident!("Event{index}");
-                quote! {
-                    #field_number => self.#field_name.#fn_name(value)?.map(#scan_event_name::#event_variant_name)
+                match field_type {
+                    FieldType::Single { ty: _, number: field_number } => quote! {
+                        #field_number => self.#field_name.#fn_name(value)?.map(#scan_event_name::#event_variant_name),
+                    },
+                    FieldType::Unsupported => TokenStream::new()
                 }
             })
         };
@@ -179,14 +182,14 @@ impl MessageScanner<'_> {
                     value: ::proto_scan::wire::ScalarField,
                 ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
                     Ok(match u32::from(field) {
-                        #(#on_scalar_arms,)*
+                        #(#on_scalar_arms)*
                         _ => None,
                     })
                 }
 
                 fn on_group(&mut self, field: ::proto_scan::wire::FieldNumber, value: ::proto_scan::wire::GroupOp) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
                     Ok(match u32::from(field) {
-                        #(#on_group_arms,)*
+                        #(#on_group_arms)*
                         _ => None,
                     })
                 }
@@ -197,7 +200,7 @@ impl MessageScanner<'_> {
                     value: impl ::proto_scan::wire::LengthDelimited,
                 ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
                     Ok(match u32::from(field) {
-                        #(#on_length_delimited_arms,)*
+                        #(#on_length_delimited_arms)*
                         _ => None,
                     })
                 }

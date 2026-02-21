@@ -60,17 +60,13 @@ fn message_impl(name: Ident, data_struct: DataStruct) -> Result<TokenStream> {
             let field_name =
                 field_name.ok_or_else(|| syn::Error::new(span, "message fields must be named"))?;
 
-            let ProstAttrs {
-                field_type,
-                field_number,
-            } = (span, attrs).try_into()?;
+            let ProstAttrs { field_type } = (span, attrs).try_into()?;
 
             let generic = Ident::new(&format!("T{i}"), Span::call_site());
 
             Ok(MessageField {
                 field_name,
                 field_type,
-                field_number,
                 generic,
             })
         })
@@ -82,7 +78,6 @@ fn message_impl(name: Ident, data_struct: DataStruct) -> Result<TokenStream> {
 
 struct ProstAttrs {
     field_type: FieldType,
-    field_number: u32,
 }
 
 impl TryFrom<(Span, Vec<Attribute>)> for ProstAttrs {
@@ -137,18 +132,13 @@ impl TryFrom<(Span, Vec<Attribute>)> for ProstAttrs {
         let field_type = if repeated {
             FieldType::Unsupported
         } else {
-            single_field_type
-                .map(FieldType::Single)
-                .unwrap_or(FieldType::Unsupported)
+            match (single_field_type, field_number) {
+                (Some(ty), Some(number)) => FieldType::Single { ty, number },
+                _ => FieldType::Unsupported,
+            }
         };
 
-        let field_number =
-            field_number.ok_or_else(|| syn::Error::new(span, "no field number found"))?;
-
-        Ok(Self {
-            field_type,
-            field_number,
-        })
+        Ok(Self { field_type })
     }
 }
 

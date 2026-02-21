@@ -2,11 +2,11 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{Ident, parse_quote};
 
+#[derive(Debug)]
 pub struct MessageField {
     pub field_name: Ident,
-    pub field_type: FieldType,
-    pub field_number: u32,
     pub generic: Ident,
+    pub field_type: FieldType,
 }
 
 pub(crate) struct MessageScannerField<'m> {
@@ -60,7 +60,7 @@ impl MessageScannerField<'_> {
         let before_no_op = generic_types.clone().take(*index).collect::<Vec<_>>();
         let after_no_op = generic_types.skip(*index + 1).collect::<Vec<_>>();
         match field_type {
-            FieldType::Single(single) => {
+            FieldType::Single { ty: single, number: _ } => {
                 let encoding_type = single.encoding_type();
                 let repr_type = single.repr_type();
 
@@ -102,12 +102,13 @@ impl MessageScannerField<'_> {
     }
 }
 
+#[derive(Debug)]
 pub enum FieldType {
-    Single(SingleFieldType),
+    Single { ty: SingleFieldType, number: u32 },
     Unsupported,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum SingleFieldType {
     Bool,
     FixedU64,
@@ -132,4 +133,3 @@ impl SingleFieldType {
         }
     }
 }
-

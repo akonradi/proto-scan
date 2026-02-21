@@ -15,9 +15,9 @@ fn example_msg() -> prost_proto::ScanExample {
         }),
         repeated_bool: vec![true, true, false, false],
         single_bool: Some(true),
-        // oneof_group: Some(prost_proto::scan_example::OneofGroup::OneofFixed32(
-        //     11111111,
-        // )),
+        oneof_group: Some(prost_proto::scan_example::OneofGroup::OneofFixed32(
+            11111111,
+        )),
         single_fixed64: Some(123456789),
     }
 }
@@ -115,9 +115,7 @@ mod read_all {
             repeated_msg: None,
             single_msg: None,
             repeated_bool: None,
-            // oneof_bool: None,
-            // oneof_fixed32: None,
-            // oneof_message: None,
+            oneof_group: None,
             single_fixed64,
         } = read_all.unwrap();
 
@@ -138,9 +136,7 @@ mod read_all {
             single_msg: None,
             repeated_bool: None,
             single_bool: None,
-            // oneof_bool: None,
-            // oneof_fixed32: None,
-            // oneof_message: None,
+            oneof_group: None,
             single_fixed64: None,
         } = scanner
             .scan(message.encode_to_vec().as_slice())

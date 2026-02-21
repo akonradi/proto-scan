@@ -368,6 +368,7 @@ name = "proto-scan-build"
 version = "0.1.0"
 dependencies = [
  "either",
+ "itertools",
  "log",
  "proc-macro2",
  "prost",
