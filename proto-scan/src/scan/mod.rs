@@ -15,23 +15,21 @@ pub trait ScanMessage {
     fn scanner() -> Self::Scanner;
 }
 
-/// A scan in progress.
-pub trait Scan: IntoIterator<Item = Result<Self::Event, StopScan>> {
-    type Event;
-    type Output;
+pub trait ScanTypes {
+    /// Output on processing a scan event.
+    type ScanEvent;
+    /// Result of collecting a sequence of parse events.
+    type ScanOutput;
+}
 
+/// A scan in progress.
+pub trait Scan: ScanTypes + IntoIterator<Item = Result<Self::ScanEvent, StopScan>> {
     /// Performs a complete scan, returning the result.
-    fn read_all(self) -> Result<Self::Output, StopScan>;
+    fn read_all(self) -> Result<Self::ScanOutput, StopScan>;
 }
 
 /// Callbacks for parse inputs encountered during a scan.
-pub trait ScanCallbacks {
-    /// Output on processing a parse event.
-    type ScanEvent;
-
-    /// Result of collecting a sequence of parse events.
-    type ScanOutput: FromIterator<Self::ScanEvent>;
-
+pub trait ScanCallbacks: ScanTypes<ScanOutput: FromIterator<Self::ScanEvent>> {
     /// Called when a scalar field is parsed.
     fn on_scalar(
         &mut self,
@@ -58,6 +56,11 @@ impl<P, S> ScanWith<P, S> {
     pub fn new(input: P, scanner: S) -> Self {
         Self(input, scanner)
     }
+}
+
+impl<P: ParseEventReader, S: ScanCallbacks> ScanTypes for ScanWith<P, S> {
+    type ScanEvent = S::ScanEvent;
+    type ScanOutput = S::ScanOutput;
 }
 
 /// [`IntoIterator::IntoIter`] type for [`ScanWith`].
@@ -96,10 +99,7 @@ impl<P: ParseEventReader, S: ScanCallbacks> Iterator for IntoIter<P, S> {
 }
 
 impl<P: ParseEventReader, S: ScanCallbacks> Scan for ScanWith<P, S> {
-    type Event = S::ScanEvent;
-    type Output = S::ScanOutput;
-
-    fn read_all(self) -> Result<Self::Output, StopScan> {
+    fn read_all(self) -> Result<Self::ScanOutput, StopScan> {
         self.into_iter().collect()
     }
 }

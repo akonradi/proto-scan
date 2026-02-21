@@ -128,7 +128,8 @@ impl ProtoMessageScanner<'_> {
         let generics = self.generic_types().collect::<Vec<_>>();
         let generics_on_scan_bounds = generics
             .iter()
-            .map(|g| quote!(#g: ::proto_scan::scan::field::OnScanField));
+            .map(|g| quote!(#g: ::proto_scan::scan::field::OnScanField))
+            .collect::<Vec<_>>();
         let generics_scan_event = generics
             .iter()
             .map(|g| quote!(#g::ScanEvent))
@@ -148,10 +149,12 @@ impl ProtoMessageScanner<'_> {
         let on_group_arms = field_arms("on_group");
         let on_length_delimited_arms = field_arms("on_length_delimited");
         quote! {
-            impl <#(#generics_on_scan_bounds,)*> ::proto_scan::scan::ScanCallbacks for #scanner_name<#(#generics,)*> {
+            impl <#(#generics_on_scan_bounds,)*> ::proto_scan::scan::ScanTypes for #scanner_name<#(#generics,)*> {
                 type ScanEvent = Option<#scan_event_name<#(#generics_scan_event),*>>;
                 type ScanOutput = #output_name<#(#generics_scan_event),*>;
+            }
 
+            impl <#(#generics_on_scan_bounds,)*> ::proto_scan::scan::ScanCallbacks for #scanner_name<#(#generics,)*> {
                 fn on_scalar(
                     &mut self,
                     field: ::proto_scan::wire::FieldNumber,
@@ -189,7 +192,8 @@ impl ProtoMessageScanner<'_> {
         let generics = self.generic_types().collect::<Vec<_>>();
         let generics_on_scan_bounds = generics
             .iter()
-            .map(|g| quote!(#g: ::proto_scan::scan::field::OnScanField));
+            .map(|g| quote!(#g: ::proto_scan::scan::field::OnScanField))
+            .collect::<Vec<_>>();
         let generics_lifetime_bounds = generics.iter().map(|g| quote!(#g: 'r));
         quote! {
             impl<#(#generics_on_scan_bounds,)*> #scanner_name <#(#generics,)*> {
@@ -197,8 +201,8 @@ impl ProtoMessageScanner<'_> {
                     self,
                     read: impl ::proto_scan::read::Read + 'r,
                 ) -> impl ::proto_scan::scan::Scan<
-                        Event = <Self as ::proto_scan::scan::ScanCallbacks>::ScanEvent,
-                        Output = <Self as ::proto_scan::scan::ScanCallbacks>::ScanOutput,
+                        ScanEvent = <Self as ::proto_scan::scan::ScanTypes>::ScanEvent,
+                        ScanOutput = <Self as ::proto_scan::scan::ScanTypes>::ScanOutput,
                     > + 'r
                 where
                     #(#generics_lifetime_bounds,)*
