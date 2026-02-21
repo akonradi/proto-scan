@@ -67,7 +67,7 @@ fn generate(requests: Vec<(Module, FileDescriptorProto)>) -> Result<HashMap<Modu
     for (module, fd) in requests {
         let name = &fd.name;
         println!("generating for {name:?} as {module:?}");
-        let contents = generate::generate_module(&module, fd)?;
+        let contents = generate::generate_module(fd)?;
 
         output.insert(module, contents);
     }

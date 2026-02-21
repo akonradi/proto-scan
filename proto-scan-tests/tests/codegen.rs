@@ -29,7 +29,7 @@ mod save_single_bool {
     fn empty() {
         let mut save_to = None;
 
-        let scanner = proto::testing::ScanExample::scanner().save_single_bool(&mut save_to);
+        let scanner = proto::ScanExample::scanner().save_single_bool(&mut save_to);
         {
             for event in scanner.scan([].as_slice()) {
                 match Result::unwrap(event) {
@@ -45,7 +45,7 @@ mod save_single_bool {
     fn with_field() {
         let mut save_to = None;
 
-        let scanner = proto::testing::ScanExample::scanner().save_single_bool(&mut save_to);
+        let scanner = proto::ScanExample::scanner().save_single_bool(&mut save_to);
         {
             let message = example_msg().encode_to_vec();
             for event in scanner.scan(message.as_slice()) {
@@ -66,11 +66,11 @@ mod emit_single_bool {
     fn empty() {
         let mut save_to = None::<bool>;
 
-        let scanner = proto::testing::ScanExample::scanner().emit_single_bool();
+        let scanner = proto::ScanExample::scanner().emit_single_bool();
         {
             for event in scanner.scan([].as_slice()) {
                 match Result::unwrap(event) {
-                    Some(proto::testing::ScanScanExampleEvent::Event3(b)) => {
+                    Some(proto::ScanScanExampleEvent::Event3(b)) => {
                         save_to = Some(b);
                     }
                     None => {}
@@ -85,12 +85,12 @@ mod emit_single_bool {
     fn with_field() {
         let mut save_to = None;
 
-        let scanner = proto::testing::ScanExample::scanner().emit_single_bool();
+        let scanner = proto::ScanExample::scanner().emit_single_bool();
         {
             let message = example_msg().encode_to_vec();
             for event in scanner.scan(message.as_slice()) {
                 match Result::unwrap(event) {
-                    Some(proto::testing::ScanScanExampleEvent::Event3(b)) => save_to = Some(b),
+                    Some(proto::ScanScanExampleEvent::Event3(b)) => save_to = Some(b),
                     None => {}
                 }
             }
@@ -105,13 +105,13 @@ mod read_all {
 
     #[test]
     fn empty() {
-        let scanner = proto::testing::ScanExample::scanner()
+        let scanner = proto::ScanExample::scanner()
             .emit_single_bool()
             .emit_single_fixed64()
             .emit_repeated_bool();
         let scan = scanner.scan([].as_slice());
         let read_all = scan.read_all();
-        let proto::testing::ScanScanExampleOutput {
+        let proto::ScanScanExampleOutput {
             single_bool,
             repeated_msg: (),
             single_msg: (),
@@ -130,11 +130,11 @@ mod read_all {
         let message = example_msg();
         let mut save_to = (None, None, vec![]);
 
-        let scanner = proto::testing::ScanExample::scanner()
+        let scanner = proto::ScanExample::scanner()
             .save_single_bool(&mut save_to.0)
             .save_single_fixed64(&mut save_to.1)
             .save_repeated_bool(&mut save_to.2);
-        let proto::testing::ScanScanExampleOutput {
+        let proto::ScanScanExampleOutput {
             repeated_msg: (),
             single_msg: (),
             repeated_bool: (),

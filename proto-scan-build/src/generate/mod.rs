@@ -1,6 +1,5 @@
 use itertools::Itertools as _;
 use proc_macro2::{Span, TokenStream};
-use prost_build::Module;
 use prost_types::FileDescriptorProto;
 use prost_types::{DescriptorProto, OneofDescriptorProto};
 use proto_scan_gen::ScannableMessage;
@@ -10,7 +9,7 @@ use std::collections::HashMap;
 use std::io::Result;
 use syn::Ident;
 
-pub(crate) fn generate_module(module: &Module, fd: FileDescriptorProto) -> Result<String> {
+pub(crate) fn generate_module(fd: FileDescriptorProto) -> Result<String> {
     let FileDescriptorProto {
         name: _,
         package: _,
@@ -31,14 +30,7 @@ pub(crate) fn generate_module(module: &Module, fd: FileDescriptorProto) -> Resul
         .map(generate_message)
         .collect::<Result<Vec<_>>>()?;
 
-    let parts = module
-        .parts()
-        .map(|m| format!("pub mod {m} {{"))
-        .chain(messages)
-        .chain(module.parts().map(|_| "}".to_owned()))
-        .collect::<Vec<_>>();
-
-    Ok(parts.join("\n"))
+    Ok(messages.join("\n"))
 }
 
 fn generate_message(message: &DescriptorProto) -> Result<String> {
