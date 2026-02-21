@@ -1,4 +1,4 @@
-use crate::scan::StopScan;
+use crate::scan::{ScanTypes, StopScan};
 #[cfg(doc)]
 use crate::wire::FieldNumber;
 use crate::wire::{GroupOp, LengthDelimited, ScalarField};
@@ -14,9 +14,8 @@ pub use no_op::NoOp;
 pub use save::Save;
 
 /// Implemented by a visitor for a fixed [`FieldNumber`].
-pub trait OnScanField {
-    /// Output event when a callback is invoked (and succeeds).
-    type ScanEvent;
+pub trait OnScanField: ScanTypes<ScanOutput: Default> {
+    fn into_output(self) -> Self::ScanOutput;
 
     /// Called when a scalar tag is read.
     fn on_scalar(&mut self, value: ScalarField) -> Result<Option<Self::ScanEvent>, StopScan>;

@@ -48,7 +48,6 @@ impl MessageScanner<'_> {
             self.scan_output_definition(),
             self.0.impl_scan_message(),
             self.scan_callbacks_impl(),
-            self.output_impl_extend_event(),
         ]
         .into_iter()
         .chain(scan_field_impls)
@@ -103,20 +102,12 @@ impl MessageScanner<'_> {
                  field_name,
                  generic,
                  ..
-             }| quote!(#field_name: ::core::option::Option<#generic>),
+             }| quote!(#field_name: #generic),
         );
         quote! {
-            #[derive(Copy, Clone, Debug, PartialEq, Hash)]
+            #[derive(Copy, Clone, Debug, Default, PartialEq, Hash)]
             pub struct #name <#(#scan_types),*> {
                 #(pub #scan_fields ),*
-            }
-
-            impl<#(#scan_types),*> ::core::default::Default for #name <#(#scan_types),*> {
-                fn default() -> Self {
-                    Self {
-                        #(#fields: ::core::option::Option::None),*
-                    }
-                }
             }
         }
     }
@@ -148,10 +139,7 @@ impl MessageScanner<'_> {
             .iter()
             .map(|g| quote!(#g: ::proto_scan::scan::field::OnScanField))
             .collect::<Vec<_>>();
-        let generics_scan_event = generics
-            .iter()
-            .map(|g| quote!(#g::ScanEvent))
-            .collect::<Vec<_>>();
+        let field_names = self.field_names().collect::<Vec<_>>();
         let field_arms = |fn_name: &str| {
             let scan_event_name = &scan_event_name;
             let fn_name = format_ident!("{fn_name}");
@@ -171,8 +159,17 @@ impl MessageScanner<'_> {
         let on_length_delimited_arms = field_arms("on_length_delimited");
         quote! {
             impl <#(#generics_on_scan_bounds,)*> ::proto_scan::scan::ScanTypes for #scanner_name<#(#generics,)*> {
-                type ScanEvent = Option<#scan_event_name<#(#generics_scan_event),*>>;
-                type ScanOutput = #output_name<#(#generics_scan_event),*>;
+                type ScanEvent = Option<#scan_event_name<#(#generics :: ScanEvent),*>>;
+                type ScanOutput = #output_name<#(#generics::ScanOutput),*>;
+            }
+
+            impl <#(#generics_on_scan_bounds,)*> ::core::convert::From<#scanner_name<#(#generics,)*>> for #output_name<#(#generics::ScanOutput),*> {
+                fn from(scanner: #scanner_name<#(#generics),*>) -> Self {
+                    let #scanner_name { #(#field_names),* } = scanner;
+                    Self {
+                        #(#field_names: #field_names.into_output(),)*
+                    }
+                }
             }
 
             impl <#(#generics_on_scan_bounds,)*> ::proto_scan::scan::ScanCallbacks for #scanner_name<#(#generics,)*> {
@@ -234,39 +231,5 @@ impl MessageScanner<'_> {
     fn scan_event_name(&self) -> Ident {
         let scanner_name = self.type_name();
         Ident::new(&format!("{scanner_name}Event"), Span::call_site())
-    }
-
-    fn output_impl_extend_event(&self) -> TokenStream {
-        let output_name = format_ident!("{}Output", self.type_name());
-        let scan_event_name = self.scan_event_name();
-        let generics = self.generic_types().collect::<Vec<_>>();
-        let item_type = quote! {
-            ::core::option::Option<
-                #scan_event_name<#(#generics),*>
-            >
-        };
-        let field_arms = {
-            self.fields().map(move |MessageScannerField { parent: _, index, field: MessageField { field_name, .. } }| {
-                let event_variant_name = format_ident!("Event{index}");
-                quote! {
-                    #scan_event_name::#event_variant_name(t) => state.#field_name = Some(t),                }
-            })
-        };
-        quote! {
-            impl <
-            #(#generics),*
-            > ::core::iter::FromIterator<#item_type> for #output_name<#(#generics),*> {
-                fn from_iter<I: ::core::iter::IntoIterator<Item=#item_type>>(items: I) -> Self {
-                    let mut state = Self::default();
-                    for item in items {
-                        let Some(item) = item else {continue};
-                        match item {
-                            #(#field_arms)*
-                        }
-                    }
-                    state
-                }
-            }
-        }
     }
 }

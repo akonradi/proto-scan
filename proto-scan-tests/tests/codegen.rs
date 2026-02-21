@@ -112,10 +112,10 @@ mod read_all {
         let read_all = scan.read_all();
         let proto::testing::ScanScanExampleOutput {
             single_bool,
-            repeated_msg: None,
-            single_msg: None,
-            repeated_bool: None,
-            oneof_group: None,
+            repeated_msg: (),
+            single_msg: (),
+            repeated_bool: (),
+            oneof_group: (),
             single_fixed64,
         } = read_all.unwrap();
 
@@ -132,12 +132,12 @@ mod read_all {
             .save_single_bool(&mut save_to.0)
             .save_single_fixed64(&mut save_to.1);
         let proto::testing::ScanScanExampleOutput {
-            repeated_msg: None,
-            single_msg: None,
-            repeated_bool: None,
-            single_bool: None,
-            oneof_group: None,
-            single_fixed64: None,
+            repeated_msg: (),
+            single_msg: (),
+            repeated_bool: (),
+            single_bool: (),
+            oneof_group: (),
+            single_fixed64: (),
         } = scanner
             .scan(message.encode_to_vec().as_slice())
             .read_all()

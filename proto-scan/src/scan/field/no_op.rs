@@ -1,15 +1,20 @@
 use std::convert::Infallible;
 
 use crate::scan::field::OnScanField;
-use crate::scan::{GroupOp, ScalarField, StopScan};
+use crate::scan::{GroupOp, ScalarField, ScanTypes, StopScan};
 use crate::wire::LengthDelimited;
 
 /// [`OnScanField`] impl that does nothing and always succeeds.
 #[derive(Default)]
 pub struct NoOp;
 
-impl OnScanField for NoOp {
+impl ScanTypes for NoOp {
     type ScanEvent = Infallible;
+    type ScanOutput = ();
+}
+
+impl OnScanField for NoOp {
+    fn into_output(self) -> Self::ScanOutput {}
 
     fn on_scalar(&mut self, _value: ScalarField) -> Result<Option<Self::ScanEvent>, StopScan> {
         Ok(None)

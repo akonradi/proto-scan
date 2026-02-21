@@ -71,7 +71,10 @@ impl MessageScannerField<'_> {
                         to: &'t mut impl From<#repr_type>,
                     ) -> #scanner_name<
                             #(#before_no_op,)*
-                            impl ::proto_scan::scan::field::OnScanField<ScanEvent = ::core::convert::Infallible> + 't,
+                            impl ::proto_scan::scan::field::OnScanField<
+                                ScanEvent = ::core::convert::Infallible,
+                                ScanOutput = ()
+                            > + 't,
                             #(#after_no_op,)*
                     > {
                         let Self { #(#scanner_fields,)* } = self;
@@ -86,7 +89,10 @@ impl MessageScannerField<'_> {
                         self,
                     ) -> #scanner_name<
                             #(#before_no_op,)*
-                            impl ::proto_scan::scan::field::OnScanField<ScanEvent = #repr_type> + 't,
+                            impl ::proto_scan::scan::field::OnScanField<
+                                ScanEvent = #repr_type,
+                                ScanOutput=::core::option::Option<#repr_type>
+                            > + 't,
                             #(#after_no_op,)*
                     > {
                         let Self { #(#scanner_fields,)* } = self;

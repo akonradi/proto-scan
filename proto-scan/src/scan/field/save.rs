@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
-use crate::scan::{GroupOp, ScalarField, StopScan};
+use crate::scan::{GroupOp, ScalarField, ScanTypes, StopScan};
 use crate::wire::{LengthDelimited, ScalarWireType};
 
 /// [`OnScanField`] that writes the decoded value to the provided location.
@@ -15,8 +15,13 @@ impl<'t, E, D> Save<'t, E, D> {
     }
 }
 
-impl<'t, E: Encoding, D: From<E::Repr>> OnScanField for Save<'t, E, D> {
+impl<'t, E: Encoding, D: From<E::Repr>> ScanTypes for Save<'t, E, D> {
     type ScanEvent = Infallible;
+    type ScanOutput = ();
+}
+
+impl<'t, E: Encoding, D: From<E::Repr>> OnScanField for Save<'t, E, D> {
+    fn into_output(self) -> Self::ScanOutput {}
 
     fn on_scalar(&mut self, value: ScalarField) -> Result<Option<Infallible>, StopScan> {
         let value = <E::Wire as ScalarWireType>::from_value(value).ok_or(StopScan)?;

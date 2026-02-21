@@ -9,7 +9,7 @@ pub struct ZigZag<T>(PhantomData<T>);
 
 pub trait Encoding {
     type Wire: ScalarWireType;
-    type Repr;
+    type Repr: Copy;
     type Error: Into<super::StopScan>;
 
     fn decode(wire: <Self::Wire as ScalarWireType>::Repr) -> Result<Self::Repr, Self::Error>;

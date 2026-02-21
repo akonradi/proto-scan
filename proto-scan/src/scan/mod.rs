@@ -41,7 +41,7 @@ pub trait Scan: ScanTypes + IntoIterator<Item = Result<Self::ScanEvent, StopScan
 }
 
 /// Callbacks for parse inputs encountered during a scan.
-pub trait ScanCallbacks: ScanTypes<ScanOutput: FromIterator<Self::ScanEvent>> {
+pub trait ScanCallbacks: ScanTypes {
     /// Called when a scalar field is parsed.
     fn on_scalar(
         &mut self,
@@ -110,9 +110,13 @@ impl<P: ParseEventReader, S: ScanCallbacks> Iterator for IntoIter<P, S> {
     }
 }
 
-impl<P: ParseEventReader, S: ScanCallbacks> Scan for ScanWith<P, S> {
+impl<P: ParseEventReader, S: ScanCallbacks + Into<S::ScanOutput>> Scan for ScanWith<P, S> {
     fn read_all(self) -> Result<Self::ScanOutput, StopScan> {
-        self.into_iter().collect()
+        let mut it = self.into_iter();
+        while let Some(r) = it.next() {
+            let _ = r?;
+        }
+        Ok(it.1.into())
     }
 }
 

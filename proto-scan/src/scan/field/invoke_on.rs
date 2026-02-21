@@ -1,8 +1,8 @@
-use std::convert::Infallible;
 use std::marker::PhantomData;
 
-use crate::scan::StopScan;
+use core::convert::Infallible;
 use crate::scan::field::OnScanField;
+use crate::scan::{ScanTypes, StopScan};
 use crate::wire::{GroupOp, LengthDelimited, ScalarField, ScalarWireType};
 
 /// Invokes the provided callback for each scalar value.
@@ -11,10 +11,17 @@ use crate::wire::{GroupOp, LengthDelimited, ScalarField, ScalarWireType};
 /// wrong wire type.
 pub struct InvokeOn<W: ScalarWireType, F>(F, PhantomData<W>);
 
-impl<'a, W: ScalarWireType, F: FnMut(W::Repr) -> Result<(), StopScan>> OnScanField
+impl<'a, W: ScalarWireType, F: FnMut(W::Repr) -> Result<(), StopScan>> ScanTypes
     for InvokeOn<W, F>
 {
     type ScanEvent = Infallible;
+    type ScanOutput = ();
+}
+
+impl<'a, W: ScalarWireType, F: FnMut(W::Repr) -> Result<(), StopScan>> OnScanField
+    for InvokeOn<W, F>
+{
+    fn into_output(self) -> Self::ScanOutput {}
 
     fn on_scalar(&mut self, value: ScalarField) -> Result<Option<Infallible>, StopScan> {
         let value = W::from_value(value).ok_or(StopScan)?;
@@ -24,10 +31,7 @@ impl<'a, W: ScalarWireType, F: FnMut(W::Repr) -> Result<(), StopScan>> OnScanFie
     fn on_group(&mut self, _: GroupOp) -> Result<Option<Infallible>, StopScan> {
         Ok(None)
     }
-    fn on_length_delimited(
-        &mut self,
-        _: impl LengthDelimited,
-    ) -> Result<Option<Infallible>, StopScan> {
+    fn on_length_delimited(&mut self, _: impl LengthDelimited) -> Result<Option<Infallible>, StopScan> {
         Ok(None)
     }
 }
