@@ -96,7 +96,6 @@ impl MessageScanner<'_> {
     fn scan_output_definition(&self) -> TokenStream {
         let name = format_ident!("{}Output", self.type_name());
         let scan_types = self.generic_types().collect::<Vec<_>>();
-        let fields = self.field_names();
         let scan_fields = self.0.fields.iter().map(
             |MessageField {
                  field_name,
@@ -200,6 +199,12 @@ impl MessageScanner<'_> {
                         #(#on_length_delimited_arms)*
                         _ => None,
                     })
+                }
+            }
+
+            impl <#(#generics: ::proto_scan::scan::field::Resettable),*> ::proto_scan::scan::field::Resettable for #scanner_name<#(#generics,)*> {
+                fn reset(&mut self) {
+                    #(self.#field_names.reset();)*
                 }
             }
         }

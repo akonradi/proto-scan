@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use std::marker::PhantomData;
 
 use crate::scan::encoding::Encoding;
-use crate::scan::field::OnScanField;
+use crate::scan::field::{OnScanField, Resettable};
 use crate::scan::{GroupOp, ScalarField, ScanTypes, StopScan};
 use crate::wire::{LengthDelimited, ScalarWireType};
 
@@ -83,5 +83,11 @@ impl<'t, E: Encoding, D: Extend<E::Repr>> OnScanField for SaveRepeated<'t, E, D>
             value
         }));
         result
+    }
+}
+
+impl<'t, D: Resettable, E> Resettable for SaveRepeated<'t, E, D> {
+    fn reset(&mut self) {
+        self.0.reset();
     }
 }

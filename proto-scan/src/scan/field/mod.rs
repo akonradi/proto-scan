@@ -29,3 +29,7 @@ pub trait OnScanField: ScanTypes<ScanOutput: Default> {
         delimited: impl LengthDelimited,
     ) -> Result<Option<Self::ScanEvent>, StopScan>;
 }
+
+pub trait Resettable {
+    fn reset(&mut self);
+}

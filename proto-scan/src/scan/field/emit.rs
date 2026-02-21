@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 
 use crate::scan::encoding::Encoding;
-use crate::scan::field::OnScanField;
+use crate::scan::field::{OnScanField, Resettable};
 use crate::scan::{ScanTypes, StopScan};
 use crate::wire::{GroupOp, LengthDelimited, ScalarField, ScalarWireType};
 
@@ -41,6 +41,12 @@ impl<E: Encoding> OnScanField for EmitScalar<E> {
         _delimited: impl LengthDelimited,
     ) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
+    }
+}
+
+impl<E: Encoding> Resettable for EmitScalar<E> {
+    fn reset(&mut self) {
+        self.0 = None;
     }
 }
 
@@ -88,5 +94,11 @@ impl<E: Encoding> OnScanField for EmitRepeated<E> {
 
     fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
+    }
+}
+
+impl<E: Encoding> Resettable for EmitRepeated<E> {
+    fn reset(&mut self) {
+        self.0.clear()
     }
 }

@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use crate::scan::field::OnScanField;
+use crate::scan::field::{OnScanField, Resettable};
 use crate::scan::{GroupOp, ScalarField, ScanTypes, StopScan};
 use crate::wire::LengthDelimited;
 
@@ -30,4 +30,8 @@ impl OnScanField for NoOp {
     ) -> Result<Option<Self::ScanEvent>, StopScan> {
         Ok(None)
     }
+}
+
+impl Resettable for NoOp {
+    fn reset(&mut self) {}
 }
