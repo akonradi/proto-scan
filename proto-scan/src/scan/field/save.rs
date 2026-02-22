@@ -1,8 +1,10 @@
 use std::convert::Infallible;
 use std::marker::PhantomData;
+use std::ops::DerefMut;
 
+use crate::scan::Resettable;
 use crate::scan::encoding::Encoding;
-use crate::scan::field::{OnScanField, Resettable};
+use crate::scan::field::OnScanField;
 use crate::scan::{GroupOp, ScalarField, ScanTypes, StopScan};
 use crate::wire::{LengthDelimited, ScalarWireType};
 
@@ -42,20 +44,20 @@ impl<'t, E: Encoding, D: From<E::Repr>> OnScanField for SaveScalar<'t, E, D> {
 }
 
 /// [`OnScanField`] that writes the decoded values to the provided location.
-pub struct SaveRepeated<'t, E, D>(&'t mut D, PhantomData<E>);
+pub struct SaveRepeated<E, D>(D, PhantomData<E>);
 
-impl<'t, E, D> SaveRepeated<'t, E, D> {
-    pub fn new(to: &'t mut D) -> Self {
+impl<E, D> SaveRepeated<E, D> {
+    pub fn new(to: D) -> Self {
         Self(to, PhantomData)
     }
 }
 
-impl<'t, E: Encoding, D> ScanTypes for SaveRepeated<'t, E, D> {
+impl<E: Encoding, D> ScanTypes for SaveRepeated<E, D> {
     type ScanEvent = Infallible;
     type ScanOutput = ();
 }
 
-impl<'t, E: Encoding, D: Extend<E::Repr>> OnScanField for SaveRepeated<'t, E, D> {
+impl<'t, E: Encoding, D: DerefMut<Target: Extend<E::Repr>>> OnScanField for SaveRepeated<E, D> {
     fn into_output(self) -> Self::ScanOutput {}
 
     fn on_scalar(&mut self, value: ScalarField) -> Result<Option<Infallible>, StopScan> {
@@ -86,8 +88,12 @@ impl<'t, E: Encoding, D: Extend<E::Repr>> OnScanField for SaveRepeated<'t, E, D>
     }
 }
 
-impl<'t, D: Resettable, E> Resettable for SaveRepeated<'t, E, D> {
-    fn reset(&mut self) {
-        self.0.reset();
+impl<D: Resettable, E> Resettable for SaveRepeated<E, D> {
+    type Mark = D::Mark;
+    fn mark(&mut self) -> Self::Mark {
+        self.0.mark()
+    }
+    fn reset(&mut self, to: Self::Mark) {
+        self.0.reset(to);
     }
 }

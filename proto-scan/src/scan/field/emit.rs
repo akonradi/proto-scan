@@ -1,8 +1,8 @@
 use std::convert::Infallible;
 
 use crate::scan::encoding::Encoding;
-use crate::scan::field::{OnScanField, Resettable};
-use crate::scan::{ScanTypes, StopScan};
+use crate::scan::field::OnScanField;
+use crate::scan::{Resettable, ScanTypes, StopScan};
 use crate::wire::{GroupOp, LengthDelimited, ScalarField, ScalarWireType};
 
 /// [`OnScanField`] implementation that produces the read value as the event output.
@@ -45,7 +45,9 @@ impl<E: Encoding> OnScanField for EmitScalar<E> {
 }
 
 impl<E: Encoding> Resettable for EmitScalar<E> {
-    fn reset(&mut self) {
+    type Mark = ();
+    fn mark(&mut self) -> Self::Mark {}
+    fn reset(&mut self, to: ()) {
         self.0 = None;
     }
 }
@@ -98,7 +100,9 @@ impl<E: Encoding> OnScanField for EmitRepeated<E> {
 }
 
 impl<E: Encoding> Resettable for EmitRepeated<E> {
-    fn reset(&mut self) {
+    type Mark = ();
+    fn mark(&mut self) -> Self::Mark {}
+    fn reset(&mut self, (): Self::Mark) {
         self.0.clear()
     }
 }

@@ -7,6 +7,8 @@ use crate::wire::{LengthDelimited, ParseEvent, ParseEventReader};
 
 pub mod encoding;
 pub mod field;
+mod resettable;
+pub use resettable::{Resettable};
 
 /// A message that can be scanned.
 pub trait ScanMessage {

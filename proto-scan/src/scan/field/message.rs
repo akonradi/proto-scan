@@ -1,18 +1,19 @@
 use std::convert::Infallible;
 
-use crate::scan::field::{OnScanField, Resettable};
-use crate::scan::{Scan, ScanCallbacks, ScanTypes, Scanner, StopScan, next_event};
+use crate::scan::field::OnScanField;
+use crate::scan::{Resettable, Scan, ScanCallbacks, ScanTypes, Scanner, StopScan, next_event};
 use crate::wire::{LengthDelimited, ParseEventReader};
 
-pub struct Message<F>(F);
+pub struct Message<F: Resettable>(F, F::Mark);
 
-impl<F: ScanCallbacks> Message<F> {
-    pub fn new(scanner: F) -> Self {
-        Self(scanner)
+impl<F: ScanCallbacks + Resettable> Message<F> {
+    pub fn new(mut scanner: F) -> Self {
+        let mark = scanner.mark();
+        Self(scanner, mark)
     }
 }
 
-impl<F: ScanCallbacks> ScanTypes for Message<F> {
+impl<F: ScanCallbacks + Resettable> ScanTypes for Message<F> {
     type ScanEvent = Infallible;
     type ScanOutput = F::ScanOutput;
 }
@@ -39,7 +40,7 @@ impl<F: ScanCallbacks<ScanOutput: Default> + Into<Self::ScanOutput> + Resettable
         &mut self,
         delimited: impl LengthDelimited,
     ) -> Result<Option<Self::ScanEvent>, StopScan> {
-        self.0.reset();
+        self.0.reset(self.1.clone());
         let mut parse = delimited.into_events();
         let fields = &mut self.0;
         while let Some(next) = next_event(&mut parse, fields) {
@@ -50,8 +51,12 @@ impl<F: ScanCallbacks<ScanOutput: Default> + Into<Self::ScanOutput> + Resettable
 }
 
 impl<F: Resettable> Resettable for Message<F> {
-    fn reset(&mut self) {
-        self.0.reset()
+    type Mark = F::Mark;
+    fn mark(&mut self) -> Self::Mark {
+        self.0.mark()
+    }
+    fn reset(&mut self, mark: Self::Mark) {
+        self.0.reset(mark)
     }
 }
 
@@ -63,7 +68,6 @@ mod test {
     use hex_literal::hex;
 
     use crate::scan::encoding::Varint;
-    use crate::scan::field::message::test::resettable_impl::ResettableImpl;
     use crate::scan::field::{EmitScalar, NoOp, SaveRepeated};
     use crate::scan::{FieldNumber, ScalarField};
 
@@ -110,31 +114,12 @@ mod test {
     }
 
     impl<T: Resettable> Resettable for Scanner<T> {
-        fn reset(&mut self) {
-            self.0.reset();
+        type Mark = (T::Mark,);
+        fn mark(&mut self) -> Self::Mark {
+            (self.0.mark(),)
         }
-    }
-
-    mod resettable_impl {
-        pub(super) struct ResettableImpl<T, M>(T, M);
-
-        impl<'v, T> ResettableImpl<&'v mut Vec<T>, usize> {
-            pub fn new_vec(v: &'v mut Vec<T>) -> Self {
-                let starting_size = v.len();
-                Self(v, starting_size)
-            }
-        }
-
-        impl<T> super::Resettable for ResettableImpl<&mut Vec<T>, usize> {
-            fn reset(&mut self) {
-                self.0.truncate(self.1);
-            }
-        }
-
-        impl<T> Extend<T> for ResettableImpl<&mut Vec<T>, usize> {
-            fn extend<It: IntoIterator<Item = T>>(&mut self, iter: It) {
-                self.0.extend(iter);
-            }
+        fn reset(&mut self, to: Self::Mark) {
+            self.0.reset(to.0);
         }
     }
 
@@ -152,7 +137,7 @@ mod test {
         /// Test1’s a field (i.e., Test3’s c.a field) is set to 150
         const INPUT: &[u8] = &hex!("1a 03 08 96 01");
 
-        let scanner = Scanner(Message(Scanner(EmitScalar::<Varint<i32>>::new())));
+        let scanner = Scanner(Message::new(Scanner(EmitScalar::<Varint<i32>>::new())));
 
         let mut input = &INPUT[..];
         let scan = Scan::new(crate::wire::parse(&mut input), scanner);
@@ -179,10 +164,9 @@ mod test {
         // to saved_to. That mirrors protobuf's last-one-wins semantics.
         for input in [Vec::from(INPUT), INPUT.repeat(2)] {
             let mut saved_to = vec![1, 2, 3];
-            let mut resettable = ResettableImpl::new_vec(&mut saved_to);
-            let scanner = Scanner(Message(Scanner(SaveRepeated::<'_, Varint<i32>, _>::new(
-                &mut resettable,
-            ))));
+            let scanner = Scanner(Message::new(Scanner(
+                SaveRepeated::<Varint<i32>, _>::new(&mut saved_to),
+            )));
 
             let mut input = &input[..];
             let scan = Scan::new(crate::wire::parse(&mut input), scanner);

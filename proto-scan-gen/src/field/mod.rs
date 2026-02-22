@@ -86,9 +86,7 @@ impl MessageScannerField<'_> {
         let scan_fn = swap_single_field_fn(
             format_ident!("scan_{field_name}"),
             vec![quote!(S: ::proto_scan::scan::field::OnScanField + 't)],
-            vec![
-                quote!(scanner: S),
-            ],
+            vec![quote!(scanner: S)],
             quote!(S),
             quote!(scanner),
         );
@@ -125,8 +123,8 @@ impl MessageScannerField<'_> {
                     format_ident!("save_{field_name}"),
                     vec![quote!(D: ::core::iter::Extend<#repr_type>)],
                     vec![quote!(to: &'t mut D)],
-                    quote! {::proto_scan::scan::field::SaveRepeated::<'t, #encoding_type, D>},
-                    quote!(::proto_scan::scan::field::SaveRepeated::<'_, #encoding_type, _>::new(to)),
+                    quote! {::proto_scan::scan::field::SaveRepeated::<#encoding_type, &'t mut D>},
+                    quote!(::proto_scan::scan::field::SaveRepeated::<#encoding_type, _>::new(to)),
                 );
                 let emit_fn = swap_single_field_fn(
                     format_ident!("emit_{field_name}"),
