@@ -66,6 +66,7 @@ fn with_repeats() -> prost_proto::WithRepeats {
         messages: vec![prost_proto::MultiFieldMessage {
             id: 1,
             name: "ABC".to_string(),
+            flag: false,
         }],
         packed_bool: BOOL_VALUES.into(),
         packed_enum: { ENUM_VALUES.map(Into::into).into() },

@@ -86,20 +86,30 @@ impl TryFrom<(Span, Vec<Attribute>)> for ProstAttrs {
     fn try_from((span, value): (Span, Vec<Attribute>)) -> std::result::Result<Self, Self::Error> {
         let attrs = prost_attrs(value)?;
 
-        let mut single_field_type = None;
+        #[derive(Clone, Copy)]
+        enum ParsedFieldType {
+            Single(SingleFieldType),
+            Message,
+        }
+
+        let mut field_type = None;
         let mut field_number = None;
         let mut repeated = false;
 
-        let single_field_type_names = [
-            ("bool", SingleFieldType::Bool),
-            ("fixed64", SingleFieldType::FixedU64),
+        let field_type_names = [
+            ("bool", ParsedFieldType::Single(SingleFieldType::Bool)),
+            (
+                "fixed64",
+                ParsedFieldType::Single(SingleFieldType::FixedU64),
+            ),
+            ("message", ParsedFieldType::Message),
         ];
 
         for attr in attrs {
-            for (name, single) in &single_field_type_names {
+            for (name, found_type) in &field_type_names {
                 if attr.path().is_ident(name) {
                     let _ = attr.require_path_only();
-                    if let Some(_) = single_field_type.replace(*single) {
+                    if let Some(_) = field_type.replace(*found_type) {
                         return Err(syn::Error::new(attr.span(), "found more than one type"));
                     }
                 }
@@ -129,14 +139,15 @@ impl TryFrom<(Span, Vec<Attribute>)> for ProstAttrs {
             }
         }
 
-        let field_type = match (single_field_type, field_number) {
-            (Some(ty), Some(number)) => {
+        let field_type = match (field_type, field_number) {
+            (Some(ParsedFieldType::Single(ty)), Some(number)) => {
                 if repeated {
                     FieldType::Repeated { ty, number }
                 } else {
                     FieldType::Single { ty, number }
                 }
             }
+            (Some(ParsedFieldType::Message), Some(number)) => FieldType::Message { number },
             _ => FieldType::Unsupported,
         };
 

@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, format_ident, quote};
+use quote::{format_ident, quote};
 use syn::{Ident, parse_quote};
 
 #[derive(Debug)]
@@ -135,7 +135,8 @@ impl MessageScannerField<'_> {
                 );
                 vec![save_fn, emit_fn, scan_fn]
             }
-            FieldType::Unsupported => vec![scan_fn],
+            FieldType::Message { number: _ } => vec![scan_fn],
+            FieldType::Unsupported => vec![],
         }
     }
 }
@@ -144,6 +145,7 @@ impl MessageScannerField<'_> {
 pub enum FieldType {
     Single { ty: SingleFieldType, number: u32 },
     Repeated { ty: SingleFieldType, number: u32 },
+    Message { number: u32 },
     Unsupported,
 }
 

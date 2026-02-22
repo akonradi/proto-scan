@@ -51,10 +51,8 @@ where
 {
     let bytes = r.read(N as u32).map_err(DecodeError::Read)?;
 
-    let bytes = bytes
-        .as_ref()
-        .as_array()
-        .ok_or(DecodeError::<R::Error>::UnexpectedEnd)?;
+    let bytes = <&V::Bytes>::try_from(bytes.as_ref())
+        .map_err(|_| DecodeError::<R::Error>::UnexpectedEnd)?;
 
     Ok(num_traits::FromBytes::from_le_bytes(bytes))
 }

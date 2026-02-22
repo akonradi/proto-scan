@@ -113,6 +113,9 @@ fn message_from_descriptor(message: &DescriptorProto) -> Result<ScannableMessage
                     ty: SingleFieldType::FixedU64,
                     number: field_number()?,
                 },
+                (Type::Message, Label::Optional | Label::Required) => FieldType::Message {
+                    number: field_number()?,
+                },
                 (
                     Type::Double
                     | Type::Float

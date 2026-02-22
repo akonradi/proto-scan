@@ -142,7 +142,7 @@ impl MessageScanner<'_> {
             self.fields().map(move |MessageScannerField { parent: _, index, field: MessageField { field_name, generic: _, field_type } }| {
                 let event_variant_name = format_ident!("Event{index}");
                 match field_type {
-                    FieldType::Single { ty: _, number } | FieldType::Repeated { ty: _, number } => quote! {
+                    FieldType::Single { ty: _, number } | FieldType::Repeated { ty: _, number } | FieldType::Message { number } => quote! {
                         #number => self.#field_name.#fn_name(value)?.map(#scan_event_name::#event_variant_name),
                     },
                     FieldType::Unsupported => TokenStream::new()

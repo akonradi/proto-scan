@@ -1,6 +1,7 @@
 use crate::proto;
 
 mod custom_field_scanner;
+mod embedded_message;
 mod read_all;
 mod repeated_scalar;
 mod single_scalar;
@@ -8,13 +9,22 @@ mod single_scalar;
 pub(super) fn example_msg() -> crate::prost_proto::ScanExample {
     use crate::prost_proto::*;
     ScanExample {
-        repeated_msg: vec![MultiFieldMessage {
-            id: 1,
-            name: "ABC".to_string(),
-        }],
+        repeated_msg: vec![
+            MultiFieldMessage {
+                id: 1,
+                name: "ABC".to_string(),
+                flag: true,
+            },
+            MultiFieldMessage {
+                id: 2,
+                name: "DEF".to_string(),
+                flag: false,
+            },
+        ],
         single_msg: Some(MultiFieldMessage {
             name: "a".to_owned(),
             id: 2,
+            flag: true,
         }),
         repeated_bool: vec![true, true, false, false],
         single_bool: Some(true),
