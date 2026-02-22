@@ -40,8 +40,6 @@ impl MessageScanner<'_> {
     pub fn generated_code(&self) -> TokenStream {
         let scan_field_impls = self.fields().map(|m| m.impl_());
 
-        let scanner_inherent_impls = self.inherent_impl();
-
         [
             self.type_definition(),
             self.scan_event_defn(),
@@ -51,7 +49,6 @@ impl MessageScanner<'_> {
         ]
         .into_iter()
         .chain(scan_field_impls)
-        .chain([scanner_inherent_impls])
         .collect::<TokenStream>()
     }
 
@@ -205,40 +202,6 @@ impl MessageScanner<'_> {
             impl <#(#generics: ::proto_scan::scan::field::Resettable),*> ::proto_scan::scan::field::Resettable for #scanner_name<#(#generics,)*> {
                 fn reset(&mut self) {
                     #(self.#field_names.reset();)*
-                }
-            }
-        }
-    }
-
-    fn inherent_impl(&self) -> TokenStream {
-        let scanner_name = self.type_name();
-        let generics = self.generic_types().collect::<Vec<_>>();
-        let generics_on_scan_bounds = generics
-            .iter()
-            .map(|g| quote!(#g: ::proto_scan::scan::field::OnScanField + 'r))
-            .collect::<Vec<_>>();
-        quote! {
-            impl<'r, #(#generics_on_scan_bounds,)*> ::proto_scan::scan::Scanner<'r> for #scanner_name <#(#generics,)*> {
-                fn scan_events(
-                    self,
-                    read: impl ::proto_scan::wire::ParseEventReader + 'r,
-                ) -> impl ::proto_scan::scan::Scan<
-                        ScanEvent = <Self as ::proto_scan::scan::ScanTypes>::ScanEvent,
-                        ScanOutput = <Self as ::proto_scan::scan::ScanTypes>::ScanOutput,
-                    > + 'r
-                {
-                    ::proto_scan::scan::ScanWith::new(read, self)
-                }
-
-                fn scan(
-                    self,
-                    read: impl ::proto_scan::read::Read + 'r,
-                ) -> impl ::proto_scan::scan::Scan<
-                        ScanEvent = <Self as ::proto_scan::scan::ScanTypes>::ScanEvent,
-                        ScanOutput = <Self as ::proto_scan::scan::ScanTypes>::ScanOutput,
-                    > + 'r
-                {
-                    self.scan_events(::proto_scan::wire::parse(read))
                 }
             }
         }

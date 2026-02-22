@@ -10,7 +10,7 @@ pub mod field;
 /// A message that can be scanned.
 pub trait ScanMessage {
     /// The scanner for the message.
-    type Scanner: for<'r> Scanner<'r>;
+    type Scanner: Scanner;
 
     /// Creates a new scanner.
     fn scanner() -> Self::Scanner;
@@ -24,27 +24,22 @@ pub trait ScanTypes {
 }
 
 /// A builder type for a [`Scan`] over a byte stream.
-pub trait Scanner<'r>: ScanTypes {
+///
+/// This is blanket-implemented for all types that implement [`ScanCallbacks`].
+pub trait Scanner: ScanTypes + Sized {
     /// Starts a scan over the provided input.
     ///
     /// Consumes `self` and produces a [`Scan`] over the input stream.
-    fn scan_events(
-        self,
-        read: impl ParseEventReader + 'r,
-    ) -> impl Scan<ScanEvent = Self::ScanEvent, ScanOutput = Self::ScanOutput> + 'r;
-    /// Starts a scan over the provided input.
-    ///
-    /// Consumes `self` and produces a [`Scan`] over the input stream.
-    fn scan(
-        self,
-        read: impl Read + 'r,
-    ) -> impl Scan<ScanEvent = Self::ScanEvent, ScanOutput = Self::ScanOutput> + 'r;
-}
+    fn scan_events<P: ParseEventReader>(self, read: P) -> Scan<P, Self> {
+        Scan::new(read, self)
+    }
 
-/// A scan in progress.
-pub trait Scan: ScanTypes + IntoIterator<Item = Result<Self::ScanEvent, StopScan>> {
-    /// Performs a complete scan, returning the result.
-    fn read_all(self) -> Result<Self::ScanOutput, StopScan>;
+    /// Starts a scan over the provided input.
+    ///
+    /// Consumes `self` and produces a [`Scan`] over the input stream.
+    fn scan<'r>(self, read: impl Read + 'r) -> Scan<impl ParseEventReader + 'r, Self> {
+        Scan::new(crate::wire::parse(read), self)
+    }
 }
 
 /// Callbacks for parse inputs encountered during a scan.
@@ -67,17 +62,16 @@ pub trait ScanCallbacks: ScanTypes {
     ) -> Result<Self::ScanEvent, StopScan>;
 }
 
-/// A [`Scan`] implementation that takes events from a [`ParseEventReader`] and
-/// applies them to a [`ScanCallbacks`].
-pub struct ScanWith<P, S>(P, S);
+/// A scan in progress.
+pub struct Scan<P, S>(P, S);
 
-impl<P, S> ScanWith<P, S> {
+impl<P, S> Scan<P, S> {
     pub fn new(input: P, scanner: S) -> Self {
         Self(input, scanner)
     }
 }
 
-impl<P: ParseEventReader, S: ScanCallbacks> ScanTypes for ScanWith<P, S> {
+impl<P: ParseEventReader, S: ScanCallbacks> ScanTypes for Scan<P, S> {
     type ScanEvent = S::ScanEvent;
     type ScanOutput = S::ScanOutput;
 }
@@ -89,7 +83,7 @@ impl<P: ParseEventReader, S: ScanCallbacks> ScanTypes for ScanWith<P, S> {
 /// an error.
 pub struct IntoIter<P, S>(P, S);
 
-impl<P: ParseEventReader, S: ScanCallbacks> IntoIterator for ScanWith<P, S> {
+impl<P: ParseEventReader, S: ScanCallbacks> IntoIterator for Scan<P, S> {
     type Item = Result<S::ScanEvent, StopScan>;
     type IntoIter = IntoIter<P, S>;
 
@@ -117,8 +111,8 @@ impl<P: ParseEventReader, S: ScanCallbacks> Iterator for IntoIter<P, S> {
     }
 }
 
-impl<P: ParseEventReader, S: ScanCallbacks + Into<S::ScanOutput>> Scan for ScanWith<P, S> {
-    fn read_all(self) -> Result<Self::ScanOutput, StopScan> {
+impl<P: ParseEventReader, S: ScanCallbacks + Into<S::ScanOutput>> Scan<P, S> {
+    pub fn read_all(self) -> Result<<Self as ScanTypes>::ScanOutput, StopScan> {
         let mut it = self.into_iter();
         while let Some(r) = it.next() {
             let _ = r?;
@@ -139,3 +133,5 @@ impl From<Infallible> for StopScan {
         match value {}
     }
 }
+
+impl<S: ScanCallbacks + Sized> Scanner for S {}
