@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::fs;
 use std::io::Result;
 use std::path::Path;
@@ -44,6 +45,7 @@ impl CompileScan for prost_build::Config {
             .collect::<HashMap<Module, String>>();
 
         let modules = generate(requests)?;
+        let cargo_cmd = std::env::var_os("CARGO");
         for (module, content) in &modules {
             let file_name = file_names
                 .get(module)
@@ -51,11 +53,16 @@ impl CompileScan for prost_build::Config {
             let output_path = target.join(file_name);
 
             println!("writing to {output_path:?}: {}", content.len());
-            write_file_if_changed(&output_path, content.as_bytes())?;
+            fs::write(&output_path, content.as_bytes())?;
 
-            if let Ok(p) = std::env::var("RUSTFMT")
-                && !p.is_empty()
-            {}
+            if let Some(cargo_cmd) = &cargo_cmd {
+                let cmd = std::process::Command::new(cargo_cmd)
+                    .args([OsStr::new("fmt"), OsStr::new("--"), output_path.as_os_str()])
+                    .status()?;
+                if !cmd.success() {
+                    eprintln!("cargo fmt failed");
+                }
+            }
         }
 
         Ok(())
@@ -73,24 +80,4 @@ fn generate(requests: Vec<(Module, FileDescriptorProto)>) -> Result<HashMap<Modu
     }
 
     Ok(output)
-}
-
-/// Write a slice as the entire contents of a file.
-///
-/// This function will create a file if it does not exist,
-/// and will entirely replace its contents if it does. When
-/// the contents is already correct, it doesn't touch to the file.
-fn write_file_if_changed(path: &Path, content: &[u8]) -> std::io::Result<()> {
-    let previous_content = fs::read(path);
-
-    if previous_content
-        .map(|previous_content| previous_content == content)
-        .unwrap_or(false)
-    {
-        trace!("unchanged: {}", path.display());
-        Ok(())
-    } else {
-        trace!("writing: {}", path.display());
-        fs::write(path, content)
-    }
 }
