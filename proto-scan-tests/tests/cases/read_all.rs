@@ -1,6 +1,6 @@
 use prost::Message as _;
-use test_case::test_case;
 use proto_scan::scan::{Scan as _, ScanMessage as _, Scanner as _};
+use test_case::test_case;
 
 use super::*;
 use InputKind::*;

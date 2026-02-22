@@ -3,7 +3,9 @@ use proc_macro2::{Span, TokenStream};
 use prost_types::FileDescriptorProto;
 use prost_types::{DescriptorProto, OneofDescriptorProto};
 use proto_scan_gen::ScannableMessage;
-use proto_scan_gen::field::{FieldType, MessageField, SingleFieldType};
+use proto_scan_gen::field::{
+    FieldType, FixedFieldType, MessageField, SingleFieldType, VarintFieldType,
+};
 use quote::quote;
 use std::collections::HashMap;
 use std::io::Result;
@@ -90,52 +92,7 @@ fn message_from_descriptor(message: &DescriptorProto) -> Result<ScannableMessage
                 return Ok(None);
             }
 
-            let label = value.label();
-            let field_number = || {
-                value.number().try_into().map_err(|_| {
-                    std::io::Error::other(format!("invalid field number {}", value.number()))
-                })
-            };
-            let field_type = match (value.r#type(), label) {
-                (Type::Bool, Label::Optional | Label::Required) => FieldType::Single {
-                    ty: SingleFieldType::Bool,
-                    number: field_number()?,
-                },
-                (Type::Fixed64, Label::Optional | Label::Required) => FieldType::Single {
-                    ty: SingleFieldType::FixedU64,
-                    number: field_number()?,
-                },
-                (Type::Bool, Label::Repeated) => FieldType::Repeated {
-                    ty: SingleFieldType::Bool,
-                    number: field_number()?,
-                },
-                (Type::Fixed64, Label::Repeated) => FieldType::Repeated {
-                    ty: SingleFieldType::FixedU64,
-                    number: field_number()?,
-                },
-                (Type::Message, Label::Optional | Label::Required) => FieldType::Message {
-                    number: field_number()?,
-                },
-                (
-                    Type::Double
-                    | Type::Float
-                    | Type::Int64
-                    | Type::Uint64
-                    | Type::Int32
-                    | Type::Fixed32
-                    | Type::String
-                    | Type::Group
-                    | Type::Message
-                    | Type::Bytes
-                    | Type::Uint32
-                    | Type::Enum
-                    | Type::Sfixed32
-                    | Type::Sfixed64
-                    | Type::Sint32
-                    | Type::Sint64,
-                    Label::Optional | Label::Repeated | Label::Required,
-                ) => FieldType::Unsupported,
-            };
+            let field_type = extract_field_type(value)?;
 
             Ok(Some((ident(value.name()), field_type)))
         })
@@ -162,4 +119,48 @@ fn message_from_descriptor(message: &DescriptorProto) -> Result<ScannableMessage
         })
         .collect();
     Ok(ScannableMessage { name, fields })
+}
+
+fn extract_field_type(value: &prost_types::FieldDescriptorProto) -> Result<FieldType> {
+    use prost_types::field_descriptor_proto::{Label, Type};
+    let label = value.label();
+    let field_number = || {
+        value
+            .number()
+            .try_into()
+            .map_err(|_| std::io::Error::other(format!("invalid field number {}", value.number())))
+    };
+    let single_field_type: SingleFieldType = match value.r#type() {
+        Type::Int64 => VarintFieldType::I64.into(),
+        Type::Uint64 => VarintFieldType::U64.into(),
+        Type::Int32 => VarintFieldType::I32.into(),
+        Type::Fixed64 => FixedFieldType::U64.into(),
+        Type::Fixed32 => FixedFieldType::U32.into(),
+        Type::Bool => VarintFieldType::Bool.into(),
+        Type::Uint32 => VarintFieldType::U32.into(),
+        Type::Sfixed32 => FixedFieldType::I32.into(),
+        Type::Sfixed64 => FixedFieldType::I64.into(),
+        Type::Sint32 => VarintFieldType::I32Z.into(),
+        Type::Sint64 => VarintFieldType::I64Z.into(),
+        Type::Float => FixedFieldType::F32.into(),
+        Type::Double => FixedFieldType::F64.into(),
+        Type::Message => {
+            return Ok(FieldType::Message {
+                number: field_number()?,
+            });
+        }
+        Type::Enum | Type::Group | Type::Bytes | Type::String => {
+            return Ok(FieldType::Unsupported);
+        }
+    };
+    Ok(match label {
+        Label::Optional | Label::Required => FieldType::Single {
+            ty: single_field_type,
+            number: field_number()?,
+        },
+        Label::Repeated => FieldType::Repeated {
+            ty: single_field_type,
+            number: field_number()?,
+        },
+    })
 }

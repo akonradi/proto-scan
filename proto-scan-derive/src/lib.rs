@@ -1,6 +1,8 @@
 use proc_macro2::{Span, TokenStream};
 use proto_scan_gen::ScannableMessage;
-use proto_scan_gen::field::{FieldType, MessageField, SingleFieldType};
+use proto_scan_gen::field::{
+    FieldType, FixedFieldType, MessageField, SingleFieldType, VarintFieldType,
+};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{Attribute, DataStruct, DeriveInput, Ident, Meta, Result, Token};
@@ -86,8 +88,9 @@ impl TryFrom<(Span, Vec<Attribute>)> for ProstAttrs {
     fn try_from((span, value): (Span, Vec<Attribute>)) -> std::result::Result<Self, Self::Error> {
         let attrs = prost_attrs(value)?;
 
-        #[derive(Clone, Copy)]
+        #[derive(Clone, Copy, Debug, derive_more::From)]
         enum ParsedFieldType {
+            #[from(SingleFieldType, VarintFieldType, FixedFieldType)]
             Single(SingleFieldType),
             Message,
         }
@@ -97,20 +100,28 @@ impl TryFrom<(Span, Vec<Attribute>)> for ProstAttrs {
         let mut repeated = false;
 
         let field_type_names = [
-            ("bool", ParsedFieldType::Single(SingleFieldType::Bool)),
-            (
-                "fixed64",
-                ParsedFieldType::Single(SingleFieldType::FixedU64),
-            ),
+            ("bool", VarintFieldType::Bool.into()),
+            ("int32", VarintFieldType::I32.into()),
+            ("int64", VarintFieldType::I64.into()),
+            ("uint32", VarintFieldType::U32.into()),
+            ("uint64", VarintFieldType::U64.into()),
+            ("sint32", VarintFieldType::I32Z.into()),
+            ("sint64", VarintFieldType::I64Z.into()),
+            ("fixed32", FixedFieldType::U32.into()),
+            ("fixed64", FixedFieldType::U64.into()),
+            ("sfixed32", FixedFieldType::I32.into()),
+            ("sfixed64", FixedFieldType::I64.into()),
             ("message", ParsedFieldType::Message),
+            ("float", FixedFieldType::F32.into()),
+            ("double", FixedFieldType::F64.into()),
         ];
 
         for attr in attrs {
             for (name, found_type) in &field_type_names {
                 if attr.path().is_ident(name) {
                     let _ = attr.require_path_only();
-                    if let Some(_) = field_type.replace(*found_type) {
-                        return Err(syn::Error::new(attr.span(), "found more than one type"));
+                    if let Some(t) = field_type.replace(*found_type) {
+                        return Err(syn::Error::new(attr.span(), format!("already found type {t:?}")));
                     }
                 }
             }

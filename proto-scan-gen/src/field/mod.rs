@@ -149,27 +149,77 @@ pub enum FieldType {
     Unsupported,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, derive_more::From)]
 pub enum SingleFieldType {
+    Varint(VarintFieldType),
+    Fixed(FixedFieldType),
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum VarintFieldType {
     Bool,
-    FixedU64,
+    I32,
+    I32Z,
+    U32,
+    I64,
+    U64,
+    I64Z,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum FixedFieldType {
+    I32,
+    U32,
+    I64,
+    U64,
+    F32,
+    F64,
 }
 
 impl SingleFieldType {
     fn repr_type(&self) -> syn::Path {
+        use SingleFieldType::*;
         match self {
-            SingleFieldType::Bool => parse_quote!(::core::primitive::bool),
-            SingleFieldType::FixedU64 => parse_quote!(::core::primitive::u64),
+            Varint(VarintFieldType::Bool) => parse_quote!(::core::primitive::bool),
+            Varint(VarintFieldType::I32 | VarintFieldType::I32Z) | Fixed(FixedFieldType::I32) => {
+                parse_quote!(::core::primitive::i32)
+            }
+            Varint(VarintFieldType::U32) | Fixed(FixedFieldType::U32) => {
+                parse_quote!(::core::primitive::u32)
+            }
+            Varint(VarintFieldType::I64 | VarintFieldType::I64Z) | Fixed(FixedFieldType::I64) => {
+                parse_quote!(::core::primitive::i64)
+            }
+            Varint(VarintFieldType::U64) | Fixed(FixedFieldType::U64) => {
+                parse_quote!(::core::primitive::u64)
+            }
+            Fixed(FixedFieldType::F32) => {
+                parse_quote!(::core::primitive::f32)
+            }
+            Fixed(FixedFieldType::F64) => {
+                parse_quote!(::core::primitive::f64)
+            }
         }
     }
 
     fn encoding_type(&self) -> syn::Path {
+        use SingleFieldType::*;
+        let repr_type = self.repr_type();
         match self {
-            SingleFieldType::Bool => {
-                parse_quote!(::proto_scan::scan::encoding::Varint<::core::primitive::bool>)
+            Varint(
+                VarintFieldType::Bool
+                | VarintFieldType::I32
+                | VarintFieldType::U32
+                | VarintFieldType::I64
+                | VarintFieldType::U64,
+            ) => {
+                parse_quote!(::proto_scan::scan::encoding::Varint<#repr_type>)
             }
-            SingleFieldType::FixedU64 => {
-                parse_quote!(::proto_scan::scan::encoding::Fixed<::core::primitive::u64>)
+            Varint(VarintFieldType::I32Z | VarintFieldType::I64Z) => {
+                parse_quote!(::proto_scan::scan::encoding::Varint<::proto_scan::scan::encoding::ZigZag<#repr_type>>)
+            }
+            Fixed(_) => {
+                parse_quote!(::proto_scan::scan::encoding::Fixed<#repr_type>)
             }
         }
     }
