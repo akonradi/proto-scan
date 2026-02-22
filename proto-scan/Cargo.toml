@@ -12,3 +12,6 @@ derive_more = { version = "2.1.1", features = ["from", "into", "try_from"] }
 either = "1.15.0"
 num-traits = "0.2.19"
 proto-scan-derive = { path = "../proto-scan-derive", optional = true }
+
+[dev-dependencies]
+hex-literal = "1.1.0"

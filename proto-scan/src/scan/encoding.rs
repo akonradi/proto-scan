@@ -1,6 +1,7 @@
 use std::convert::Infallible;
 use std::marker::PhantomData;
 
+use crate::scan::StopScan;
 use crate::wire::ScalarWireType;
 
 pub struct Varint<T>(PhantomData<T>);
@@ -29,6 +30,19 @@ impl Encoding for Varint<bool> {
         }
     }
 }
+
+impl Encoding for Varint<i32> {
+    type Wire = super::Varint;
+
+    type Repr = i32;
+    type Error = super::StopScan;
+
+    fn decode(wire: <Self::Wire as ScalarWireType>::Repr) -> Result<i32, super::StopScan> {
+        let v : u32 = wire.try_into().ok().ok_or(StopScan)?;
+        Ok(v as i32)
+    }
+}
+
 
 impl Encoding for Fixed<u64> {
     type Wire = super::I64;

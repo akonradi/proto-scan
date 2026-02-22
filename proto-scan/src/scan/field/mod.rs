@@ -5,11 +5,13 @@ use crate::wire::{GroupOp, LengthDelimited, ScalarField};
 
 mod emit;
 mod invoke_on;
+mod message;
 mod no_op;
 mod save;
 
 pub use emit::{EmitRepeated, EmitScalar};
 pub use invoke_on::InvokeOn;
+pub use message::Message;
 pub use no_op::NoOp;
 pub use save::{SaveRepeated, SaveScalar};
 

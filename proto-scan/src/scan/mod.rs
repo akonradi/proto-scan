@@ -1,4 +1,5 @@
 use std::convert::Infallible;
+use std::path::Iter;
 
 use crate::read::Read;
 pub use crate::wire::{FieldNumber, GroupOp, I32, I64, ScalarField, Varint};
@@ -95,20 +96,26 @@ impl<P: ParseEventReader, S: ScanCallbacks> IntoIterator for Scan<P, S> {
 impl<P: ParseEventReader, S: ScanCallbacks> Iterator for IntoIter<P, S> {
     type Item = Result<S::ScanEvent, StopScan>;
     fn next(&mut self) -> Option<Result<S::ScanEvent, StopScan>> {
-        let Self(parse, fields) = self;
-        let (field_number, event) = match parse.next() {
-            Some(Err(_)) => return Some(Err(StopScan)),
-            None => return None,
-            Some(Ok(event)) => event,
-        };
-
-        let output = match event {
-            ParseEvent::Scalar(scalar_field) => fields.on_scalar(field_number, scalar_field),
-            ParseEvent::Group(group_op) => fields.on_group(field_number, group_op),
-            ParseEvent::LengthDelimited(l) => fields.on_length_delimited(field_number, l),
-        };
-        Some(output)
+        next_event(&mut self.0, &mut self.1)
     }
+}
+
+pub(crate) fn next_event<P: ParseEventReader, S: ScanCallbacks>(
+    parse: &mut P,
+    fields: &mut S,
+) -> Option<Result<S::ScanEvent, StopScan>> {
+    let (field_number, event) = match parse.next() {
+        Some(Err(_)) => return Some(Err(StopScan)),
+        None => return None,
+        Some(Ok(event)) => event,
+    };
+
+    let output = match event {
+        ParseEvent::Scalar(scalar_field) => fields.on_scalar(field_number, scalar_field),
+        ParseEvent::Group(group_op) => fields.on_group(field_number, group_op),
+        ParseEvent::LengthDelimited(l) => fields.on_length_delimited(field_number, l),
+    };
+    Some(output)
 }
 
 impl<P: ParseEventReader, S: ScanCallbacks + Into<S::ScanOutput>> Scan<P, S> {
