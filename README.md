@@ -1,7 +1,3 @@
-<<<<<<<<<<< Conflict 1 of 1
-+++++++++++ Contents of side #1
-<<<<<<< Conflict 1 of 1
-+++++++ Contents of side #1 (no terminating newline)
 # proto-scan
 
 This is a library for reading data from protocol buffer messages in a streaming context.

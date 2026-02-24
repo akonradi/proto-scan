@@ -9,7 +9,7 @@ members = [
 resolver = "3"
 
 [workspace.package]
-version = "0.1.0-alpha"
+version = "0.1.0-alpha1"
 authors = ["Alex Bakon"]
 repository = "https://github.com/akonradi/proto-scan"
 edition = "2024"
@@ -17,10 +17,10 @@ license = "MIT"
 rust-version = "1.85"
 
 [workspace.dependencies]
-proto-scan = { path = "./proto-scan", version = "0.1.0-alpha" }
-proto-scan-build = { path = "./proto-scan-build", version = "0.1.0-alpha"  }
-proto-scan-derive = { path = "./proto-scan-derive", version = "0.1.0-alpha"  }
-proto-scan-gen = { path = "./proto-scan-gen", version = "0.1.0-alpha" }
+proto-scan = { path = "./proto-scan", version = "0.1.0-alpha1" }
+proto-scan-build = { path = "./proto-scan-build", version = "0.1.0-alpha1"  }
+proto-scan-derive = { path = "./proto-scan-derive", version = "0.1.0-alpha1"  }
+proto-scan-gen = { path = "./proto-scan-gen", version = "0.1.0-alpha1" }
 
 assert_matches = "1.5.0"
 derive_more = { version = "2.1.1", features = ["from", "into", "try_from"] }
