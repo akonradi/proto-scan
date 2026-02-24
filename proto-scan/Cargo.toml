@@ -2,10 +2,7 @@
 name = "proto-scan"
 readme = "../README.md"
 description = "Scan protocol buffer messages as event streams, or to extract individual fields."
-keywords = [
-    "proto", "protobuf", "protocol", "buffer",
-    "scan", "binary", "read", "field", "wire", "parse"
-]
+keywords = [ "proto", "protobuf", "scan", "parse", "read" ]
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
