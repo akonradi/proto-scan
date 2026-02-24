@@ -68,3 +68,10 @@ enum EnumType {
   one = 1;
   two = 2;
 }
+
+message BytesFieldTypes {
+  bytes bytes_field = 1;
+  string string_field = 2;
+  repeated bytes repeated_bytes_field = 3;
+  repeated string repeated_string_field = 4;
+}

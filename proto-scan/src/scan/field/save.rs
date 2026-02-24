@@ -97,3 +97,71 @@ impl<D: Resettable, E> Resettable for SaveRepeated<E, D> {
         self.0.reset(to);
     }
 }
+
+/// [`OnScanField`] that writes the decoded values to the provided location.
+pub struct SaveBytes<E: ?Sized, D>(D, PhantomData<E>);
+
+impl<E: ?Sized, D> SaveBytes<E, D> {
+    pub fn new(to: D) -> Self {
+        Self(to, PhantomData)
+    }
+}
+
+impl<E: ?Sized, D> ScanTypes for SaveBytes<E, D> {
+    type ScanEvent = Infallible;
+    type ScanOutput = ();
+}
+
+impl<'t, D: for <'a> From<&'a [u8]>> OnScanField for SaveBytes<[u8], &'t mut D> {
+    fn into_output(self) -> Self::ScanOutput {}
+
+    fn on_scalar(&mut self, _value: ScalarField) -> Result<Option<Infallible>, StopScan> {
+        Err(StopScan)
+    }
+
+    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Infallible>, StopScan> {
+        Err(StopScan)
+    }
+
+    fn on_length_delimited(
+        &mut self,
+        delimited: impl LengthDelimited,
+    ) -> Result<Option<Infallible>, StopScan> {
+        let bytes = delimited.into_bytes().ok().ok_or(StopScan)?;
+        *self.0 = bytes.as_ref().into();
+        Ok(None)
+    }
+}
+
+impl<'t, D: for <'a> From<&'a str>> OnScanField for SaveBytes<str, &'t mut D> {
+    fn into_output(self) -> Self::ScanOutput {}
+
+    fn on_scalar(&mut self, _value: ScalarField) -> Result<Option<Infallible>, StopScan> {
+        Err(StopScan)
+    }
+
+    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Infallible>, StopScan> {
+        Err(StopScan)
+    }
+
+    fn on_length_delimited(
+        &mut self,
+        delimited: impl LengthDelimited,
+    ) -> Result<Option<Infallible>, StopScan> {
+        let bytes = delimited.into_bytes().ok().ok_or(StopScan)?;
+        let bytes = core::str::from_utf8( bytes.as_ref()).map_err(|_| StopScan)?;
+        *self.0 = bytes.into();
+        Ok(None)
+    }
+}
+
+
+impl<D: Resettable, E> Resettable for SaveBytes<E, D> {
+    type Mark = D::Mark;
+    fn mark(&mut self) -> Self::Mark {
+        self.0.mark()
+    }
+    fn reset(&mut self, to: Self::Mark) {
+        self.0.reset(to);
+    }
+}

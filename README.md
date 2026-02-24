@@ -1,3 +1,5 @@
+<<<<<<<<<<< Conflict 1 of 1
++++++++++++ Contents of side #1
 <<<<<<< Conflict 1 of 1
 +++++++ Contents of side #1 (no terminating newline)
 # proto-scan
@@ -45,5 +47,6 @@ This is still a work in progress. A non-exhaustive list of things remaining:
 - Make the library and generated code `no_std` with a feature flag
 - Enable higher-performance varint deserialization with a `Read::peek` method.
 - Document `proto-scan-build` and derive processes better (for now see the build script of the -tests crate).
+- Enable higher-performance varint deserialization with a `Read::peek` method.
 
 [`prost`]: https://docs.rs/prost/latest/prost/

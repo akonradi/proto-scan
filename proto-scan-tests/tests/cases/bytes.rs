@@ -1,0 +1,60 @@
+use prost::Message;
+use proto_scan::scan::{ScanMessage as _, Scanner as _};
+use test_case::test_case;
+
+use super::*;
+use InputKind::*;
+
+#[test_case(Empty)]
+#[test_case(Full)]
+fn save_bytes(input: InputKind) {
+    let input = input.into_bytes_field_types();
+    let mut save_to = proto::ScanBytesFieldTypesOutput {
+        bytes_field: Vec::new(),
+        string_field: String::new(),
+        repeated_bytes_field: (),
+        repeated_string_field: (),
+    };
+
+    let scanner = proto::BytesFieldTypes::scanner()
+        .save_bytes_field(&mut save_to.bytes_field)
+        .save_string_field(&mut save_to.string_field);
+    {
+        let bytes = input.encode_to_vec();
+        for event in scanner.scan(bytes.as_slice()) {
+            match Result::unwrap(event) {
+                None => {}
+            }
+        }
+    }
+
+    let expected = proto::ScanBytesFieldTypesOutput {
+        bytes_field: input.bytes_field,
+        string_field: input.string_field,
+        repeated_bytes_field: (),
+        repeated_string_field: (),
+    };
+    assert_eq!(save_to, expected);
+}
+
+#[test_case(Empty)]
+#[test_case(Full)]
+fn emit_bytes(input: InputKind) {
+    let input = input.into_bytes_field_types();
+
+    let scanner = proto::BytesFieldTypes::scanner()
+        .emit_bytes_field()
+        .emit_string_field();
+    let output = {
+        let bytes = input.encode_to_vec();
+        scanner.scan(bytes.as_slice()).read_all().unwrap()
+    };
+
+    let expected = proto::ScanBytesFieldTypesOutput {
+        bytes_field: Some(input.bytes_field.into_boxed_slice()),
+        string_field: Some(input.string_field),
+        repeated_bytes_field: (),
+        repeated_string_field: (),
+    };
+    assert_eq!(output, expected);
+}

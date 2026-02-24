@@ -4,7 +4,7 @@ use prost_types::FileDescriptorProto;
 use prost_types::{DescriptorProto, OneofDescriptorProto};
 use proto_scan_gen::ScannableMessage;
 use proto_scan_gen::field::{
-    FieldType, FixedFieldType, MessageField, SingleFieldType, VarintFieldType,
+    FieldType, FixedFieldType, MessageField, ParsedFieldType, VarintFieldType,
 };
 use quote::quote;
 use std::collections::HashMap;
@@ -122,13 +122,8 @@ fn message_from_descriptor(message: &DescriptorProto) -> Result<ScannableMessage
 fn extract_field_type(value: &prost_types::FieldDescriptorProto) -> Result<FieldType> {
     use prost_types::field_descriptor_proto::{Label, Type};
     let label = value.label();
-    let field_number = || {
-        value
-            .number()
-            .try_into()
-            .map_err(|_| std::io::Error::other(format!("invalid field number {}", value.number())))
-    };
-    let single_field_type: SingleFieldType = match value.r#type() {
+
+    let parsed_field_type: ParsedFieldType = match value.r#type() {
         Type::Int64 => VarintFieldType::I64.into(),
         Type::Uint64 => VarintFieldType::U64.into(),
         Type::Int32 => VarintFieldType::I32.into(),
@@ -142,23 +137,32 @@ fn extract_field_type(value: &prost_types::FieldDescriptorProto) -> Result<Field
         Type::Sint64 => VarintFieldType::I64Z.into(),
         Type::Float => FixedFieldType::F32.into(),
         Type::Double => FixedFieldType::F64.into(),
-        Type::Message => {
-            return Ok(FieldType::Message {
-                number: field_number()?,
-            });
-        }
-        Type::Enum | Type::Group | Type::Bytes | Type::String => {
+        Type::Message => ParsedFieldType::Message,
+        Type::Bytes => ParsedFieldType::Bytes { utf8: false },
+        Type::String => ParsedFieldType::Bytes { utf8: true },
+        Type::Enum | Type::Group => {
             return Ok(FieldType::Unsupported);
         }
     };
-    Ok(match label {
-        Label::Optional | Label::Required => FieldType::Single {
-            ty: single_field_type,
-            number: field_number()?,
-        },
-        Label::Repeated => FieldType::Repeated {
-            ty: single_field_type,
-            number: field_number()?,
-        },
+    let number = value
+        .number()
+        .try_into()
+        .map_err(|_| std::io::Error::other(format!("invalid field number {}", value.number())))?;
+
+    Ok(match (parsed_field_type, label) {
+        (ParsedFieldType::Single(single), Label::Optional | Label::Required) => {
+            FieldType::Single { ty: single, number }
+        }
+        (ParsedFieldType::Single(single), Label::Repeated) => {
+            FieldType::Repeated { ty: single, number }
+        }
+        (ParsedFieldType::Message, Label::Optional | Label::Required) => {
+            FieldType::Message { number }
+        }
+        (ParsedFieldType::Bytes { utf8 }, Label::Optional | Label::Required) => {
+            FieldType::Bytes { utf8, number }
+        }
+        (ParsedFieldType::Message, Label::Repeated)
+        | (ParsedFieldType::Bytes { utf8: _ }, Label::Repeated) => FieldType::Unsupported,
     })
 }

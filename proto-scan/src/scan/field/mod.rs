@@ -9,11 +9,11 @@ mod message;
 mod no_op;
 mod save;
 
-pub use emit::{EmitRepeated, EmitScalar};
+pub use emit::{EmitRepeated, EmitScalar, EmitBytes};
 pub use invoke_on::InvokeOn;
 pub use message::Message;
 pub use no_op::NoOp;
-pub use save::{SaveRepeated, SaveScalar};
+pub use save::{SaveRepeated, SaveScalar, SaveBytes};
 
 /// Implemented by a visitor for a fixed [`FieldNumber`].
 pub trait OnScanField: ScanTypes<ScanOutput: Default> {

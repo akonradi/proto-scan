@@ -1,5 +1,6 @@
 use crate::proto;
 
+mod bytes;
 mod custom_field_scanner;
 mod embedded_message;
 mod read_all;
@@ -62,6 +63,15 @@ impl InputKind {
             fixed32_field: 372943813,
             sfixed32_field: -17348172,
             float_field: -0.08776,
+        }
+    }
+
+    fn into_bytes_field_types(self) -> crate::prost_proto::BytesFieldTypes {
+        crate::prost_proto::BytesFieldTypes {
+            bytes_field: b"abc".into(),
+            string_field: "abc".into(),
+            repeated_bytes_field: vec![b"abc".into(), b"123".into()],
+            repeated_string_field: vec!["abc".into(), "123".into()],
         }
     }
 }

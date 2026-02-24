@@ -135,6 +135,28 @@ impl MessageScannerField<'_> {
                 );
                 vec![save_fn, emit_fn, scan_fn]
             }
+            FieldType::Bytes { utf8, number: _ } => {
+                let borrow_type = if *utf8 {
+                    quote! {::core::primitive::str}
+                } else {
+                    quote! {[::core::primitive::u8]}
+                };
+                let save_fn = swap_single_field_fn(
+                    format_ident!("save_{field_name}"),
+                    vec![quote!(D: for<'d> ::core::convert::From<&'d #borrow_type>)],
+                    vec![quote!(to: &'t mut D)],
+                    quote! {::proto_scan::scan::field::SaveBytes::<#borrow_type, &'t mut D>},
+                    quote!(::proto_scan::scan::field::SaveBytes::<#borrow_type, _>::new(to)),
+                );
+                let emit_fn = swap_single_field_fn(
+                    format_ident!("emit_{field_name}"),
+                    vec![],
+                    vec![],
+                    quote! {::proto_scan::scan::field::EmitBytes::<#borrow_type>},
+                    quote!(::proto_scan::scan::field::EmitBytes::<#borrow_type>::new()),
+                );
+                vec![save_fn, emit_fn, scan_fn]
+            }
             FieldType::Message { number: _ } => vec![scan_fn],
             FieldType::Unsupported => vec![],
         }
@@ -145,6 +167,7 @@ impl MessageScannerField<'_> {
 pub enum FieldType {
     Single { ty: SingleFieldType, number: u32 },
     Repeated { ty: SingleFieldType, number: u32 },
+    Bytes { utf8: bool, number: u32 },
     Message { number: u32 },
     Unsupported,
 }
@@ -153,6 +176,14 @@ pub enum FieldType {
 pub enum SingleFieldType {
     Varint(VarintFieldType),
     Fixed(FixedFieldType),
+}
+
+#[derive(Clone, Copy, Debug, derive_more::From)]
+pub enum ParsedFieldType {
+    #[from(SingleFieldType, VarintFieldType, FixedFieldType)]
+    Single(SingleFieldType),
+    Message,
+    Bytes {utf8: bool}
 }
 
 #[derive(Copy, Clone, Debug)]

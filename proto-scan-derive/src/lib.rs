@@ -1,7 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use proto_scan_gen::ScannableMessage;
 use proto_scan_gen::field::{
-    FieldType, FixedFieldType, MessageField, SingleFieldType, VarintFieldType,
+    FieldType, FixedFieldType, MessageField, ParsedFieldType, VarintFieldType,
 };
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -88,13 +88,6 @@ impl TryFrom<Vec<Attribute>> for ProstAttrs {
     fn try_from(value: Vec<Attribute>) -> std::result::Result<Self, Self::Error> {
         let attrs = prost_attrs(value)?;
 
-        #[derive(Clone, Copy, Debug, derive_more::From)]
-        enum ParsedFieldType {
-            #[from(SingleFieldType, VarintFieldType, FixedFieldType)]
-            Single(SingleFieldType),
-            Message,
-        }
-
         let mut field_type = None;
         let mut field_number = None;
         let mut repeated = false;
@@ -114,6 +107,8 @@ impl TryFrom<Vec<Attribute>> for ProstAttrs {
             ("message", ParsedFieldType::Message),
             ("float", FixedFieldType::F32.into()),
             ("double", FixedFieldType::F64.into()),
+            ("bytes", ParsedFieldType::Bytes { utf8: false }),
+            ("string", ParsedFieldType::Bytes { utf8: true }),
         ];
 
         for attr in attrs {
@@ -153,16 +148,37 @@ impl TryFrom<Vec<Attribute>> for ProstAttrs {
             }
         }
 
-        let field_type = match (field_type, field_number) {
-            (Some(ParsedFieldType::Single(ty)), Some(number)) => {
-                if repeated {
-                    FieldType::Repeated { ty, number }
-                } else {
-                    FieldType::Single { ty, number }
-                }
+        let field_type = match (field_type, field_number, repeated) {
+            (Some(ParsedFieldType::Single(ty)), Some(number), true) => {
+                FieldType::Repeated { ty, number }
             }
-            (Some(ParsedFieldType::Message), Some(number)) => FieldType::Message { number },
-            _ => FieldType::Unsupported,
+            (Some(ParsedFieldType::Single(ty)), Some(number), false) => {
+                FieldType::Single { ty, number }
+            }
+            (Some(ParsedFieldType::Message), Some(number), false) => FieldType::Message { number },
+            (Some(ParsedFieldType::Bytes { utf8 }), Some(number), false) => {
+                FieldType::Bytes { utf8, number }
+            }
+            (
+                Some(ParsedFieldType::Message | ParsedFieldType::Bytes { utf8: _ }),
+                Some(_number),
+                true,
+            ) => FieldType::Unsupported,
+            (None, _, _) => FieldType::Unsupported,
+            (
+                Some(
+                    ft @ (ParsedFieldType::Single(_)
+                    | ParsedFieldType::Message
+                    | ParsedFieldType::Bytes { .. }),
+                ),
+                None,
+                _repeated,
+            ) => {
+                return Err(syn::Error::new(
+                    Span::call_site(),
+                    format!("no field number for {ft:?}"),
+                ));
+            }
         };
 
         Ok(Self { field_type })
