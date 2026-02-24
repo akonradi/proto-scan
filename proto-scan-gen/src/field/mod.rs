@@ -103,8 +103,8 @@ impl MessageScannerField<'_> {
                     format_ident!("save_{field_name}"),
                     vec![quote!(D: From<#repr_type>)],
                     vec![quote!(to: &'t mut D)],
-                    quote! {::proto_scan::scan::field::SaveScalar::<'t, #encoding_type, D>},
-                    quote!(::proto_scan::scan::field::SaveScalar::<'_, #encoding_type, _>::new(to)),
+                    quote! {::proto_scan::scan::field::SaveScalar::<#encoding_type, &'t mut D>},
+                    quote!(::proto_scan::scan::field::SaveScalar::<#encoding_type, _>::new(to)),
                 );
                 let emit_fn = swap_single_field_fn(
                     format_ident!("emit_{field_name}"),

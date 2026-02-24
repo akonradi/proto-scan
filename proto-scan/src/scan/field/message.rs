@@ -1,13 +1,14 @@
 use std::convert::Infallible;
 
 use crate::scan::field::OnScanField;
-use crate::scan::{Resettable, ScanCallbacks, ScanTypes, StopScan, next_event};
+use crate::scan::{IntoResettable, Resettable, ScanCallbacks, ScanTypes, StopScan, next_event};
 use crate::wire::LengthDelimited;
 
 pub struct Message<F: Resettable>(F, F::Mark);
 
 impl<F: ScanCallbacks + Resettable> Message<F> {
-    pub fn new(mut scanner: F) -> Self {
+    pub fn new(scanner: impl IntoResettable<Resettable = F>) -> Self {
+        let mut scanner = scanner.into_resettable();
         let mark = scanner.mark();
         Self(scanner, mark)
     }
@@ -131,6 +132,14 @@ mod test {
         }
         fn reset(&mut self, to: Self::Mark) {
             self.1.reset(to.0);
+        }
+    }
+
+    impl<T: IntoResettable> IntoResettable for Scanner<T> {
+        type Resettable = Scanner<T::Resettable>;
+        fn into_resettable(self) -> Self::Resettable {
+            let Self(f, t) = self;
+            Scanner(f, t.into_resettable())
         }
     }
 

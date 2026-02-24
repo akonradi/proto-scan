@@ -198,6 +198,16 @@ impl MessageScanner<'_> {
                     })
                 }
             }
+            impl <#(#generics: ::proto_scan::scan::IntoResettable),*> ::proto_scan::scan::IntoResettable for #scanner_name<#(#generics,)*> {
+                type Resettable = #scanner_name<#(<#generics as ::proto_scan::scan::IntoResettable>::Resettable),*>;
+
+                fn into_resettable(self) -> Self::Resettable {
+                    let Self { #(#field_names),* } = self;
+                    #scanner_name {
+                        #(#field_names: #field_names.into_resettable()),*
+                    }
+                }
+            }
 
             impl <#(#generics: ::proto_scan::scan::Resettable),*> ::proto_scan::scan::Resettable for #scanner_name<#(#generics,)*> {
                 type Mark = ( #(<#generics as ::proto_scan::scan::Resettable>::Mark,)* );

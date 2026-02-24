@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 
 use crate::scan::field::OnScanField;
-use crate::scan::{GroupOp, Resettable, ScalarField, ScanTypes, StopScan};
+use crate::scan::{GroupOp, IntoResettable, Resettable, ScalarField, ScanTypes, StopScan};
 use crate::wire::LengthDelimited;
 
 /// [`OnScanField`] impl that does nothing and always succeeds.
@@ -36,4 +36,11 @@ impl Resettable for NoOp {
     type Mark = ();
     fn mark(&mut self) -> Self::Mark {}
     fn reset(&mut self, (): Self::Mark) {}
+}
+
+impl IntoResettable for NoOp {
+    type Resettable = Self;
+    fn into_resettable(self) -> Self::Resettable {
+        self
+    }
 }

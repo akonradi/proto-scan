@@ -1,6 +1,5 @@
 use std::marker::PhantomData;
 
-use crate::scan::Resettable;
 use crate::scan::field::OnScanField;
 use crate::scan::{ScanTypes, StopScan};
 use crate::wire::{GroupOp, LengthDelimited, ScalarField, ScalarWireType};
@@ -38,10 +37,4 @@ impl<'a, W: ScalarWireType, F: FnMut(W::Repr) -> Result<(), StopScan>> OnScanFie
     ) -> Result<Option<Infallible>, StopScan> {
         Ok(None)
     }
-}
-
-impl<W, F> Resettable for InvokeOn<W, F> {
-    type Mark = ();
-    fn mark(&mut self) -> Self::Mark {}
-    fn reset(&mut self, (): Self::Mark) {}
 }

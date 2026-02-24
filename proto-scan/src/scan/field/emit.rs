@@ -3,7 +3,7 @@ use std::convert::Infallible;
 use crate::read::ReadBuffer as _;
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
-use crate::scan::{Resettable, ScanTypes, StopScan};
+use crate::scan::{IntoResettable, Resettable, ScanTypes, StopScan};
 use crate::wire::{GroupOp, LengthDelimited, ScalarField, ScalarWireType};
 
 /// [`OnScanField`] implementation that produces the read value as the event output.
@@ -50,6 +50,13 @@ impl<E: Encoding> Resettable for EmitScalar<E> {
     fn mark(&mut self) -> Self::Mark {}
     fn reset(&mut self, (): Self::Mark) {
         self.0 = None;
+    }
+}
+
+impl<E: Encoding> IntoResettable for EmitScalar<E> {
+    type Resettable = Self;
+    fn into_resettable(self) -> Self::Resettable {
+        self
     }
 }
 
