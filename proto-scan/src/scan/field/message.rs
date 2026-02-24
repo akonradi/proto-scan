@@ -1,8 +1,8 @@
 use std::convert::Infallible;
 
 use crate::scan::field::OnScanField;
-use crate::scan::{Resettable, Scan, ScanCallbacks, ScanTypes, Scanner, StopScan, next_event};
-use crate::wire::{LengthDelimited, ParseEventReader};
+use crate::scan::{Resettable, ScanCallbacks, ScanTypes, StopScan, next_event};
+use crate::wire::LengthDelimited;
 
 pub struct Message<F: Resettable>(F, F::Mark);
 
@@ -62,17 +62,16 @@ impl<F: Resettable> Resettable for Message<F> {
 
 #[cfg(test)]
 mod test {
-    use std::rc::Rc;
 
     use assert_matches::assert_matches;
     use hex_literal::hex;
 
     use crate::scan::encoding::Varint;
     use crate::scan::field::{EmitScalar, NoOp, SaveRepeated};
-    use crate::scan::{FieldNumber, ScalarField};
+    use crate::scan::{FieldNumber, ScalarField, Scan};
 
     use super::*;
-    struct Scanner<T = NoOp>(T);
+    struct Scanner<T = NoOp>(u32, T);
     #[derive(Debug, Default, PartialEq)]
     struct ScanOutput<T>(T);
     impl<T: ScanTypes> ScanTypes for Scanner<T> {
@@ -85,7 +84,11 @@ mod test {
             field: FieldNumber,
             value: ScalarField,
         ) -> Result<Self::ScanEvent, StopScan> {
-            self.0.on_scalar(value).map(|e| e.map(|e| (e,)))
+            if field == self.0 {
+                self.1.on_scalar(value).map(|e| e.map(|e| (e,)))
+            } else {
+                Ok(None)
+            }
         }
 
         fn on_group(
@@ -93,7 +96,11 @@ mod test {
             field: FieldNumber,
             op: crate::scan::GroupOp,
         ) -> Result<Self::ScanEvent, StopScan> {
-            self.0.on_group(op).map(|e| e.map(|e| (e,)))
+            if field == self.0 {
+                self.1.on_group(op).map(|e| e.map(|e| (e,)))
+            } else {
+                Ok(None)
+            }
         }
 
         fn on_length_delimited(
@@ -101,25 +108,29 @@ mod test {
             field: FieldNumber,
             delimited: impl LengthDelimited,
         ) -> Result<Self::ScanEvent, StopScan> {
-            self.0
-                .on_length_delimited(delimited)
-                .map(|e| e.map(|e| (e,)))
+            if field == self.0 {
+                self.1
+                    .on_length_delimited(delimited)
+                    .map(|e| e.map(|e| (e,)))
+            } else {
+                Ok(None)
+            }
         }
     }
 
     impl<T: OnScanField> From<Scanner<T>> for ScanOutput<T::ScanOutput> {
         fn from(value: Scanner<T>) -> Self {
-            Self(value.0.into_output())
+            Self(value.1.into_output())
         }
     }
 
     impl<T: Resettable> Resettable for Scanner<T> {
         type Mark = (T::Mark,);
         fn mark(&mut self) -> Self::Mark {
-            (self.0.mark(),)
+            (self.1.mark(),)
         }
         fn reset(&mut self, to: Self::Mark) {
-            self.0.reset(to.0);
+            self.1.reset(to.0);
         }
     }
 
@@ -137,7 +148,10 @@ mod test {
         /// Test1’s a field (i.e., Test3’s c.a field) is set to 150
         const INPUT: &[u8] = &hex!("1a 03 08 96 01");
 
-        let scanner = Scanner(Message::new(Scanner(EmitScalar::<Varint<i32>>::new())));
+        let scanner = Scanner(
+            3,
+            Message::new(Scanner(1, EmitScalar::<Varint<i32>>::new())),
+        );
 
         let mut input = &INPUT[..];
         let scan = Scan::new(crate::wire::parse(&mut input), scanner);
@@ -164,9 +178,13 @@ mod test {
         // to saved_to. That mirrors protobuf's last-one-wins semantics.
         for input in [Vec::from(INPUT), INPUT.repeat(2)] {
             let mut saved_to = vec![1, 2, 3];
-            let scanner = Scanner(Message::new(Scanner(
-                SaveRepeated::<Varint<i32>, _>::new(&mut saved_to),
-            )));
+            let scanner = Scanner(
+                3,
+                Message::new(Scanner(
+                    1,
+                    SaveRepeated::<Varint<i32>, _>::new(&mut saved_to),
+                )),
+            );
 
             let mut input = &input[..];
             let scan = Scan::new(crate::wire::parse(&mut input), scanner);

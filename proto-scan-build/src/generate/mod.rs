@@ -58,14 +58,14 @@ fn message_from_descriptor(message: &DescriptorProto) -> Result<ScannableMessage
     let DescriptorProto {
         name,
         field,
-        extension,
-        nested_type,
-        enum_type,
-        extension_range,
         oneof_decl,
-        options,
-        reserved_range,
-        reserved_name,
+        extension: _,
+        nested_type: _,
+        enum_type: _,
+        extension_range: _,
+        options: _,
+        reserved_range: _,
+        reserved_name: _,
     } = message;
 
     let name = ident(
@@ -84,8 +84,6 @@ fn message_from_descriptor(message: &DescriptorProto) -> Result<ScannableMessage
     let field_types = field
         .iter()
         .map(|value| {
-            use prost_types::field_descriptor_proto::{Label, Type};
-
             if let Some(index) = value.oneof_index
                 && oneofs_to_fields.get(&index).is_some_and(|v| v.len() > 1)
             {

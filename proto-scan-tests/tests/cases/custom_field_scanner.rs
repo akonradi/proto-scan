@@ -1,7 +1,7 @@
 use prost::Message as _;
-use proto_scan::scan::field::{Message, OnScanField};
-use proto_scan::scan::{Scan, ScanMessage as _, ScanTypes, Scanner as _};
-use proto_scan::wire::{ParseEventReader, ScalarField};
+use proto_scan::scan::field::OnScanField;
+use proto_scan::scan::{ScanMessage as _, ScanTypes, Scanner as _};
+use proto_scan::wire::ScalarField;
 use test_case::test_case;
 
 use super::*;

@@ -1,5 +1,4 @@
 use std::convert::Infallible;
-use std::path::Iter;
 
 use crate::read::Read;
 pub use crate::wire::{FieldNumber, GroupOp, I32, I64, ScalarField, Varint};

@@ -17,11 +17,11 @@ pub fn scan_message_derive(input: proc_macro::TokenStream) -> proc_macro::TokenS
 
 fn derive_impl(input: DeriveInput) -> Result<TokenStream> {
     let DeriveInput {
-        attrs,
-        vis,
         ident,
         generics,
         data,
+        attrs: _,
+        vis: _,
     } = input;
 
     if !generics.params.is_empty() {
@@ -33,7 +33,7 @@ fn derive_impl(input: DeriveInput) -> Result<TokenStream> {
 
     match data {
         syn::Data::Struct(data_struct) => message_impl(ident, data_struct),
-        syn::Data::Enum(data_enum) => todo!(),
+        syn::Data::Enum(_data_enum) => todo!(),
         syn::Data::Union(u) => {
             return Err(syn::Error::new(
                 u.union_token.span(),
@@ -52,17 +52,17 @@ fn message_impl(name: Ident, data_struct: DataStruct) -> Result<TokenStream> {
             let span = field.span();
             let syn::Field {
                 attrs,
-                vis,
-                mutability,
                 ident: field_name,
-                colon_token,
-                ty,
+                vis: _,
+                mutability: _,
+                colon_token: _,
+                ty: _,
             } = field;
 
             let field_name =
                 field_name.ok_or_else(|| syn::Error::new(span, "message fields must be named"))?;
 
-            let ProstAttrs { field_type } = (span, attrs).try_into()?;
+            let ProstAttrs { field_type } = attrs.try_into()?;
 
             let generic = Ident::new(&format!("T{i}"), Span::call_site());
 
@@ -82,10 +82,10 @@ struct ProstAttrs {
     field_type: FieldType,
 }
 
-impl TryFrom<(Span, Vec<Attribute>)> for ProstAttrs {
+impl TryFrom<Vec<Attribute>> for ProstAttrs {
     type Error = syn::Error;
 
-    fn try_from((span, value): (Span, Vec<Attribute>)) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: Vec<Attribute>) -> std::result::Result<Self, Self::Error> {
         let attrs = prost_attrs(value)?;
 
         #[derive(Clone, Copy, Debug, derive_more::From)]
@@ -121,7 +121,10 @@ impl TryFrom<(Span, Vec<Attribute>)> for ProstAttrs {
                 if attr.path().is_ident(name) {
                     let _ = attr.require_path_only();
                     if let Some(t) = field_type.replace(*found_type) {
-                        return Err(syn::Error::new(attr.span(), format!("already found type {t:?}")));
+                        return Err(syn::Error::new(
+                            attr.span(),
+                            format!("already found type {t:?}"),
+                        ));
                     }
                 }
             }

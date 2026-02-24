@@ -43,5 +43,5 @@ impl<'a, W: ScalarWireType, F: FnMut(W::Repr) -> Result<(), StopScan>> OnScanFie
 impl<W, F> Resettable for InvokeOn<W, F> {
     type Mark = ();
     fn mark(&mut self) -> Self::Mark {}
-    fn reset(&mut self, to: Self::Mark) {}
+    fn reset(&mut self, (): Self::Mark) {}
 }

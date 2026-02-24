@@ -47,7 +47,7 @@ impl<E: Encoding> OnScanField for EmitScalar<E> {
 impl<E: Encoding> Resettable for EmitScalar<E> {
     type Mark = ();
     fn mark(&mut self) -> Self::Mark {}
-    fn reset(&mut self, to: ()) {
+    fn reset(&mut self, (): Self::Mark) {
         self.0 = None;
     }
 }
