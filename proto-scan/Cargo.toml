@@ -1,17 +1,27 @@
 [package]
 name = "proto-scan"
-version = "0.1.0"
-edition = "2024"
+readme = "../README.md"
+description = "Scan protocol buffer messages as event streams, or to extract individual fields."
+keywords = [
+    "proto", "protobuf", "protocol", "buffer",
+    "scan", "binary", "read", "field", "wire", "parse"
+]
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+rust-version.workspace = true
 
 [features]
 derive = ["dep:proto-scan-derive"]
 
 [dependencies]
-assert_matches = "1.5.0"
-derive_more = { version = "2.1.1", features = ["from", "into", "try_from"] }
-either = "1.15.0"
-num-traits = "0.2.19"
-proto-scan-derive = { path = "../proto-scan-derive", optional = true }
+assert_matches = { workspace = true }
+derive_more = { workspace = true }
+either = { workspace = true }
+num-traits = { workspace = true }
+proto-scan-derive = { workspace = true , optional = true }
 
 [dev-dependencies]
-hex-literal = "1.1.0"
+hex-literal = { workspace = true }

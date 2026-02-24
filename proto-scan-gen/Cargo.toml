@@ -1,10 +1,16 @@
 [package]
 name = "proto-scan-gen"
-version = "0.1.0"
-edition = "2024"
+description = "Code generation library for proto-scan crate"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+version.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
 
 [dependencies]
-derive_more = { version = "2.1.1", features = ["from", "into", "try_from"] }
-proc-macro2 = "1.0"
-quote = "1.0"
-syn = "2.0"
+derive_more = { workspace = true }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }

@@ -84,8 +84,9 @@ fn message_from_descriptor(message: &DescriptorProto) -> Result<ScannableMessage
     let field_types = field
         .iter()
         .map(|value| {
-            if let Some(index) = value.oneof_index
-                && oneofs_to_fields.get(&index).is_some_and(|v| v.len() > 1)
+            if value
+                .oneof_index
+                .is_some_and(|index| oneofs_to_fields.get(&index).is_some_and(|v| v.len() > 1))
             {
                 return Ok(None);
             }

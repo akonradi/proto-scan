@@ -1,15 +1,18 @@
 [package]
 name = "proto-scan-tests"
-version = "0.1.0"
-edition = "2024"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+version.workspace = true
+rust-version.workspace = true
 
 [dependencies]
-either = "1.15.0"
-prost = "0.14.3"
-prost-types = "0.14.3"
-proto-scan = { path = "../proto-scan", features = ["derive"]}
-test-case = "3"
+either = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
+proto-scan = { workspace = true, features = ["derive"]}
+test-case = { workspace = true }
 
 [build-dependencies]
-prost-build = "0.14.3"
-proto-scan-build = { path = "../proto-scan-build" }
+prost-build = { workspace = true }
+proto-scan-build = { workspace = true }

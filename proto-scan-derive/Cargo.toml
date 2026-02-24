@@ -1,13 +1,18 @@
 [package]
 name = "proto-scan-derive"
-version = "0.1.0"
-edition = "2024"
+description = "Derive macros for proto-scan crate"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+version.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 
 [lib]
 proc-macro = true
 
 [dependencies]
-derive_more = { version = "2.1.1", features = ["from", "into", "try_from"] }
-proto-scan-gen = { path = "../proto-scan-gen" }
-proc-macro2 = "1.0"
-syn = { version = "2.0", features = ["derive"] }
+derive_more = { workspace = true }
+proto-scan-gen = { workspace = true }
+proc-macro2 = { workspace = true }
+syn = { workspace = true }

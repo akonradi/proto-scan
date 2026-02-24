@@ -1,17 +1,22 @@
 [package]
 name = "proto-scan-build"
-version = "0.1.0"
-edition = "2024"
+description = "Code generation for proto-scan from protocol buffer message descriptors."
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+version.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 
 [dependencies]
-derive_more = { version = "2.1.1", features = ["from", "into", "try_from"] }
-proto-scan-gen = { path = "../proto-scan-gen" }
-log = "0.4"
-either = "1.15.0"
-prost = "0.14.3"
-prost-build = "0.14.3"
-prost-types = "0.14.3"
-syn = "2.0.116"
-quote = "1.0.44"
-proc-macro2 = "1.0.106"
-itertools = "0.14.0"
+derive_more = { workspace = true }
+either = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+proc-macro2 = { workspace = true }
+prost = { workspace = true }
+prost-build = { workspace = true }
+prost-types = { workspace = true }
+proto-scan-gen = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
