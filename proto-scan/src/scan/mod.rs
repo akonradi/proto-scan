@@ -133,7 +133,7 @@ impl<P: ParseEventReader, S: ScanCallbacks + Into<S::ScanOutput>> Scan<P, S> {
 ///
 /// TODO: make this an enum that provides some detail about why the scan was
 /// unsuccessful.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct StopScan;
 
 impl From<Infallible> for StopScan {

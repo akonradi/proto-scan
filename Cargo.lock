@@ -301,6 +301,7 @@ dependencies = [
  "either",
  "hex-literal",
  "num-traits",
+ "prost",
  "proto-scan-derive",
 ]
 

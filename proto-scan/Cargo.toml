@@ -22,3 +22,8 @@ proto-scan-derive = { workspace = true , optional = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }
+# For documentation
+prost = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
