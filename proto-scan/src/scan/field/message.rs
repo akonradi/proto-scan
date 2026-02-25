@@ -4,13 +4,11 @@ use crate::scan::field::OnScanField;
 use crate::scan::{IntoResettable, Resettable, ScanCallbacks, ScanTypes, StopScan, next_event};
 use crate::wire::LengthDelimited;
 
-pub struct Message<F: Resettable>(F, F::Mark);
+pub struct Message<F>(F);
 
 impl<F: ScanCallbacks + Resettable> Message<F> {
     pub fn new(scanner: impl IntoResettable<Resettable = F>) -> Self {
-        let mut scanner = scanner.into_resettable();
-        let mark = scanner.mark();
-        Self(scanner, mark)
+        Self(scanner.into_resettable())
     }
 }
 
@@ -41,7 +39,7 @@ impl<F: ScanCallbacks<ScanOutput: Default> + Into<Self::ScanOutput> + Resettable
         &mut self,
         delimited: impl LengthDelimited,
     ) -> Result<Option<Self::ScanEvent>, StopScan> {
-        self.0.reset(self.1.clone());
+        self.0.reset();
         let mut parse = delimited.into_events();
         let fields = &mut self.0;
         while let Some(next) = next_event(&mut parse, fields) {
@@ -52,12 +50,8 @@ impl<F: ScanCallbacks<ScanOutput: Default> + Into<Self::ScanOutput> + Resettable
 }
 
 impl<F: Resettable> Resettable for Message<F> {
-    type Mark = F::Mark;
-    fn mark(&mut self) -> Self::Mark {
-        self.0.mark()
-    }
-    fn reset(&mut self, mark: Self::Mark) {
-        self.0.reset(mark)
+    fn reset(&mut self) {
+        self.0.reset()
     }
 }
 
@@ -126,12 +120,8 @@ mod test {
     }
 
     impl<T: Resettable> Resettable for Scanner<T> {
-        type Mark = (T::Mark,);
-        fn mark(&mut self) -> Self::Mark {
-            (self.1.mark(),)
-        }
-        fn reset(&mut self, to: Self::Mark) {
-            self.1.reset(to.0);
+        fn reset(&mut self) {
+            self.1.reset();
         }
     }
 

@@ -46,9 +46,7 @@ impl<E: Encoding> OnScanField for EmitScalar<E> {
 }
 
 impl<E: Encoding> Resettable for EmitScalar<E> {
-    type Mark = ();
-    fn mark(&mut self) -> Self::Mark {}
-    fn reset(&mut self, (): Self::Mark) {
+    fn reset(&mut self) {
         self.0 = None;
     }
 }
@@ -108,9 +106,7 @@ impl<E: Encoding> OnScanField for EmitRepeated<E> {
 }
 
 impl<E: Encoding> Resettable for EmitRepeated<E> {
-    type Mark = ();
-    fn mark(&mut self) -> Self::Mark {}
-    fn reset(&mut self, (): Self::Mark) {
+    fn reset(&mut self) {
         self.0.clear()
     }
 }
@@ -188,9 +184,7 @@ impl OnScanField for EmitBytes<[u8]> {
 
 
 impl<E: ToOwnedBytes + ?Sized> Resettable for EmitBytes<E> {
-    type Mark = ();
-    fn mark(&mut self) -> Self::Mark {}
-    fn reset(&mut self, (): Self::Mark) {
+    fn reset(&mut self) {
         self.0 = None;
     }
 }

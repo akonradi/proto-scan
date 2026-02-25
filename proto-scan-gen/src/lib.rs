@@ -210,13 +210,8 @@ impl MessageScanner<'_> {
             }
 
             impl <#(#generics: ::proto_scan::scan::Resettable),*> ::proto_scan::scan::Resettable for #scanner_name<#(#generics,)*> {
-                type Mark = ( #(<#generics as ::proto_scan::scan::Resettable>::Mark,)* );
-                fn mark(&mut self) -> Self::Mark {
-                    ( #(self.#field_names.mark(),)* )
-                }
-                fn reset(&mut self, to: Self::Mark) {
-                    let ( #(#field_names,)* ) = to;
-                    #(self.#field_names.reset(#field_names);)*
+                fn reset(&mut self) {
+                    #(self.#field_names.reset();)*
                 }
             }
         }

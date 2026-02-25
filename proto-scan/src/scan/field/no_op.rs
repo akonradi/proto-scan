@@ -33,9 +33,7 @@ impl OnScanField for NoOp {
 }
 
 impl Resettable for NoOp {
-    type Mark = ();
-    fn mark(&mut self) -> Self::Mark {}
-    fn reset(&mut self, (): Self::Mark) {}
+    fn reset(&mut self) {}
 }
 
 impl IntoResettable for NoOp {

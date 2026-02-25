@@ -1,8 +1,6 @@
+/// A type that can be "reset" to an intial value.
 pub trait Resettable {
-    type Mark: Clone;
-    fn mark(&mut self) -> Self::Mark;
-
-    fn reset(&mut self, to: Self::Mark);
+    fn reset(&mut self);
 }
 
 /// A type that can be transformed into a [`Resettable`] type.
@@ -13,16 +11,4 @@ pub trait IntoResettable {
     type Resettable: Resettable;
 
     fn into_resettable(self) -> Self::Resettable;
-}
-
-impl<T> Resettable for &mut Vec<T> {
-    type Mark = usize;
-
-    fn mark(&mut self) -> Self::Mark {
-        self.len()
-    }
-
-    fn reset(&mut self, to: Self::Mark) {
-        self.truncate(to);
-    }
 }

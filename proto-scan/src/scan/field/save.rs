@@ -12,7 +12,7 @@ use crate::wire::{LengthDelimited, ScalarWireType};
 pub struct SaveScalar<E, D>(D, PhantomData<E>);
 
 /// Generalization of assignment for wrapping types.
-/// 
+///
 /// A type `Wrap<T>(T, bool)` could implement `SaveFrom<T>` to save the value
 /// and note that a modification was made.
 pub trait SaveFrom<T> {
@@ -61,9 +61,7 @@ impl<E: Encoding, D: SaveFrom<E::Repr>> OnScanField for SaveScalar<E, D> {
 pub struct RestoreOnReset<'t, D>(&'t mut D, Option<D>);
 
 impl<'t, D> Resettable for RestoreOnReset<'t, D> {
-    type Mark = ();
-    fn mark(&mut self) -> Self::Mark {}
-    fn reset(&mut self, (): Self::Mark) {
+    fn reset(&mut self) {
         if let Some(prev) = self.1.take() {
             *self.0 = prev;
         }
@@ -85,13 +83,8 @@ impl<'t, E, D> IntoResettable for SaveScalar<E, &'t mut D> {
 }
 
 impl<'t, E, D> Resettable for SaveScalar<E, RestoreOnReset<'t, D>> {
-    type Mark = ();
-    fn mark(&mut self) -> Self::Mark {
-        self.0.mark()
-    }
-
-    fn reset(&mut self, to: Self::Mark) {
-        self.0.reset(to);
+    fn reset(&mut self) {
+        self.0.reset();
     }
 }
 
@@ -143,19 +136,22 @@ impl<'t, E: Encoding, D: DerefMut<Target: Extend<E::Repr>>> OnScanField for Save
 impl<'t, E, D> IntoResettable for SaveRepeated<E, &'t mut Vec<D>> {
     type Resettable = SaveRepeated<E, RestoreLenOnReset<'t, Vec<D>>>;
     fn into_resettable(self) -> Self::Resettable {
-        SaveRepeated(RestoreLenOnReset(self.0), PhantomData)
+        SaveRepeated(RestoreLenOnReset::new(self.0), PhantomData)
     }
 }
 
-pub struct RestoreLenOnReset<'t, T>(&'t mut T);
+pub struct RestoreLenOnReset<'t, T>(&'t mut T, usize);
+
+impl<'t, T> RestoreLenOnReset<'t, Vec<T>> {
+    pub fn new(arg: &'t mut Vec<T>) -> Self {
+        let len = arg.len();
+        Self(arg, len)
+    }
+}
 
 impl<'t, T> Resettable for RestoreLenOnReset<'t, Vec<T>> {
-    type Mark = usize;
-    fn mark(&mut self) -> Self::Mark {
-        self.0.len()
-    }
-    fn reset(&mut self, to: Self::Mark) {
-        self.0.truncate(to);
+    fn reset(&mut self) {
+        self.0.truncate(self.1);
     }
 }
 
@@ -173,12 +169,8 @@ impl<'t, T> DerefMut for RestoreLenOnReset<'t, T> {
 }
 
 impl<D: Resettable, E> Resettable for SaveRepeated<E, D> {
-    type Mark = D::Mark;
-    fn mark(&mut self) -> Self::Mark {
-        self.0.mark()
-    }
-    fn reset(&mut self, to: Self::Mark) {
-        self.0.reset(to);
+    fn reset(&mut self) {
+        self.0.reset();
     }
 }
 
@@ -240,11 +232,7 @@ impl<'t, D: for<'a> From<&'a str>> OnScanField for SaveBytes<str, &'t mut D> {
 }
 
 impl<D: Resettable, E> Resettable for SaveBytes<E, D> {
-    type Mark = D::Mark;
-    fn mark(&mut self) -> Self::Mark {
-        self.0.mark()
-    }
-    fn reset(&mut self, to: Self::Mark) {
-        self.0.reset(to);
+    fn reset(&mut self) {
+        self.0.reset();
     }
 }
