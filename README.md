@@ -41,7 +41,6 @@ This is still a work in progress. A non-exhaustive list of things remaining:
 - Implement `Read` for `std::io::Read`.
 - Avoid a copy when saving a string or repeated bytes field from a `Read` impl whose buffer is a `Vec` or `Box<u8>`.
 - Make the library and generated code `no_std` with a feature flag
-- Enable higher-performance varint deserialization with a `Read::peek` method.
 - Document `proto-scan-build` and derive processes better (for now see the build script of the -tests crate).
 - Enable higher-performance varint deserialization with a `Read::peek` method.
 
