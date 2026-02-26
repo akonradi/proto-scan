@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 
 use crate::scan::field::OnScanField;
-use crate::scan::{GroupOp, IntoResettable, Resettable, ScalarField, ScanTypes, StopScan};
+use crate::scan::{GroupOp, IntoResettable, NumericField, Resettable, ScanTypes, StopScan};
 use crate::wire::LengthDelimited;
 
 /// [`OnScanField`] impl that does nothing and always succeeds.
@@ -16,7 +16,7 @@ impl ScanTypes for NoOp {
 impl OnScanField for NoOp {
     fn into_output(self) -> Self::ScanOutput {}
 
-    fn on_scalar(&mut self, _value: ScalarField) -> Result<Option<Self::ScanEvent>, StopScan> {
+    fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
         Ok(None)
     }
 

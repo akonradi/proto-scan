@@ -1,13 +1,13 @@
 use prost::Message as _;
 use proto_scan::scan::field::OnScanField;
 use proto_scan::scan::{ScanMessage as _, ScanTypes, Scanner as _};
-use proto_scan::wire::ScalarField;
+use proto_scan::wire::NumericField;
 use test_case::test_case;
 
 use super::*;
 use InputKind::*;
 
-struct CustomScanner<'t>(&'t mut Option<ScalarField>);
+struct CustomScanner<'t>(&'t mut Option<NumericField>);
 #[derive(Debug, PartialEq)]
 struct CustomEvent;
 #[derive(Debug, Default, PartialEq)]
@@ -23,9 +23,9 @@ impl OnScanField for CustomScanner<'_> {
         CustomOutput
     }
 
-    fn on_scalar(
+    fn on_numeric(
         &mut self,
-        value: ScalarField,
+        value: NumericField,
     ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::StopScan> {
         *self.0 = Some(value);
         Ok(Some(CustomEvent))
@@ -68,6 +68,6 @@ fn custom_scanner(input: InputKind) {
     assert_eq!(single_bool, CustomOutput);
     assert_eq!(
         out,
-        input.single_bool.map(|b| ScalarField::Varint(b as u64))
+        input.single_bool.map(|b| NumericField::Varint(b as u64))
     );
 }

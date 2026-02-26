@@ -4,12 +4,12 @@ use std::ops::{Deref, DerefMut};
 
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
-use crate::scan::{GroupOp, ScalarField, ScanTypes, StopScan};
+use crate::scan::{GroupOp, NumericField, ScanTypes, StopScan};
 use crate::scan::{IntoResettable, Resettable};
-use crate::wire::{LengthDelimited, ScalarWireType};
+use crate::wire::{LengthDelimited, NumericWireType};
 
 /// [`OnScanField`] that writes the decoded value to the provided location.
-pub struct WriteScalar<E, D>(D, PhantomData<E>);
+pub struct WriteNumeric<E, D>(D, PhantomData<E>);
 
 /// Generalization of assignment for wrapping types.
 ///
@@ -25,22 +25,22 @@ impl<S, T: From<S>> SaveFrom<S> for &mut T {
     }
 }
 
-impl<E, D> WriteScalar<E, D> {
+impl<E, D> WriteNumeric<E, D> {
     pub fn new(to: D) -> Self {
         Self(to, PhantomData)
     }
 }
 
-impl<E, D> ScanTypes for WriteScalar<E, D> {
+impl<E, D> ScanTypes for WriteNumeric<E, D> {
     type ScanEvent = Infallible;
     type ScanOutput = ();
 }
 
-impl<E: Encoding, D: SaveFrom<E::Repr>> OnScanField for WriteScalar<E, D> {
+impl<E: Encoding, D: SaveFrom<E::Repr>> OnScanField for WriteNumeric<E, D> {
     fn into_output(self) -> Self::ScanOutput {}
 
-    fn on_scalar(&mut self, value: ScalarField) -> Result<Option<Infallible>, StopScan> {
-        let value = <E::Wire as ScalarWireType>::from_value(value).ok_or(StopScan)?;
+    fn on_numeric(&mut self, value: NumericField) -> Result<Option<Infallible>, StopScan> {
+        let value = <E::Wire as NumericWireType>::from_value(value).ok_or(StopScan)?;
         self.0.save_from(E::decode(value).map_err(Into::into)?);
         Ok(None)
     }
@@ -74,15 +74,15 @@ impl<'t, T: Into<D>, D> SaveFrom<T> for RestoreOnReset<'t, D> {
     }
 }
 
-impl<'t, E, D> IntoResettable for WriteScalar<E, &'t mut D> {
-    type Resettable = WriteScalar<E, RestoreOnReset<'t, D>>;
+impl<'t, E, D> IntoResettable for WriteNumeric<E, &'t mut D> {
+    type Resettable = WriteNumeric<E, RestoreOnReset<'t, D>>;
 
     fn into_resettable(self) -> Self::Resettable {
-        WriteScalar(RestoreOnReset(self.0, None), PhantomData)
+        WriteNumeric(RestoreOnReset(self.0, None), PhantomData)
     }
 }
 
-impl<'t, E, D> Resettable for WriteScalar<E, RestoreOnReset<'t, D>> {
+impl<'t, E, D> Resettable for WriteNumeric<E, RestoreOnReset<'t, D>> {
     fn reset(&mut self) {
         self.0.reset();
     }
@@ -105,8 +105,8 @@ impl<E: Encoding, D> ScanTypes for WriteRepeated<E, D> {
 impl<'t, E: Encoding, D: DerefMut<Target: Extend<E::Repr>>> OnScanField for WriteRepeated<E, D> {
     fn into_output(self) -> Self::ScanOutput {}
 
-    fn on_scalar(&mut self, value: ScalarField) -> Result<Option<Infallible>, StopScan> {
-        let value = <E::Wire as ScalarWireType>::from_value(value).ok_or(StopScan)?;
+    fn on_numeric(&mut self, value: NumericField) -> Result<Option<Infallible>, StopScan> {
+        let value = <E::Wire as NumericWireType>::from_value(value).ok_or(StopScan)?;
         let decoded = E::decode(value).map_err(Into::into)?.into();
         self.0.extend([decoded]);
         Ok(None)
@@ -191,7 +191,7 @@ impl<E: ?Sized, D> ScanTypes for WriteBytes<E, D> {
 impl<'t, D: for<'a> From<&'a [u8]>> OnScanField for WriteBytes<[u8], &'t mut D> {
     fn into_output(self) -> Self::ScanOutput {}
 
-    fn on_scalar(&mut self, _value: ScalarField) -> Result<Option<Infallible>, StopScan> {
+    fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Infallible>, StopScan> {
         Err(StopScan)
     }
 
@@ -212,7 +212,7 @@ impl<'t, D: for<'a> From<&'a [u8]>> OnScanField for WriteBytes<[u8], &'t mut D> 
 impl<'t, D: for<'a> From<&'a str>> OnScanField for WriteBytes<str, &'t mut D> {
     fn into_output(self) -> Self::ScanOutput {}
 
-    fn on_scalar(&mut self, _value: ScalarField) -> Result<Option<Infallible>, StopScan> {
+    fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Infallible>, StopScan> {
         Err(StopScan)
     }
 

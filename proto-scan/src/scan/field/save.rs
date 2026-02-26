@@ -4,30 +4,30 @@ use crate::read::ReadBuffer as _;
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
 use crate::scan::{IntoResettable, Resettable, ScanTypes, StopScan};
-use crate::wire::{GroupOp, LengthDelimited, ScalarField, ScalarWireType};
+use crate::wire::{GroupOp, LengthDelimited, NumericField, NumericWireType};
 
 /// [`OnScanField`] implementation that produces the read value as the event output.
 ///
 /// Deserializes according to the [`Encoding`] type parameter.
-pub struct SaveScalar<E: Encoding>(Option<E::Repr>);
+pub struct SaveNumeric<E: Encoding>(Option<E::Repr>);
 
-impl<E: Encoding> ScanTypes for SaveScalar<E> {
+impl<E: Encoding> ScanTypes for SaveNumeric<E> {
     type ScanEvent = E::Repr;
     type ScanOutput = Option<E::Repr>;
 }
 
-impl<T: Encoding> SaveScalar<T> {
+impl<T: Encoding> SaveNumeric<T> {
     pub fn new() -> Self {
         Self(None)
     }
 }
 
-impl<E: Encoding> OnScanField for SaveScalar<E> {
+impl<E: Encoding> OnScanField for SaveNumeric<E> {
     fn into_output(self) -> Self::ScanOutput {
         self.0
     }
-    fn on_scalar(&mut self, value: ScalarField) -> Result<Option<Self::ScanEvent>, StopScan> {
-        let value = <E::Wire as ScalarWireType>::from_value(value).ok_or(StopScan)?;
+    fn on_numeric(&mut self, value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
+        let value = <E::Wire as NumericWireType>::from_value(value).ok_or(StopScan)?;
         let value = E::decode(value).map_err(Into::into)?;
         self.0 = Some(value);
         Ok(Some(value))
@@ -45,13 +45,13 @@ impl<E: Encoding> OnScanField for SaveScalar<E> {
     }
 }
 
-impl<E: Encoding> Resettable for SaveScalar<E> {
+impl<E: Encoding> Resettable for SaveNumeric<E> {
     fn reset(&mut self) {
         self.0 = None;
     }
 }
 
-impl<E: Encoding> IntoResettable for SaveScalar<E> {
+impl<E: Encoding> IntoResettable for SaveNumeric<E> {
     type Resettable = Self;
     fn into_resettable(self) -> Self::Resettable {
         self
@@ -78,8 +78,8 @@ impl<E: Encoding> OnScanField for SaveRepeated<E> {
     fn into_output(self) -> Self::ScanOutput {
         self.0
     }
-    fn on_scalar(&mut self, value: ScalarField) -> Result<Option<Self::ScanEvent>, StopScan> {
-        let value = <E::Wire as ScalarWireType>::from_value(value).ok_or(StopScan)?;
+    fn on_numeric(&mut self, value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
+        let value = <E::Wire as NumericWireType>::from_value(value).ok_or(StopScan)?;
         self.0.extend([E::decode(value).map_err(Into::into)?]);
         Ok(None)
     }
@@ -141,7 +141,7 @@ impl OnScanField for SaveBytes<str> {
     fn into_output(self) -> Self::ScanOutput {
         self.0
     }
-    fn on_scalar(&mut self, _value: ScalarField) -> Result<Option<Self::ScanEvent>, StopScan> {
+    fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
     }
 
@@ -164,7 +164,7 @@ impl OnScanField for SaveBytes<[u8]> {
     fn into_output(self) -> Self::ScanOutput {
         self.0
     }
-    fn on_scalar(&mut self, _value: ScalarField) -> Result<Option<Self::ScanEvent>, StopScan> {
+    fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
     }
 

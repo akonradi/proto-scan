@@ -69,14 +69,14 @@
 //!   while let Some(event) = reader.next() {
 //!     let (field_number, event) = event?;
 //!     match event {
-//!       wire::ParseEvent::Scalar(s) if field_number == 1 => match s {
-//!         wire::ScalarField::Varint(v) => found_a = Some(
+//!       wire::ParseEvent::Numeric(s) if field_number == 1 => match s {
+//!         wire::NumericField::Varint(v) => found_a = Some(
 //!           // cast bits according to protobuf encoding format
 //!           v as i64
 //!         ),
-//!         wire::ScalarField::I64(_) | wire::ScalarField::I32(_) => found_a = None,
+//!         wire::NumericField::I64(_) | wire::NumericField::I32(_) => found_a = None,
 //!       },
-//!       wire::ParseEvent::Scalar(_) | wire::ParseEvent::Group(_) | wire::ParseEvent::LengthDelimited(_) => {},
+//!       wire::ParseEvent::Numeric(_) | wire::ParseEvent::Group(_) | wire::ParseEvent::LengthDelimited(_) => {},
 //!     }
 //!   }
 //!   Ok(found_a)

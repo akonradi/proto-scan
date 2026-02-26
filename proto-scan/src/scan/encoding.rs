@@ -2,18 +2,18 @@ use std::convert::Infallible;
 use std::marker::PhantomData;
 
 use crate::scan::StopScan;
-use crate::wire::ScalarWireType;
+use crate::wire::NumericWireType;
 
 pub struct Varint<T>(PhantomData<T>);
 pub struct Fixed<T>(PhantomData<T>);
 pub struct ZigZag<T>(PhantomData<T>);
 
 pub trait Encoding {
-    type Wire: ScalarWireType;
+    type Wire: NumericWireType;
     type Repr: Copy;
     type Error: Into<super::StopScan>;
 
-    fn decode(wire: <Self::Wire as ScalarWireType>::Repr) -> Result<Self::Repr, Self::Error>;
+    fn decode(wire: <Self::Wire as NumericWireType>::Repr) -> Result<Self::Repr, Self::Error>;
 }
 
 fn zigzag_decode<U>(u: U) -> U
@@ -36,7 +36,7 @@ impl Encoding for Varint<bool> {
     type Repr = bool;
     type Error = super::StopScan;
 
-    fn decode(wire: <Self::Wire as ScalarWireType>::Repr) -> Result<bool, super::StopScan> {
+    fn decode(wire: <Self::Wire as NumericWireType>::Repr) -> Result<bool, super::StopScan> {
         match wire {
             0 => Ok(false),
             1 => Ok(true),
@@ -53,7 +53,7 @@ macro_rules! impl_encoding {
             type Repr = $t;
             type Error = super::StopScan;
 
-            fn decode(wire: <Self::Wire as ScalarWireType>::Repr) -> Result<$t, super::StopScan> {
+            fn decode(wire: <Self::Wire as NumericWireType>::Repr) -> Result<$t, super::StopScan> {
                 let unzigged = zigzag_decode(<$repr>::try_from(wire).ok().ok_or(super::StopScan)?);
                 let bytes = unzigged.to_ne_bytes();
                 Ok(<$t>::from_ne_bytes(bytes))
@@ -67,7 +67,7 @@ macro_rules! impl_encoding {
             type Repr = $t;
             type Error = super::StopScan;
 
-            fn decode(wire: <Self::Wire as ScalarWireType>::Repr) -> Result<$t, super::StopScan> {
+            fn decode(wire: <Self::Wire as NumericWireType>::Repr) -> Result<$t, super::StopScan> {
                 let repr = <$repr>::from_ne_bytes(wire.to_ne_bytes());
                 repr.try_into().ok().ok_or(StopScan)
             }
@@ -81,7 +81,7 @@ macro_rules! impl_encoding {
             type Error = Infallible;
 
             fn decode(
-                wire: <Self::Wire as ScalarWireType>::Repr,
+                wire: <Self::Wire as NumericWireType>::Repr,
             ) -> Result<Self::Repr, Infallible> {
                 Ok(<$t>::from_ne_bytes(wire.to_ne_bytes()))
             }

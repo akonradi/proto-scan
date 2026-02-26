@@ -2,15 +2,15 @@ use std::convert::Infallible as Never;
 
 use crate::DecodeError;
 use crate::read::Read;
-use crate::wire::ScalarField;
+use crate::wire::NumericField;
 
-pub trait ScalarWireType: sealed::Sealed {
+pub trait NumericWireType: sealed::Sealed {
     type Repr;
     const BYTE_LEN: std::ops::RangeInclusive<u8>;
 
     fn read_from<R: Read>(r: &mut R) -> Result<Self::Repr, DecodeError<R::Error>>;
 
-    fn from_value(s: ScalarField) -> Option<Self::Repr>;
+    fn from_value(s: NumericField) -> Option<Self::Repr>;
 }
 
 pub struct Varint(Never);
@@ -27,7 +27,7 @@ mod sealed {
     impl Sealed for super::I32 {}
 }
 
-impl ScalarWireType for Varint {
+impl NumericWireType for Varint {
     type Repr = u64;
     const BYTE_LEN: std::ops::RangeInclusive<u8> = 1..=10;
 
@@ -35,10 +35,10 @@ impl ScalarWireType for Varint {
         super::parse_base128_varint(r)
     }
 
-    fn from_value(s: ScalarField) -> Option<Self::Repr> {
+    fn from_value(s: NumericField) -> Option<Self::Repr> {
         match s {
-            ScalarField::Varint(v) => Some(v),
-            ScalarField::I64(_) | ScalarField::I32(_) => None,
+            NumericField::Varint(v) => Some(v),
+            NumericField::I64(_) | NumericField::I32(_) => None,
         }
     }
 }
@@ -57,7 +57,7 @@ where
     Ok(num_traits::FromBytes::from_le_bytes(bytes))
 }
 
-impl ScalarWireType for I64 {
+impl NumericWireType for I64 {
     type Repr = u64;
     const BYTE_LEN: std::ops::RangeInclusive<u8> = 8..=8;
 
@@ -65,15 +65,15 @@ impl ScalarWireType for I64 {
         read_fixed_from(r)
     }
 
-    fn from_value(s: ScalarField) -> Option<Self::Repr> {
+    fn from_value(s: NumericField) -> Option<Self::Repr> {
         match s {
-            ScalarField::I64(i) => Some(i),
-            ScalarField::Varint(_) | ScalarField::I32(_) => None,
+            NumericField::I64(i) => Some(i),
+            NumericField::Varint(_) | NumericField::I32(_) => None,
         }
     }
 }
 
-impl ScalarWireType for I32 {
+impl NumericWireType for I32 {
     type Repr = u32;
     const BYTE_LEN: std::ops::RangeInclusive<u8> = 4..=4;
 
@@ -81,10 +81,10 @@ impl ScalarWireType for I32 {
         read_fixed_from(r)
     }
 
-    fn from_value(s: ScalarField) -> Option<Self::Repr> {
+    fn from_value(s: NumericField) -> Option<Self::Repr> {
         match s {
-            ScalarField::I32(i) => Some(i),
-            ScalarField::Varint(_) | ScalarField::I64(_) => None,
+            NumericField::I32(i) => Some(i),
+            NumericField::Varint(_) | NumericField::I64(_) => None,
         }
     }
 }

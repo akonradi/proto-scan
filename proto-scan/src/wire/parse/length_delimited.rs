@@ -5,8 +5,8 @@ use either::Either;
 
 use crate::DecodeError;
 use crate::read::{Read, ReadError, ReadTypes};
-use crate::wire::parse::{DoBeforeNext, EventReader, LimitReader, ScalarIter};
-use crate::wire::{LengthDelimited, ParseEventReader, ScalarWireType};
+use crate::wire::parse::{DoBeforeNext, EventReader, LimitReader, NumericIter};
+use crate::wire::{LengthDelimited, NumericWireType, ParseEventReader};
 
 pub(super) struct LengthDelimitedImpl<'a, R> {
     pub(super) reader: LimitReader<&'a mut R>,
@@ -44,7 +44,7 @@ impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
 }
 
 impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedImpl<'a, R> {
-    type PackedIter<W: ScalarWireType> = ScalarIter<'a, R, W>;
+    type PackedIter<W: NumericWireType> = NumericIter<'a, R, W>;
 
     fn len(&self) -> u32 {
         self.reader.remaining()
@@ -60,8 +60,8 @@ impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedI
         Ok(bytes)
     }
 
-    fn into_packed<W: ScalarWireType>(self) -> Self::PackedIter<W> {
-        ScalarIter::<_, W>::new(self)
+    fn into_packed<W: NumericWireType>(self) -> Self::PackedIter<W> {
+        NumericIter::<_, W>::new(self)
     }
 
     fn into_events(self) -> impl ParseEventReader<Error = Self::Error> {

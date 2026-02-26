@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 
 use crate::read::Read;
-pub use crate::wire::{FieldNumber, GroupOp, I32, I64, ScalarField, Varint};
+pub use crate::wire::{FieldNumber, GroupOp, I32, I64, NumericField, Varint};
 use crate::wire::{LengthDelimited, ParseEvent, ParseEventReader};
 
 pub mod encoding;
@@ -46,11 +46,11 @@ pub trait Scanner: ScanTypes + Sized {
 
 /// Callbacks for parse inputs encountered during a scan.
 pub trait ScanCallbacks: ScanTypes {
-    /// Called when a scalar field is parsed.
-    fn on_scalar(
+    /// Called when a numeric field is parsed.
+    fn on_numeric(
         &mut self,
         field: FieldNumber,
-        value: ScalarField,
+        value: NumericField,
     ) -> Result<Self::ScanEvent, StopScan>;
 
     /// Called when a SGROUP or EGROUP tag is read.
@@ -112,7 +112,7 @@ pub(crate) fn next_event<P: ParseEventReader, S: ScanCallbacks>(
     };
 
     let output = match event {
-        ParseEvent::Scalar(scalar_field) => fields.on_scalar(field_number, scalar_field),
+        ParseEvent::Numeric(numeric_field) => fields.on_numeric(field_number, numeric_field),
         ParseEvent::Group(group_op) => fields.on_group(field_number, group_op),
         ParseEvent::LengthDelimited(l) => fields.on_length_delimited(field_number, l),
     };

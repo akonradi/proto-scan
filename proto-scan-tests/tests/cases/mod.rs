@@ -4,8 +4,8 @@ mod bytes;
 mod custom_field_scanner;
 mod embedded_message;
 mod read_all;
-mod repeated_scalar;
-mod single_scalar;
+mod repeated_numeric;
+mod single_numeric;
 
 pub(super) fn example_msg() -> crate::prost_proto::ScanExample {
     use crate::prost_proto::*;

@@ -5,8 +5,8 @@ use crate::read::count_reader::CountReader;
 use crate::read::{Read, ReadError};
 use crate::wire::parse::{DoBeforeNext, LengthDelimitedImpl, LimitReader};
 use crate::wire::{
-    FieldNumber, GroupOp, I32, I64, LengthDelimited, ParseEvent, ParseEventReader, ScalarField,
-    ScalarWireType, Tag, Varint, WireType,
+    FieldNumber, GroupOp, I32, I64, LengthDelimited, NumericField, NumericWireType, ParseEvent,
+    ParseEventReader, Tag, Varint, WireType,
 };
 
 pub(super) struct EventReader<'a, R> {
@@ -60,11 +60,11 @@ impl<'a, R: Read> ParseEventReader for EventReader<'a, R> {
         Some(
             match wire_type {
                 WireType::Varint => Varint::read_from(&mut self.inner)
-                    .map(|value| ParseEvent::Scalar(ScalarField::Varint(value))),
+                    .map(|value| ParseEvent::Numeric(NumericField::Varint(value))),
                 WireType::I64 => I64::read_from(&mut &mut self.inner)
-                    .map(|value| ParseEvent::Scalar(ScalarField::I64(value))),
+                    .map(|value| ParseEvent::Numeric(NumericField::I64(value))),
                 WireType::I32 => I32::read_from(&mut &mut self.inner)
-                    .map(|value| ParseEvent::Scalar(ScalarField::I32(value))),
+                    .map(|value| ParseEvent::Numeric(NumericField::I32(value))),
                 WireType::Sgroup => Ok(ParseEvent::Group(GroupOp::Start)),
                 WireType::Egroup => Ok(ParseEvent::Group(GroupOp::End)),
                 WireType::LengthDelimited => {

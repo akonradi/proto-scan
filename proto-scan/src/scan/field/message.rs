@@ -24,9 +24,9 @@ impl<F: ScanCallbacks<ScanOutput: Default> + Into<Self::ScanOutput> + Resettable
         self.0.into()
     }
 
-    fn on_scalar(
+    fn on_numeric(
         &mut self,
-        _value: crate::scan::ScalarField,
+        _value: crate::scan::NumericField,
     ) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
     }
@@ -62,8 +62,8 @@ mod test {
     use hex_literal::hex;
 
     use crate::scan::encoding::Varint;
-    use crate::scan::field::{NoOp, SaveScalar, WriteRepeated};
-    use crate::scan::{FieldNumber, ScalarField, Scan};
+    use crate::scan::field::{NoOp, SaveNumeric, WriteRepeated};
+    use crate::scan::{FieldNumber, NumericField, Scan};
 
     use super::*;
     struct Scanner<T = NoOp>(u32, T);
@@ -74,13 +74,13 @@ mod test {
         type ScanOutput = ScanOutput<T::ScanOutput>;
     }
     impl<T: OnScanField> ScanCallbacks for Scanner<T> {
-        fn on_scalar(
+        fn on_numeric(
             &mut self,
             field: FieldNumber,
-            value: ScalarField,
+            value: NumericField,
         ) -> Result<Self::ScanEvent, StopScan> {
             if field == self.0 {
-                self.1.on_scalar(value).map(|e| e.map(|e| (e,)))
+                self.1.on_numeric(value).map(|e| e.map(|e| (e,)))
             } else {
                 Ok(None)
             }
@@ -149,7 +149,7 @@ mod test {
 
         let scanner = Scanner(
             3,
-            Message::new(Scanner(1, SaveScalar::<Varint<i32>>::new())),
+            Message::new(Scanner(1, SaveNumeric::<Varint<i32>>::new())),
         );
 
         let mut input = &INPUT[..];

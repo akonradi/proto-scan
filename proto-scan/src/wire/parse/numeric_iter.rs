@@ -2,15 +2,15 @@ use std::marker::PhantomData;
 
 use crate::decode_error::DecodeError;
 use crate::read::Read;
-use crate::wire::ScalarWireType;
+use crate::wire::NumericWireType;
 use crate::wire::parse::{DoBeforeNext, LengthDelimitedImpl};
 
-pub(super) struct ScalarIter<'a, R, W> {
+pub(super) struct NumericIter<'a, R, W> {
     inner: LengthDelimitedImpl<'a, R>,
     _wire_type: PhantomData<W>,
 }
 
-impl<'a, R, W> ScalarIter<'a, R, W> {
+impl<'a, R, W> NumericIter<'a, R, W> {
     pub(crate) fn new(inner: LengthDelimitedImpl<'a, R>) -> Self {
         Self {
             inner,
@@ -19,7 +19,7 @@ impl<'a, R, W> ScalarIter<'a, R, W> {
     }
 }
 
-impl<'a, R: Read, W: ScalarWireType> Iterator for ScalarIter<'a, R, W> {
+impl<'a, R: Read, W: NumericWireType> Iterator for NumericIter<'a, R, W> {
     type Item = Result<W::Repr, DecodeError<R::Error>>;
 
     fn next(&mut self) -> Option<Self::Item> {

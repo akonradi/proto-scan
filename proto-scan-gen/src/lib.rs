@@ -157,7 +157,7 @@ impl MessageScanner<'_> {
             })
         };
 
-        let on_scalar_arms = field_arms("on_scalar");
+        let on_numeric_arms = field_arms("on_numeric");
         let on_group_arms = field_arms("on_group");
         let on_length_delimited_arms = field_arms("on_length_delimited");
         quote! {
@@ -176,13 +176,13 @@ impl MessageScanner<'_> {
             }
 
             impl <#(#generics_on_scan_bounds,)*> ::proto_scan::scan::ScanCallbacks for #scanner_name<#(#generics,)*> {
-                fn on_scalar(
+                fn on_numeric(
                     &mut self,
                     field: ::proto_scan::wire::FieldNumber,
-                    value: ::proto_scan::wire::ScalarField,
+                    value: ::proto_scan::wire::NumericField,
                 ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
                     Ok(match u32::from(field) {
-                        #(#on_scalar_arms)*
+                        #(#on_numeric_arms)*
                         _ => None,
                     })
                 }

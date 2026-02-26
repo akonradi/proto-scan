@@ -2,28 +2,28 @@ use std::marker::PhantomData;
 
 use crate::scan::field::OnScanField;
 use crate::scan::{ScanTypes, StopScan};
-use crate::wire::{GroupOp, LengthDelimited, ScalarField, ScalarWireType};
+use crate::wire::{GroupOp, LengthDelimited, NumericField, NumericWireType};
 use core::convert::Infallible;
 
-/// Invokes the provided callback for each scalar value.
+/// Invokes the provided callback for each numeric value.
 ///
-/// [`OnScanField::on_scalar`] returns an error if the encoded value has the
+/// [`OnScanField::on_numeric`] returns an error if the encoded value has the
 /// wrong wire type.
 pub struct InvokeOn<W, F>(F, PhantomData<W>);
 
-impl<'a, W: ScalarWireType, F: FnMut(W::Repr) -> Result<(), StopScan>> ScanTypes
+impl<'a, W: NumericWireType, F: FnMut(W::Repr) -> Result<(), StopScan>> ScanTypes
     for InvokeOn<W, F>
 {
     type ScanEvent = Infallible;
     type ScanOutput = ();
 }
 
-impl<'a, W: ScalarWireType, F: FnMut(W::Repr) -> Result<(), StopScan>> OnScanField
+impl<'a, W: NumericWireType, F: FnMut(W::Repr) -> Result<(), StopScan>> OnScanField
     for InvokeOn<W, F>
 {
     fn into_output(self) -> Self::ScanOutput {}
 
-    fn on_scalar(&mut self, value: ScalarField) -> Result<Option<Infallible>, StopScan> {
+    fn on_numeric(&mut self, value: NumericField) -> Result<Option<Infallible>, StopScan> {
         let value = W::from_value(value).ok_or(StopScan)?;
         let () = (self.0)(value)?;
         Ok(None)

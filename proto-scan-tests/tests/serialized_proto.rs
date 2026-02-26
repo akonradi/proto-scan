@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 use either::Either;
 use prost::Message;
 use proto_scan::wire::{
-    FieldNumber, I32, I64, LengthDelimited, ParseEvent, ParseEventReader, ScalarField, Varint,
+    FieldNumber, I32, I64, LengthDelimited, NumericField, ParseEvent, ParseEventReader, Varint,
 };
 use proto_scan_tests::prost_proto;
 
@@ -17,46 +17,46 @@ const ENUM_VALUES: [prost_proto::with_repeats::EnumType; 3] = {
     [EnumType::A, EnumType::B, EnumType::C]
 };
 
-static SCALAR_FIELDS: LazyLock<HashMap<FieldNumber, Vec<ScalarField>>> = LazyLock::new(|| {
+static SCALAR_FIELDS: LazyLock<HashMap<FieldNumber, Vec<NumericField>>> = LazyLock::new(|| {
     HashMap::from([
         (
             FieldNumber::try_from(5).unwrap(),
-            VARINT_VALUES.map(ScalarField::Varint).into(),
+            VARINT_VALUES.map(NumericField::Varint).into(),
         ),
         (
             FieldNumber::try_from(7).unwrap(),
-            FIXED32_VALUES.map(ScalarField::I32).into(),
+            FIXED32_VALUES.map(NumericField::I32).into(),
         ),
         (
             FieldNumber::try_from(9).unwrap(),
-            FIXED64_VALUES.map(ScalarField::I64).into(),
+            FIXED64_VALUES.map(NumericField::I64).into(),
         ),
     ])
 });
 
-static PACKED_FIELDS: LazyLock<HashMap<FieldNumber, Vec<ScalarField>>> = LazyLock::new(|| {
+static PACKED_FIELDS: LazyLock<HashMap<FieldNumber, Vec<NumericField>>> = LazyLock::new(|| {
     HashMap::from([
         (
             FieldNumber::try_from(2).unwrap(),
             ENUM_VALUES
-                .map(|e| ScalarField::Varint((e as u32).into()))
+                .map(|e| NumericField::Varint((e as u32).into()))
                 .into(),
         ),
         (
             FieldNumber::try_from(3).unwrap(),
-            BOOL_VALUES.map(|b| ScalarField::Varint(b.into())).into(),
+            BOOL_VALUES.map(|b| NumericField::Varint(b.into())).into(),
         ),
         (
             FieldNumber::try_from(4).unwrap(),
-            VARINT_VALUES.map(|b| ScalarField::Varint(b.into())).into(),
+            VARINT_VALUES.map(|b| NumericField::Varint(b.into())).into(),
         ),
         (
             FieldNumber::try_from(6).unwrap(),
-            FIXED32_VALUES.map(|b| ScalarField::I32(b.into())).into(),
+            FIXED32_VALUES.map(|b| NumericField::I32(b.into())).into(),
         ),
         (
             FieldNumber::try_from(8).unwrap(),
-            FIXED64_VALUES.map(|b| ScalarField::I64(b.into())).into(),
+            FIXED64_VALUES.map(|b| NumericField::I64(b.into())).into(),
         ),
     ])
 });
@@ -80,7 +80,7 @@ fn with_repeats() -> prost_proto::WithRepeats {
 }
 
 #[test]
-fn extract_scalars_parse() {
+fn extract_numerics_parse() {
     let mut events = HashMap::<_, Vec<_>>::new();
 
     let bytes = with_repeats().encode_to_vec();
@@ -89,7 +89,7 @@ fn extract_scalars_parse() {
     while let Some(event) = reader.next() {
         let (field_number, event) = event.unwrap();
         match event {
-            ParseEvent::Scalar(value) => events.entry(field_number).or_default().push(value),
+            ParseEvent::Numeric(value) => events.entry(field_number).or_default().push(value),
             ParseEvent::Group(_) | ParseEvent::LengthDelimited(_) => {}
         }
     }
@@ -111,25 +111,25 @@ fn extract_packed_fields_parse() {
                 2 | 3 | 4 => {
                     let it = value
                         .into_packed::<Varint>()
-                        .map(|r| ScalarField::Varint(r.unwrap()));
+                        .map(|r| NumericField::Varint(r.unwrap()));
                     Either::Left(it)
                 }
                 6 => {
                     let it = value
                         .into_packed::<I32>()
-                        .map(|r| ScalarField::I32(r.unwrap()));
+                        .map(|r| NumericField::I32(r.unwrap()));
                     Either::Right(Either::Left(it))
                 }
                 8 => {
                     let it = value
                         .into_packed::<I64>()
-                        .map(|r| ScalarField::I64(r.unwrap()));
+                        .map(|r| NumericField::I64(r.unwrap()));
                     Either::Right(Either::Right(it))
                 }
                 1 => continue,
                 field_number => panic!("unknown field {field_number}"),
             },
-            ParseEvent::Scalar(_) | ParseEvent::Group(_) => {
+            ParseEvent::Numeric(_) | ParseEvent::Group(_) => {
                 continue;
             }
         };
@@ -165,7 +165,7 @@ fn extract_string() {
                     }
                 }
             }
-            ParseEvent::Scalar(_) => {}
+            ParseEvent::Numeric(_) => {}
             ParseEvent::Group(_) => {}
         }
     }

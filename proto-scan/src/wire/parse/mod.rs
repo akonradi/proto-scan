@@ -5,24 +5,24 @@ use either::Either;
 
 use crate::DecodeError;
 use crate::read::{Read, ReadError, ReadTypes};
-use crate::wire::{FieldNumber, GroupOp, ScalarField, ScalarWireType};
+use crate::wire::{FieldNumber, GroupOp, NumericField, NumericWireType};
 
 use event_reader::EventReader;
 use length_delimited::LengthDelimitedImpl;
 use limit_reader::LimitReader;
-use scalar_iter::ScalarIter;
+use numeric_iter::NumericIter;
 
 mod event_reader;
 mod length_delimited;
 mod limit_reader;
-mod scalar_iter;
+mod numeric_iter;
 
 /// Accessor for the contents of a length-delimited field.
 ///
 /// Length-delimited fields are used to encode several different types of values
 /// - raw byte sequences (`repeated byte` or `string` fields)
 /// - embedded messages
-/// - packed repeated scalar fields
+/// - packed repeated numeric fields
 ///
 /// This trait allows interpreting the contents of length-delimited field as at
 /// most one of those representations.
@@ -30,7 +30,7 @@ pub trait LengthDelimited: ReadTypes {
     /// Returns the number of bytes in the field.
     fn len(&self) -> u32;
 
-    type PackedIter<W: ScalarWireType>: Iterator<Item = Result<W::Repr, DecodeError<Self::Error>>>;
+    type PackedIter<W: NumericWireType>: Iterator<Item = Result<W::Repr, DecodeError<Self::Error>>>;
 
     /// Interprets the contents of a field as packed values.
     ///
@@ -38,7 +38,7 @@ pub trait LengthDelimited: ReadTypes {
     /// returns the next value or an error if it cannot be decoded. If the
     /// iterator is dropped before it is exhausted, the remaining values and/or
     /// read errors are dropped.
-    fn into_packed<W: ScalarWireType>(self) -> Self::PackedIter<W>;
+    fn into_packed<W: NumericWireType>(self) -> Self::PackedIter<W>;
 
     /// Reads the contents of the delimited field as bytes.
     fn into_bytes(self) -> Result<Self::Buffer, DecodeError<Self::Error>>;
@@ -71,8 +71,8 @@ pub trait ParseEventReader: ReadError {
 /// An event returned by [`ParseEventReader::next`].
 #[derive(Debug)]
 pub enum ParseEvent<L> {
-    /// A scalar field was encountered.
-    Scalar(ScalarField),
+    /// A numeric field was encountered.
+    Numeric(NumericField),
     /// An group was opened or closed.
     Group(GroupOp),
     /// A length-delimited field was encountered.
@@ -97,7 +97,7 @@ enum DoBeforeNext {
 #[cfg(test)]
 mod test {
     use crate::wire::serialize_base128_varint;
-    use crate::wire::{FieldNumber, ScalarField, Tag, Varint, WireType};
+    use crate::wire::{FieldNumber, NumericField, Tag, Varint, WireType};
 
     use super::*;
 
@@ -133,7 +133,7 @@ mod test {
                 wire_type: WireType::I32,
             }
             .serialized(),
-            ScalarField::I32(0x04030201).serialize(),
+            NumericField::I32(0x04030201).serialize(),
         ]
         .concat();
 
@@ -145,7 +145,7 @@ mod test {
                 assert_eq!(field_number, 1);
                 value.into_packed::<Varint>()
             }
-            (field_number, ParseEvent::Scalar(_) | ParseEvent::Group(_)) => {
+            (field_number, ParseEvent::Numeric(_) | ParseEvent::Group(_)) => {
                 panic!("wrong event; field = {field_number:?}")
             }
         };
@@ -156,9 +156,9 @@ mod test {
 
         let next = parse.next().unwrap().unwrap();
         match next {
-            (field_number, ParseEvent::Scalar(scalar_field)) => {
+            (field_number, ParseEvent::Numeric(numeric_field)) => {
                 assert_eq!(field_number, 2);
-                assert_eq!(scalar_field, ScalarField::I32(0x04030201))
+                assert_eq!(numeric_field, NumericField::I32(0x04030201))
             }
             (field_number, ParseEvent::Group(_) | ParseEvent::LengthDelimited(_)) => {
                 panic!("wrong event field {field_number:?}")
@@ -194,7 +194,7 @@ mod test {
                 wire_type: WireType::I32,
             }
             .serialized(),
-            ScalarField::I32(0x04030201).serialize(),
+            NumericField::I32(0x04030201).serialize(),
         ]
         .concat();
 
@@ -206,17 +206,17 @@ mod test {
                 assert_eq!(field_number, 1);
                 value
             }
-            (field_number, ParseEvent::Scalar(_) | ParseEvent::Group(_)) => {
+            (field_number, ParseEvent::Numeric(_) | ParseEvent::Group(_)) => {
                 panic!("wrong event; field = {field_number:?}")
             }
         };
         {
             let mut embedded_events = embedded.into_events();
             match embedded_events.next().unwrap().unwrap() {
-                (FieldNumber(6), ParseEvent::Scalar(ScalarField::Varint(1))) => {}
+                (FieldNumber(6), ParseEvent::Numeric(NumericField::Varint(1))) => {}
                 (
                     field_number,
-                    ParseEvent::Scalar(_) | ParseEvent::Group(_) | ParseEvent::LengthDelimited(_),
+                    ParseEvent::Numeric(_) | ParseEvent::Group(_) | ParseEvent::LengthDelimited(_),
                 ) => {
                     panic!("wrong event field {field_number:?}")
                 }
@@ -229,9 +229,9 @@ mod test {
 
         let next = parse.next().unwrap().unwrap();
         match next {
-            (field_number, ParseEvent::Scalar(scalar_field)) => {
+            (field_number, ParseEvent::Numeric(numeric_field)) => {
                 assert_eq!(field_number, 2);
-                assert_eq!(scalar_field, ScalarField::I32(0x04030201))
+                assert_eq!(numeric_field, NumericField::I32(0x04030201))
             }
             (field_number, ParseEvent::Group(_) | ParseEvent::LengthDelimited(_)) => {
                 panic!("wrong event field {field_number:?}")

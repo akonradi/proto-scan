@@ -148,16 +148,16 @@ impl MessageScannerField<'_> {
                     write_fn_docs(),
                     vec![quote!(D: From<#repr_type>)],
                     vec![quote!(to: &'t mut D)],
-                    quote! {::proto_scan::scan::field::WriteScalar::<#encoding_type, &'t mut D>},
-                    quote!(::proto_scan::scan::field::WriteScalar::<#encoding_type, _>::new(to)),
+                    quote! {::proto_scan::scan::field::WriteNumeric::<#encoding_type, &'t mut D>},
+                    quote!(::proto_scan::scan::field::WriteNumeric::<#encoding_type, _>::new(to)),
                 );
                 let save_fn = swap_single_field_fn(
                     format_ident!("save_{field_name}"),
                     save_fn_docs(),
                     vec![],
                     vec![],
-                    quote! {::proto_scan::scan::field::SaveScalar::<#encoding_type>},
-                    quote!(::proto_scan::scan::field::SaveScalar::<#encoding_type>::new()),
+                    quote! {::proto_scan::scan::field::SaveNumeric::<#encoding_type>},
+                    quote!(::proto_scan::scan::field::SaveNumeric::<#encoding_type>::new()),
                 );
                 vec![write_fn, save_fn, scan_fn]
             }
