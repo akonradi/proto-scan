@@ -40,3 +40,35 @@ fn scan_message(input: InputKind) {
         }
     );
 }
+
+#[test]
+fn scan_concatenated() {
+    // If the input is the concatenation of two messages, where both have an
+    // embedded message but only the first sets a field in that embedded
+    // message, seeing the field set in the first message should not be observable
+    // in terms of the mut ref passed to the write_ builder method.
+    let mut input = InputKind::Full.into_example_msg();
+    let mut bytes = input.encode_to_vec();
+    input.single_msg.as_mut().unwrap().id = 0;
+    bytes.extend(input.encode_to_vec());
+
+    let mut saved_id = 55555555;
+    let scanner = proto::ScanExample::scanner().single_msg(Message::new(
+        proto::MultiFieldMessage::scanner().write_id(&mut saved_id),
+    ));
+    let proto::ScanScanExampleOutput {
+        repeated_msg: (),
+        single_msg:
+            proto::ScanMultiFieldMessageOutput {
+                flag: (),
+                id: (),
+                name: (),
+            },
+        repeated_bool: (),
+        single_bool: (),
+        single_fixed64: (),
+        oneof_group: (),
+    } = scanner.scan(bytes.as_slice()).read_all().unwrap();
+
+    assert_eq!(saved_id, 55555555)
+}

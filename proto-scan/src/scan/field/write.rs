@@ -70,7 +70,7 @@ impl<'t, D> Resettable for RestoreOnReset<'t, D> {
 
 impl<'t, T: Into<D>, D> SaveFrom<T> for RestoreOnReset<'t, D> {
     fn save_from(&mut self, value: T) {
-        *self.0 = value.into()
+        self.1 = Some(core::mem::replace(&mut self.0, value.into()));
     }
 }
 
