@@ -188,7 +188,7 @@ impl<E: ?Sized, D> ScanTypes for WriteBytes<E, D> {
     type ScanOutput = ();
 }
 
-impl<'t, D: for<'a> From<&'a [u8]>> OnScanField for WriteBytes<[u8], &'t mut D> {
+impl<D: for<'a> SaveFrom<&'a [u8]>> OnScanField for WriteBytes<[u8], D> {
     fn into_output(self) -> Self::ScanOutput {}
 
     fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Infallible>, StopScan> {
@@ -204,12 +204,12 @@ impl<'t, D: for<'a> From<&'a [u8]>> OnScanField for WriteBytes<[u8], &'t mut D> 
         delimited: impl LengthDelimited,
     ) -> Result<Option<Infallible>, StopScan> {
         let bytes = delimited.into_bytes().ok().ok_or(StopScan)?;
-        *self.0 = bytes.as_ref().into();
+        self.0.save_from(bytes.as_ref().into());
         Ok(None)
     }
 }
 
-impl<'t, D: for<'a> From<&'a str>> OnScanField for WriteBytes<str, &'t mut D> {
+impl<D: for<'a> SaveFrom<&'a str>> OnScanField for WriteBytes<str, D> {
     fn into_output(self) -> Self::ScanOutput {}
 
     fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Infallible>, StopScan> {
@@ -226,13 +226,21 @@ impl<'t, D: for<'a> From<&'a str>> OnScanField for WriteBytes<str, &'t mut D> {
     ) -> Result<Option<Infallible>, StopScan> {
         let bytes = delimited.into_bytes().ok().ok_or(StopScan)?;
         let bytes = core::str::from_utf8(bytes.as_ref()).map_err(|_| StopScan)?;
-        *self.0 = bytes.into();
+        self.0.save_from(bytes.into());
         Ok(None)
     }
 }
 
-impl<D: Resettable, E> Resettable for WriteBytes<E, D> {
+impl<D: Resettable, E: ?Sized> Resettable for WriteBytes<E, D> {
     fn reset(&mut self) {
         self.0.reset();
+    }
+}
+
+impl<'t, E: ?Sized, D> IntoResettable for WriteBytes<E, &'t mut D> {
+    type Resettable = WriteBytes<E, RestoreOnReset<'t, D>>;
+
+    fn into_resettable(self) -> Self::Resettable {
+        WriteBytes(RestoreOnReset(self.0, None), PhantomData)
     }
 }

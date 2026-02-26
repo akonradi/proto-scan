@@ -49,12 +49,15 @@ fn scan_concatenated() {
     // in terms of the mut ref passed to the write_ builder method.
     let mut input = InputKind::Full.into_example_msg();
     let mut bytes = input.encode_to_vec();
-    input.single_msg.as_mut().unwrap().id = 0;
+    input.single_msg = Some(Default::default());
     bytes.extend(input.encode_to_vec());
 
     let mut saved_id = 55555555;
+    let mut saved_name = "a name".to_owned();
     let scanner = proto::ScanExample::scanner().single_msg(Message::new(
-        proto::MultiFieldMessage::scanner().write_id(&mut saved_id),
+        proto::MultiFieldMessage::scanner()
+            .write_id(&mut saved_id)
+            .write_name(&mut saved_name),
     ));
     let proto::ScanScanExampleOutput {
         repeated_msg: (),

@@ -13,7 +13,7 @@ pub use invoke_on::InvokeOn;
 pub use message::Message;
 pub use no_op::NoOp;
 pub use save::{SaveBytes, SaveNumeric, SaveRepeated};
-pub use write::{WriteBytes, WriteNumeric, WriteRepeated};
+pub use write::{WriteBytes, WriteNumeric, WriteRepeated, SaveFrom};
 
 /// Implemented by a visitor for a fixed [`FieldNumber`].
 pub trait OnScanField: ScanTypes<ScanOutput: Default> {
