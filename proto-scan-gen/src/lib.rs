@@ -36,6 +36,31 @@ impl ScannableMessage {
 #[derive(Copy, Clone)]
 pub struct MessageScanner<'m>(&'m ScannableMessage);
 
+#[derive(Copy, Clone)]
+pub struct MessageScanOutput<'m>(MessageScanner<'m>);
+
+impl MessageScanOutput<'_> {
+    fn type_name(&self) -> Ident {
+        format_ident!("{}Output", self.0.type_name())
+    }
+
+    fn generated_code(&self) -> TokenStream {
+        self.scan_output_definition()
+    }
+
+    fn scan_output_definition(&self) -> TokenStream {
+        let name = self.type_name();
+        let scan_types = self.0.generic_types().collect::<Vec<_>>();
+        let scan_fields = self.0.fields().map(|m| &m.field.field_name);
+        quote! {
+            #[derive(Copy, Clone, Debug, Default, PartialEq, Hash)]
+            pub struct #name <#(#scan_types),*> {
+                #(pub #scan_fields: #scan_types ),*
+            }
+        }
+    }
+}
+
 impl MessageScanner<'_> {
     pub fn generated_code(&self) -> TokenStream {
         let scan_field_impls = self.fields().map(|m| m.impl_());
@@ -43,7 +68,7 @@ impl MessageScanner<'_> {
         [
             self.type_definition(),
             self.scan_event_defn(),
-            self.scan_output_definition(),
+            MessageScanOutput(*self).generated_code(),
             self.0.impl_scan_message(),
             self.scan_callbacks_impl(),
         ]
@@ -90,24 +115,6 @@ impl MessageScanner<'_> {
         }
     }
 
-    fn scan_output_definition(&self) -> TokenStream {
-        let name = format_ident!("{}Output", self.type_name());
-        let scan_types = self.generic_types().collect::<Vec<_>>();
-        let scan_fields = self.0.fields.iter().map(
-            |MessageField {
-                 field_name,
-                 generic,
-                 ..
-             }| quote!(#field_name: #generic),
-        );
-        quote! {
-            #[derive(Copy, Clone, Debug, Default, PartialEq, Hash)]
-            pub struct #name <#(#scan_types),*> {
-                #(pub #scan_fields ),*
-            }
-        }
-    }
-
     fn field_names(&self) -> impl Iterator<Item = &Ident> + Clone {
         self.fields().map(|m| &m.field.field_name)
     }
@@ -128,7 +135,7 @@ impl MessageScanner<'_> {
 
     fn scan_callbacks_impl(&self) -> TokenStream {
         let scanner_name = self.type_name();
-        let output_name = format_ident!("{scanner_name}Output");
+        let output_name = MessageScanOutput(*self).type_name();
         let scan_event_name = self.scan_event_name();
         let generics = self.generic_types().collect::<Vec<_>>();
         let generics_on_scan_bounds = generics
