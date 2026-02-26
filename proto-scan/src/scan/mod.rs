@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 
 use crate::read::Read;
-pub use crate::wire::{FieldNumber, GroupOp, I32, I64, NumericField, Varint};
+use crate::wire::{FieldNumber, GroupOp, I32, I64, NumericField, Varint};
 use crate::wire::{LengthDelimited, ParseEvent, ParseEventReader};
 
 pub mod encoding;
@@ -78,10 +78,10 @@ impl<P: ParseEventReader, S: ScanCallbacks> ScanTypes for Scan<P, S> {
     type ScanOutput = S::ScanOutput;
 }
 
-/// [`IntoIterator::IntoIter`] type for [`ScanWith`].
+/// [`IntoIterator::IntoIter`] type for [`Scan`].
 ///
 /// Implements [`Iterator`] by applying events from a [`ParseEventReader`] to a
-/// [`ScanCallbacks`] and yielding the resulting [`ScanCallbacks::ScanEvent`] or
+/// [`ScanCallbacks`] and yielding the resulting [`ScanTypes::ScanEvent`] or
 /// an error.
 pub struct IntoIter<P, S>(P, S);
 
