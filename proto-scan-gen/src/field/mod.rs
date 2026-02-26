@@ -2,6 +2,8 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{Ident, parse_quote};
 
+use crate::MessageScanOutput;
+
 #[derive(Debug)]
 pub struct MessageField {
     pub field_name: Ident,
@@ -56,17 +58,24 @@ impl MessageScannerField<'_> {
         } = self;
         let scanner_name = parent.type_name();
         let scanner_fields = parent.field_names().collect::<Vec<_>>();
-        let generic_types = parent.generic_types();
-        let before_no_op = generic_types.clone().take(*index).collect::<Vec<_>>();
-        let after_no_op = generic_types.skip(*index + 1).collect::<Vec<_>>();
+        let (before_no_op, after_no_op) = {
+            let mut generic_types = parent.generic_types();
+            (
+                (&mut generic_types).take(*index).collect::<Vec<_>>(),
+                generic_types.skip(1).collect::<Vec<_>>(),
+            )
+        };
+        let output_type = MessageScanOutput(self.parent).type_name();
 
         let swap_single_field_fn =
             |fn_name: Ident,
+             docs: Vec<String>,
              generics: Vec<TokenStream>,
              args: Vec<TokenStream>,
              output_type: TokenStream,
              construct_field: TokenStream| {
                 quote! {
+                    #( #[doc = #docs] )*
                     pub fn #fn_name <'t, #(#generics),*>(
                         self,
                         #(#args),*
@@ -85,11 +94,46 @@ impl MessageScannerField<'_> {
 
         let scan_fn = swap_single_field_fn(
             format_ident!("scan_{field_name}"),
+            vec![
+                format!("Sets the field scanner for message field `{field_name}`."),
+                "".to_owned(),
+                format!(
+                    "This allows the caller to specify the behavior on
+                    encountering the field `{field_name}` defined in the source
+                    message. The output of the provided field scanner will be
+                    included in the overall scan output as
+                    [`{output_type}::{field_name}`]."
+                ),
+            ],
             vec![quote!(S: ::proto_scan::scan::field::OnScanField + 't)],
             vec![quote!(scanner: S)],
             quote!(S),
             quote!(scanner),
         );
+
+        let save_fn_docs = || {
+            vec![
+                format!("Sets the scanner to write field `{field_name}` to the provided location."),
+                "".to_string(),
+                format!(
+                    "When the field `{field_name}` is encountered in the input,
+                    the decoded value will be written to the argument `to`. No
+                    output is provided in the overall scan output
+                    ([`{output_type}::{field_name}`] is `()`)."
+                ),
+            ]
+        };
+        let emit_fn_docs = || {
+            vec![
+                format!("Sets the scanner to output field `{field_name}`."),
+                "".to_owned(),
+                format!(
+                    "When the field `{field_name}` is encountered in the input
+                    during a scan, the decoded value will be saved and produced
+                    in the output as [`{output_type}::{field_name}`]."
+                ),
+            ]
+        };
 
         match field_type {
             FieldType::Single {
@@ -101,6 +145,7 @@ impl MessageScannerField<'_> {
 
                 let save_fn = swap_single_field_fn(
                     format_ident!("save_{field_name}"),
+                    save_fn_docs(),
                     vec![quote!(D: From<#repr_type>)],
                     vec![quote!(to: &'t mut D)],
                     quote! {::proto_scan::scan::field::SaveScalar::<#encoding_type, &'t mut D>},
@@ -108,6 +153,7 @@ impl MessageScannerField<'_> {
                 );
                 let emit_fn = swap_single_field_fn(
                     format_ident!("emit_{field_name}"),
+                    emit_fn_docs(),
                     vec![],
                     vec![],
                     quote! {::proto_scan::scan::field::EmitScalar::<#encoding_type>},
@@ -121,6 +167,7 @@ impl MessageScannerField<'_> {
 
                 let save_fn = swap_single_field_fn(
                     format_ident!("save_{field_name}"),
+                    save_fn_docs(),
                     vec![quote!(D: ::core::iter::Extend<#repr_type>)],
                     vec![quote!(to: &'t mut D)],
                     quote! {::proto_scan::scan::field::SaveRepeated::<#encoding_type, &'t mut D>},
@@ -128,6 +175,7 @@ impl MessageScannerField<'_> {
                 );
                 let emit_fn = swap_single_field_fn(
                     format_ident!("emit_{field_name}"),
+                    emit_fn_docs(),
                     vec![],
                     vec![],
                     quote! {::proto_scan::scan::field::EmitRepeated::<#encoding_type>},
@@ -143,6 +191,7 @@ impl MessageScannerField<'_> {
                 };
                 let save_fn = swap_single_field_fn(
                     format_ident!("save_{field_name}"),
+                    save_fn_docs(),
                     vec![quote!(D: for<'d> ::core::convert::From<&'d #borrow_type>)],
                     vec![quote!(to: &'t mut D)],
                     quote! {::proto_scan::scan::field::SaveBytes::<#borrow_type, &'t mut D>},
@@ -150,6 +199,7 @@ impl MessageScannerField<'_> {
                 );
                 let emit_fn = swap_single_field_fn(
                     format_ident!("emit_{field_name}"),
+                    emit_fn_docs(),
                     vec![],
                     vec![],
                     quote! {::proto_scan::scan::field::EmitBytes::<#borrow_type>},
@@ -183,7 +233,9 @@ pub enum ParsedFieldType {
     #[from(SingleFieldType, VarintFieldType, FixedFieldType)]
     Single(SingleFieldType),
     Message,
-    Bytes {utf8: bool}
+    Bytes {
+        utf8: bool,
+    },
 }
 
 #[derive(Copy, Clone, Debug)]
