@@ -92,7 +92,7 @@ impl MessageScannerField<'_> {
                 }
             };
 
-        let scan_fn = swap_single_field_fn(
+        let custom_fn = swap_single_field_fn(
             format_ident!("{field_name}"),
             vec![
                 format!("Sets the field scanner for message field `{field_name}`."),
@@ -159,7 +159,7 @@ impl MessageScannerField<'_> {
                     quote! {::proto_scan::scan::field::SaveNumeric::<#encoding_type>},
                     quote!(::proto_scan::scan::field::SaveNumeric::<#encoding_type>::new()),
                 );
-                vec![write_fn, save_fn, scan_fn]
+                vec![write_fn, save_fn, custom_fn]
             }
             FieldType::Repeated { ty, number: _ } => {
                 let encoding_type = ty.encoding_type();
@@ -181,7 +181,7 @@ impl MessageScannerField<'_> {
                     quote! {::proto_scan::scan::field::SaveRepeated::<#encoding_type>},
                     quote!(::proto_scan::scan::field::SaveRepeated::<#encoding_type>::new()),
                 );
-                vec![write_fn, save_fn, scan_fn]
+                vec![write_fn, save_fn, custom_fn]
             }
             FieldType::Bytes { utf8, number: _ } => {
                 let borrow_type = if *utf8 {
@@ -205,9 +205,29 @@ impl MessageScannerField<'_> {
                     quote! {::proto_scan::scan::field::SaveBytes::<#borrow_type>},
                     quote!(::proto_scan::scan::field::SaveBytes::<#borrow_type>::new()),
                 );
-                vec![write_fn, save_fn, scan_fn]
+                vec![write_fn, save_fn, custom_fn]
             }
-            FieldType::Message { number: _ } => vec![scan_fn],
+            FieldType::Message { number: _ } => {
+                let scan_fn = swap_single_field_fn(
+                    format_ident!("scan_{field_name}"),
+                    vec![
+                        format!("Sets the scanner for the embedded message `{field_name}`."),
+                        "".to_owned(),
+                        format!(
+                            "Sets the builder to use the provided scanner to
+                            read the contents of the message in `{field_name}`.
+                            The output of the scanner will be included in the
+                            overall scan output as
+                            [`{output_type}::{field_name}`]."
+                        ),
+                    ],
+                    vec![quote!(S: ::proto_scan::scan::IntoResettable<Resettable: ::proto_scan::scan::ScanCallbacks> + 't)],
+                    vec![quote!(scanner: S)],
+                    quote!(::proto_scan::scan::field::Message<<S as ::proto_scan::scan::IntoResettable>::Resettable>),
+                    quote!(::proto_scan::scan::field::Message::new(scanner)),
+                );
+                vec![scan_fn, custom_fn]
+            }
             FieldType::Unsupported => vec![],
         }
     }

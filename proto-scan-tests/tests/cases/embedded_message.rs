@@ -13,11 +13,11 @@ fn scan_message(input: InputKind) {
     let bytes = input.encode_to_vec();
     let mut saved_id = None;
 
-    let scanner = proto::ScanExample::scanner().single_msg(Message::new(
+    let scanner = proto::ScanExample::scanner().scan_single_msg(
         proto::MultiFieldMessage::scanner()
             .save_flag()
             .write_id(&mut saved_id),
-    ));
+    );
     let scan = scanner.scan(bytes.as_slice());
 
     let read_all = scan.read_all();
