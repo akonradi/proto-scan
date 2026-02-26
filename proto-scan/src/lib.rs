@@ -25,13 +25,13 @@
 //!     #[prost(int64, tag = "1")]
 //!     pub a: i64,
 //! }
-//! 
+//!
 //! fn read_a<R: read::Read>(r: R) -> Result<Option<i64>, scan::StopScan> {
-//!   let scanner = Test1::scanner().emit_a();
+//!   let scanner = Test1::scanner().save_a();
 //!   let ScanTest1Output { a } = scanner.scan(r).read_all()?;
 //!   Ok(a)
 //! }
-//! 
+//!
 //! fn main() {
 //!   // From the protobuf documentation encoding guide, this is a Test message
 //!   // with a = 150.
@@ -40,10 +40,10 @@
 //!   assert_eq!(read_a(&mut &INPUT[..]), Ok(Some(150)))
 //! }
 //! ```
-//! 
+//!
 //! Calling the [`scan::ScanMessage::scanner`] method from the impl generated
 //! for `Test1` returns an instance of a generated builder type `ScanTest1`.
-//! `ScanTest1` has a builder method `emit_a` that produces a new `ScanTest1`.
+//! `ScanTest1` has a builder method `save_a` that produces a new `ScanTest1`.
 //! When the built scanner processes the input, it records the value of the last
 //! `a` field found in the input. When `ScanTest1`'s
 //! [`read_all()`](scan::Scan::read_all) method is called, it returns (on
@@ -51,7 +51,7 @@
 //! that contains the decoded output. Any other tag types or fields are ignored.
 //! The input to `read_a` is a `&mut &[u8]` which has an implementation of
 //! [`Read`](read::Read).
-//! 
+//!
 //! # Low-level: parse event stream
 //!
 //! The low-level event interface uses [`wire::ParseEventReader`] to read

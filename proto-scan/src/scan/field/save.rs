@@ -1,125 +1,93 @@
 use std::convert::Infallible;
-use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
 
+use crate::read::ReadBuffer as _;
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
-use crate::scan::{GroupOp, ScalarField, ScanTypes, StopScan};
-use crate::scan::{IntoResettable, Resettable};
-use crate::wire::{LengthDelimited, ScalarWireType};
+use crate::scan::{IntoResettable, Resettable, ScanTypes, StopScan};
+use crate::wire::{GroupOp, LengthDelimited, ScalarField, ScalarWireType};
 
-/// [`OnScanField`] that writes the decoded value to the provided location.
-pub struct SaveScalar<E, D>(D, PhantomData<E>);
-
-/// Generalization of assignment for wrapping types.
+/// [`OnScanField`] implementation that produces the read value as the event output.
 ///
-/// A type `Wrap<T>(T, bool)` could implement `SaveFrom<T>` to save the value
-/// and note that a modification was made.
-pub trait SaveFrom<T> {
-    fn save_from(&mut self, value: T);
+/// Deserializes according to the [`Encoding`] type parameter.
+pub struct SaveScalar<E: Encoding>(Option<E::Repr>);
+
+impl<E: Encoding> ScanTypes for SaveScalar<E> {
+    type ScanEvent = E::Repr;
+    type ScanOutput = Option<E::Repr>;
 }
 
-impl<S, T: From<S>> SaveFrom<S> for &mut T {
-    fn save_from(&mut self, value: S) {
-        **self = value.into();
+impl<T: Encoding> SaveScalar<T> {
+    pub fn new() -> Self {
+        Self(None)
     }
 }
 
-impl<E, D> SaveScalar<E, D> {
-    pub fn new(to: D) -> Self {
-        Self(to, PhantomData)
+impl<E: Encoding> OnScanField for SaveScalar<E> {
+    fn into_output(self) -> Self::ScanOutput {
+        self.0
     }
-}
-
-impl<E, D> ScanTypes for SaveScalar<E, D> {
-    type ScanEvent = Infallible;
-    type ScanOutput = ();
-}
-
-impl<E: Encoding, D: SaveFrom<E::Repr>> OnScanField for SaveScalar<E, D> {
-    fn into_output(self) -> Self::ScanOutput {}
-
-    fn on_scalar(&mut self, value: ScalarField) -> Result<Option<Infallible>, StopScan> {
+    fn on_scalar(&mut self, value: ScalarField) -> Result<Option<Self::ScanEvent>, StopScan> {
         let value = <E::Wire as ScalarWireType>::from_value(value).ok_or(StopScan)?;
-        self.0.save_from(E::decode(value).map_err(Into::into)?);
-        Ok(None)
+        let value = E::decode(value).map_err(Into::into)?;
+        self.0 = Some(value);
+        Ok(Some(value))
     }
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Infallible>, StopScan> {
+    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
     }
 
     fn on_length_delimited(
         &mut self,
         _delimited: impl LengthDelimited,
-    ) -> Result<Option<Infallible>, StopScan> {
+    ) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
     }
 }
 
-/// Implements [`SaveFrom`] and [`Resettable`] to save and restore a previous value.
-pub struct RestoreOnReset<'t, D>(&'t mut D, Option<D>);
-
-impl<'t, D> Resettable for RestoreOnReset<'t, D> {
+impl<E: Encoding> Resettable for SaveScalar<E> {
     fn reset(&mut self) {
-        if let Some(prev) = self.1.take() {
-            *self.0 = prev;
-        }
+        self.0 = None;
     }
 }
 
-impl<'t, T: Into<D>, D> SaveFrom<T> for RestoreOnReset<'t, D> {
-    fn save_from(&mut self, value: T) {
-        *self.0 = value.into()
-    }
-}
-
-impl<'t, E, D> IntoResettable for SaveScalar<E, &'t mut D> {
-    type Resettable = SaveScalar<E, RestoreOnReset<'t, D>>;
-
+impl<E: Encoding> IntoResettable for SaveScalar<E> {
+    type Resettable = Self;
     fn into_resettable(self) -> Self::Resettable {
-        SaveScalar(RestoreOnReset(self.0, None), PhantomData)
+        self
     }
 }
 
-impl<'t, E, D> Resettable for SaveScalar<E, RestoreOnReset<'t, D>> {
-    fn reset(&mut self) {
-        self.0.reset();
-    }
-}
+/// [`OnScanField`] implementation that produces the read values as the scan output.
+///
+/// Deserializes according to the [`Encoding`] type parameter.
+pub struct SaveRepeated<E: Encoding>(Vec<E::Repr>);
 
-/// [`OnScanField`] that writes the decoded values to the provided location.
-pub struct SaveRepeated<E, D>(D, PhantomData<E>);
-
-impl<E, D> SaveRepeated<E, D> {
-    pub fn new(to: D) -> Self {
-        Self(to, PhantomData)
-    }
-}
-
-impl<E: Encoding, D> ScanTypes for SaveRepeated<E, D> {
+impl<E: Encoding> ScanTypes for SaveRepeated<E> {
     type ScanEvent = Infallible;
-    type ScanOutput = ();
+    type ScanOutput = Vec<E::Repr>;
 }
 
-impl<'t, E: Encoding, D: DerefMut<Target: Extend<E::Repr>>> OnScanField for SaveRepeated<E, D> {
-    fn into_output(self) -> Self::ScanOutput {}
-
-    fn on_scalar(&mut self, value: ScalarField) -> Result<Option<Infallible>, StopScan> {
-        let value = <E::Wire as ScalarWireType>::from_value(value).ok_or(StopScan)?;
-        let decoded = E::decode(value).map_err(Into::into)?.into();
-        self.0.extend([decoded]);
-        Ok(None)
+impl<T: Encoding> SaveRepeated<T> {
+    pub fn new() -> Self {
+        Self(Vec::new())
     }
+}
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Infallible>, StopScan> {
-        Err(StopScan)
+impl<E: Encoding> OnScanField for SaveRepeated<E> {
+    fn into_output(self) -> Self::ScanOutput {
+        self.0
+    }
+    fn on_scalar(&mut self, value: ScalarField) -> Result<Option<Self::ScanEvent>, StopScan> {
+        let value = <E::Wire as ScalarWireType>::from_value(value).ok_or(StopScan)?;
+        self.0.extend([E::decode(value).map_err(Into::into)?]);
+        Ok(None)
     }
 
     fn on_length_delimited(
         &mut self,
         delimited: impl LengthDelimited,
-    ) -> Result<Option<Infallible>, StopScan> {
+    ) -> Result<Option<Self::ScanEvent>, StopScan> {
         let mut packed = delimited.into_packed::<E::Wire>();
         let mut result = Ok(None);
         self.0.extend(core::iter::from_fn(|| {
@@ -131,108 +99,91 @@ impl<'t, E: Encoding, D: DerefMut<Target: Extend<E::Repr>>> OnScanField for Save
         }));
         result
     }
-}
 
-impl<'t, E, D> IntoResettable for SaveRepeated<E, &'t mut Vec<D>> {
-    type Resettable = SaveRepeated<E, RestoreLenOnReset<'t, Vec<D>>>;
-    fn into_resettable(self) -> Self::Resettable {
-        SaveRepeated(RestoreLenOnReset::new(self.0), PhantomData)
+    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan> {
+        Err(StopScan)
     }
 }
 
-pub struct RestoreLenOnReset<'t, T>(&'t mut T, usize);
-
-impl<'t, T> RestoreLenOnReset<'t, Vec<T>> {
-    pub fn new(arg: &'t mut Vec<T>) -> Self {
-        let len = arg.len();
-        Self(arg, len)
-    }
-}
-
-impl<'t, T> Resettable for RestoreLenOnReset<'t, Vec<T>> {
+impl<E: Encoding> Resettable for SaveRepeated<E> {
     fn reset(&mut self) {
-        self.0.truncate(self.1);
+        self.0.clear()
     }
 }
 
-impl<'t, T> Deref for RestoreLenOnReset<'t, T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        &*self.0
+/// [`OnScanField`] implementation that produces the read value as the event output.
+pub struct SaveBytes<E: ToOwnedBytes + ?Sized>(Option<E::Owned>);
+
+pub trait ToOwnedBytes {
+    type Owned: for<'a> From<&'a Self>;
+}
+
+impl ToOwnedBytes for str {
+    type Owned = String;
+}
+
+impl ToOwnedBytes for [u8] {
+    type Owned = Box<[u8]>;
+}
+
+impl<E: ToOwnedBytes + ?Sized> ScanTypes for SaveBytes<E> {
+    type ScanEvent = Infallible;
+    type ScanOutput = Option<E::Owned>;
+}
+
+impl<T: ToOwnedBytes + ?Sized> SaveBytes<T> {
+    pub fn new() -> Self {
+        Self(None)
     }
 }
 
-impl<'t, T> DerefMut for RestoreLenOnReset<'t, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
+impl OnScanField for SaveBytes<str> {
+    fn into_output(self) -> Self::ScanOutput {
         self.0
     }
-}
-
-impl<D: Resettable, E> Resettable for SaveRepeated<E, D> {
-    fn reset(&mut self) {
-        self.0.reset();
-    }
-}
-
-/// [`OnScanField`] that writes the decoded values to the provided location.
-pub struct SaveBytes<E: ?Sized, D>(D, PhantomData<E>);
-
-impl<E: ?Sized, D> SaveBytes<E, D> {
-    pub fn new(to: D) -> Self {
-        Self(to, PhantomData)
-    }
-}
-
-impl<E: ?Sized, D> ScanTypes for SaveBytes<E, D> {
-    type ScanEvent = Infallible;
-    type ScanOutput = ();
-}
-
-impl<'t, D: for<'a> From<&'a [u8]>> OnScanField for SaveBytes<[u8], &'t mut D> {
-    fn into_output(self) -> Self::ScanOutput {}
-
-    fn on_scalar(&mut self, _value: ScalarField) -> Result<Option<Infallible>, StopScan> {
+    fn on_scalar(&mut self, _value: ScalarField) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
     }
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Infallible>, StopScan> {
+    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
     }
 
     fn on_length_delimited(
         &mut self,
         delimited: impl LengthDelimited,
-    ) -> Result<Option<Infallible>, StopScan> {
-        let bytes = delimited.into_bytes().ok().ok_or(StopScan)?;
-        *self.0 = bytes.as_ref().into();
+    ) -> Result<Option<Self::ScanEvent>, StopScan> {
+        let bytes = delimited.into_bytes().map_err(|_| StopScan)?.into_bytes();
+        let string = String::from_utf8(bytes.into()).map_err(|_| StopScan)?;
+        self.0 = Some(string);
         Ok(None)
     }
 }
 
-impl<'t, D: for<'a> From<&'a str>> OnScanField for SaveBytes<str, &'t mut D> {
-    fn into_output(self) -> Self::ScanOutput {}
-
-    fn on_scalar(&mut self, _value: ScalarField) -> Result<Option<Infallible>, StopScan> {
+impl OnScanField for SaveBytes<[u8]> {
+    fn into_output(self) -> Self::ScanOutput {
+        self.0
+    }
+    fn on_scalar(&mut self, _value: ScalarField) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
     }
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Infallible>, StopScan> {
+    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
     }
 
     fn on_length_delimited(
         &mut self,
         delimited: impl LengthDelimited,
-    ) -> Result<Option<Infallible>, StopScan> {
-        let bytes = delimited.into_bytes().ok().ok_or(StopScan)?;
-        let bytes = core::str::from_utf8(bytes.as_ref()).map_err(|_| StopScan)?;
-        *self.0 = bytes.into();
+    ) -> Result<Option<Self::ScanEvent>, StopScan> {
+        let bytes = delimited.into_bytes().map_err(|_| StopScan)?.into_bytes();
+        self.0 = Some(bytes);
         Ok(None)
     }
 }
 
-impl<D: Resettable, E> Resettable for SaveBytes<E, D> {
+impl<E: ToOwnedBytes + ?Sized> Resettable for SaveBytes<E> {
     fn reset(&mut self) {
-        self.0.reset();
+        self.0 = None;
     }
 }

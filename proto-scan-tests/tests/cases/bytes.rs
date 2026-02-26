@@ -7,7 +7,7 @@ use InputKind::*;
 
 #[test_case(Empty)]
 #[test_case(Full)]
-fn save_bytes(input: InputKind) {
+fn write_bytes(input: InputKind) {
     let input = input.into_bytes_field_types();
     let mut save_to = proto::ScanBytesFieldTypesOutput {
         bytes_field: Vec::new(),
@@ -17,8 +17,8 @@ fn save_bytes(input: InputKind) {
     };
 
     let scanner = proto::BytesFieldTypes::scanner()
-        .save_bytes_field(&mut save_to.bytes_field)
-        .save_string_field(&mut save_to.string_field);
+        .write_bytes_field(&mut save_to.bytes_field)
+        .write_string_field(&mut save_to.string_field);
     {
         let bytes = input.encode_to_vec();
         for event in scanner.scan(bytes.as_slice()) {
@@ -39,12 +39,12 @@ fn save_bytes(input: InputKind) {
 
 #[test_case(Empty)]
 #[test_case(Full)]
-fn emit_bytes(input: InputKind) {
+fn save_bytes(input: InputKind) {
     let input = input.into_bytes_field_types();
 
     let scanner = proto::BytesFieldTypes::scanner()
-        .emit_bytes_field()
-        .emit_string_field();
+        .save_bytes_field()
+        .save_string_field();
     let output = {
         let bytes = input.encode_to_vec();
         scanner.scan(bytes.as_slice()).read_all().unwrap()

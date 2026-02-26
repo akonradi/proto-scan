@@ -4,7 +4,7 @@ pub trait Resettable {
 }
 
 /// A type that can be transformed into a [`Resettable`] type.
-/// 
+///
 /// Implementations can use `Self` for [`IntoResettable::Resettable`] if they
 /// already implement the trait.
 pub trait IntoResettable {

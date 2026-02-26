@@ -62,7 +62,7 @@ mod test {
     use hex_literal::hex;
 
     use crate::scan::encoding::Varint;
-    use crate::scan::field::{EmitScalar, NoOp, SaveRepeated};
+    use crate::scan::field::{NoOp, SaveScalar, WriteRepeated};
     use crate::scan::{FieldNumber, ScalarField, Scan};
 
     use super::*;
@@ -149,7 +149,7 @@ mod test {
 
         let scanner = Scanner(
             3,
-            Message::new(Scanner(1, EmitScalar::<Varint<i32>>::new())),
+            Message::new(Scanner(1, SaveScalar::<Varint<i32>>::new())),
         );
 
         let mut input = &INPUT[..];
@@ -181,7 +181,7 @@ mod test {
                 3,
                 Message::new(Scanner(
                     1,
-                    SaveRepeated::<Varint<i32>, _>::new(&mut saved_to),
+                    WriteRepeated::<Varint<i32>, _>::new(&mut saved_to),
                 )),
             );
 

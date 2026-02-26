@@ -93,7 +93,7 @@ impl MessageScannerField<'_> {
             };
 
         let scan_fn = swap_single_field_fn(
-            format_ident!("scan_{field_name}"),
+            format_ident!("{field_name}"),
             vec![
                 format!("Sets the field scanner for message field `{field_name}`."),
                 "".to_owned(),
@@ -111,7 +111,7 @@ impl MessageScannerField<'_> {
             quote!(scanner),
         );
 
-        let save_fn_docs = || {
+        let write_fn_docs = || {
             vec![
                 format!("Sets the scanner to write field `{field_name}` to the provided location."),
                 "".to_string(),
@@ -123,7 +123,7 @@ impl MessageScannerField<'_> {
                 ),
             ]
         };
-        let emit_fn_docs = || {
+        let save_fn_docs = || {
             vec![
                 format!("Sets the scanner to output field `{field_name}`."),
                 "".to_owned(),
@@ -143,45 +143,45 @@ impl MessageScannerField<'_> {
                 let encoding_type = single.encoding_type();
                 let repr_type = single.repr_type();
 
+                let write_fn = swap_single_field_fn(
+                    format_ident!("write_{field_name}"),
+                    write_fn_docs(),
+                    vec![quote!(D: From<#repr_type>)],
+                    vec![quote!(to: &'t mut D)],
+                    quote! {::proto_scan::scan::field::WriteScalar::<#encoding_type, &'t mut D>},
+                    quote!(::proto_scan::scan::field::WriteScalar::<#encoding_type, _>::new(to)),
+                );
                 let save_fn = swap_single_field_fn(
                     format_ident!("save_{field_name}"),
                     save_fn_docs(),
-                    vec![quote!(D: From<#repr_type>)],
-                    vec![quote!(to: &'t mut D)],
-                    quote! {::proto_scan::scan::field::SaveScalar::<#encoding_type, &'t mut D>},
-                    quote!(::proto_scan::scan::field::SaveScalar::<#encoding_type, _>::new(to)),
-                );
-                let emit_fn = swap_single_field_fn(
-                    format_ident!("emit_{field_name}"),
-                    emit_fn_docs(),
                     vec![],
                     vec![],
-                    quote! {::proto_scan::scan::field::EmitScalar::<#encoding_type>},
-                    quote!(::proto_scan::scan::field::EmitScalar::<#encoding_type>::new()),
+                    quote! {::proto_scan::scan::field::SaveScalar::<#encoding_type>},
+                    quote!(::proto_scan::scan::field::SaveScalar::<#encoding_type>::new()),
                 );
-                vec![save_fn, emit_fn, scan_fn]
+                vec![write_fn, save_fn, scan_fn]
             }
             FieldType::Repeated { ty, number: _ } => {
                 let encoding_type = ty.encoding_type();
                 let repr_type = ty.repr_type();
 
+                let write_fn = swap_single_field_fn(
+                    format_ident!("write_{field_name}"),
+                    write_fn_docs(),
+                    vec![quote!(D: ::core::iter::Extend<#repr_type>)],
+                    vec![quote!(to: &'t mut D)],
+                    quote! {::proto_scan::scan::field::WriteRepeated::<#encoding_type, &'t mut D>},
+                    quote!(::proto_scan::scan::field::WriteRepeated::<#encoding_type, _>::new(to)),
+                );
                 let save_fn = swap_single_field_fn(
                     format_ident!("save_{field_name}"),
                     save_fn_docs(),
-                    vec![quote!(D: ::core::iter::Extend<#repr_type>)],
-                    vec![quote!(to: &'t mut D)],
-                    quote! {::proto_scan::scan::field::SaveRepeated::<#encoding_type, &'t mut D>},
-                    quote!(::proto_scan::scan::field::SaveRepeated::<#encoding_type, _>::new(to)),
-                );
-                let emit_fn = swap_single_field_fn(
-                    format_ident!("emit_{field_name}"),
-                    emit_fn_docs(),
                     vec![],
                     vec![],
-                    quote! {::proto_scan::scan::field::EmitRepeated::<#encoding_type>},
-                    quote!(::proto_scan::scan::field::EmitRepeated::<#encoding_type>::new()),
+                    quote! {::proto_scan::scan::field::SaveRepeated::<#encoding_type>},
+                    quote!(::proto_scan::scan::field::SaveRepeated::<#encoding_type>::new()),
                 );
-                vec![save_fn, emit_fn, scan_fn]
+                vec![write_fn, save_fn, scan_fn]
             }
             FieldType::Bytes { utf8, number: _ } => {
                 let borrow_type = if *utf8 {
@@ -189,23 +189,23 @@ impl MessageScannerField<'_> {
                 } else {
                     quote! {[::core::primitive::u8]}
                 };
+                let write_fn = swap_single_field_fn(
+                    format_ident!("write_{field_name}"),
+                    write_fn_docs(),
+                    vec![quote!(D: for<'d> ::core::convert::From<&'d #borrow_type>)],
+                    vec![quote!(to: &'t mut D)],
+                    quote! {::proto_scan::scan::field::WriteBytes::<#borrow_type, &'t mut D>},
+                    quote!(::proto_scan::scan::field::WriteBytes::<#borrow_type, _>::new(to)),
+                );
                 let save_fn = swap_single_field_fn(
                     format_ident!("save_{field_name}"),
                     save_fn_docs(),
-                    vec![quote!(D: for<'d> ::core::convert::From<&'d #borrow_type>)],
-                    vec![quote!(to: &'t mut D)],
-                    quote! {::proto_scan::scan::field::SaveBytes::<#borrow_type, &'t mut D>},
-                    quote!(::proto_scan::scan::field::SaveBytes::<#borrow_type, _>::new(to)),
-                );
-                let emit_fn = swap_single_field_fn(
-                    format_ident!("emit_{field_name}"),
-                    emit_fn_docs(),
                     vec![],
                     vec![],
-                    quote! {::proto_scan::scan::field::EmitBytes::<#borrow_type>},
-                    quote!(::proto_scan::scan::field::EmitBytes::<#borrow_type>::new()),
+                    quote! {::proto_scan::scan::field::SaveBytes::<#borrow_type>},
+                    quote!(::proto_scan::scan::field::SaveBytes::<#borrow_type>::new()),
                 );
-                vec![save_fn, emit_fn, scan_fn]
+                vec![write_fn, save_fn, scan_fn]
             }
             FieldType::Message { number: _ } => vec![scan_fn],
             FieldType::Unsupported => vec![],

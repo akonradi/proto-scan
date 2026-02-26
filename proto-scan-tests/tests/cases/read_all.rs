@@ -11,9 +11,9 @@ fn read_all(input: InputKind) {
     let input = input.into_example_msg();
     let bytes = input.encode_to_vec();
     let scanner = proto::ScanExample::scanner()
-        .emit_single_bool()
-        .emit_single_fixed64()
-        .emit_repeated_bool();
+        .save_single_bool()
+        .save_single_fixed64()
+        .save_repeated_bool();
     let scan = scanner.scan(bytes.as_slice());
 
     let read_all = scan.read_all();

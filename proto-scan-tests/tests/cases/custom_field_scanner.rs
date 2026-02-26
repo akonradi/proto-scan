@@ -52,7 +52,7 @@ fn custom_scanner(input: InputKind) {
     let input = input.into_example_msg();
     let bytes = input.encode_to_vec();
     let mut out = None;
-    let scanner = proto::ScanExample::scanner().scan_single_bool(CustomScanner(&mut out));
+    let scanner = proto::ScanExample::scanner().single_bool(CustomScanner(&mut out));
     let scan = scanner.scan(bytes.as_slice());
 
     let read_all = scan.read_all();

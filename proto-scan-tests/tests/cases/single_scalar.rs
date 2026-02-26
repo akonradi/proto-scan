@@ -7,7 +7,7 @@ use InputKind::*;
 
 #[test_case(Empty)]
 #[test_case(Full)]
-fn save_field(input: InputKind) {
+fn write_field(input: InputKind) {
     let input = input.into_single_field_types();
     let mut save_to = proto::ScanSingleFieldTypesOutput {
         int32_field: None,
@@ -27,19 +27,19 @@ fn save_field(input: InputKind) {
     };
 
     let scanner = proto::SingleFieldTypes::scanner()
-        .save_int32_field(&mut save_to.int32_field)
-        .save_int64_field(&mut save_to.int64_field)
-        .save_uint32_field(&mut save_to.uint32_field)
-        .save_uint64_field(&mut save_to.uint64_field)
-        .save_sint32_field(&mut save_to.sint32_field)
-        .save_sint64_field(&mut save_to.sint64_field)
-        .save_bool_field(&mut save_to.bool_field)
-        .save_fixed64_field(&mut save_to.fixed64_field)
-        .save_sfixed64_field(&mut save_to.sfixed64_field)
-        .save_double_field(&mut save_to.double_field)
-        .save_fixed32_field(&mut save_to.fixed32_field)
-        .save_sfixed32_field(&mut save_to.sfixed32_field)
-        .save_float_field(&mut save_to.float_field);
+        .write_int32_field(&mut save_to.int32_field)
+        .write_int64_field(&mut save_to.int64_field)
+        .write_uint32_field(&mut save_to.uint32_field)
+        .write_uint64_field(&mut save_to.uint64_field)
+        .write_sint32_field(&mut save_to.sint32_field)
+        .write_sint64_field(&mut save_to.sint64_field)
+        .write_bool_field(&mut save_to.bool_field)
+        .write_fixed64_field(&mut save_to.fixed64_field)
+        .write_sfixed64_field(&mut save_to.sfixed64_field)
+        .write_double_field(&mut save_to.double_field)
+        .write_fixed32_field(&mut save_to.fixed32_field)
+        .write_sfixed32_field(&mut save_to.sfixed32_field)
+        .write_float_field(&mut save_to.float_field);
     {
         let bytes = input.encode_to_vec();
         for event in scanner.scan(bytes.as_slice()) {
@@ -70,23 +70,23 @@ fn save_field(input: InputKind) {
 
 #[test_case(Empty)]
 #[test_case(Full)]
-fn emit_field(input: InputKind) {
+fn save_field(input: InputKind) {
     let input = input.into_single_field_types();
 
     let scanner = proto::SingleFieldTypes::scanner()
-        .emit_int32_field()
-        .emit_int64_field()
-        .emit_uint32_field()
-        .emit_uint64_field()
-        .emit_sint32_field()
-        .emit_sint64_field()
-        .emit_bool_field()
-        .emit_fixed64_field()
-        .emit_sfixed64_field()
-        .emit_double_field()
-        .emit_fixed32_field()
-        .emit_sfixed32_field()
-        .emit_float_field();
+        .save_int32_field()
+        .save_int64_field()
+        .save_uint32_field()
+        .save_uint64_field()
+        .save_sint32_field()
+        .save_sint64_field()
+        .save_bool_field()
+        .save_fixed64_field()
+        .save_sfixed64_field()
+        .save_double_field()
+        .save_fixed32_field()
+        .save_sfixed32_field()
+        .save_float_field();
 
     let output = {
         let bytes = input.encode_to_vec();
