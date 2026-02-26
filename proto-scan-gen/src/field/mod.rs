@@ -221,9 +221,15 @@ impl MessageScannerField<'_> {
                             [`{output_type}::{field_name}`]."
                         ),
                     ],
-                    vec![quote!(S: ::proto_scan::scan::IntoResettable<Resettable: ::proto_scan::scan::ScanCallbacks> + 't)],
+                    vec![
+                        quote!(S: ::proto_scan::scan::IntoResettable<Resettable: ::proto_scan::scan::ScanCallbacks> + 't),
+                    ],
                     vec![quote!(scanner: S)],
-                    quote!(::proto_scan::scan::field::Message<<S as ::proto_scan::scan::IntoResettable>::Resettable>),
+                    quote!(
+                        ::proto_scan::scan::field::Message<
+                            <S as ::proto_scan::scan::IntoResettable>::Resettable,
+                        >
+                    ),
                     quote!(::proto_scan::scan::field::Message::new(scanner)),
                 );
                 vec![scan_fn, custom_fn]

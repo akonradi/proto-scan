@@ -27,17 +27,17 @@
 //! }
 //!
 //! fn read_a<R: read::Read>(r: R) -> Result<Option<i64>, scan::StopScan> {
-//!   let scanner = Test1::scanner().save_a();
-//!   let ScanTest1Output { a } = scanner.scan(r).read_all()?;
-//!   Ok(a)
+//!     let scanner = Test1::scanner().save_a();
+//!     let ScanTest1Output { a } = scanner.scan(r).read_all()?;
+//!     Ok(a)
 //! }
 //!
 //! fn main() {
-//!   // From the protobuf documentation encoding guide, this is a Test message
-//!   // with a = 150.
-//!   const INPUT: &[u8] = &[0x08, 0x96, 0x01];
+//!     // From the protobuf documentation encoding guide, this is a Test message
+//!     // with a = 150.
+//!     const INPUT: &[u8] = &[0x08, 0x96, 0x01];
 //!
-//!   assert_eq!(read_a(&mut &INPUT[..]), Ok(Some(150)))
+//!     assert_eq!(read_a(&mut &INPUT[..]), Ok(Some(150)))
 //! }
 //! ```
 //!
@@ -60,34 +60,38 @@
 //! # use proto_scan::*;
 //! use wire::ParseEventReader;
 //! fn read_a<R: read::Read>(r: R) -> Result<Option<i64>, DecodeError<R::Error>> {
-//!   // From the protobuf documentation encoding guide.
-//!   // message Test1 {
-//!   //   int64 a = 1;
-//!   // }
-//!   let mut reader = wire::parse(r);
-//!   let mut found_a = None;
-//!   while let Some(event) = reader.next() {
-//!     let (field_number, event) = event?;
-//!     match event {
-//!       wire::ParseEvent::Numeric(s) if field_number == 1 => match s {
-//!         wire::NumericField::Varint(v) => found_a = Some(
-//!           // cast bits according to protobuf encoding format
-//!           v as i64
-//!         ),
-//!         wire::NumericField::I64(_) | wire::NumericField::I32(_) => found_a = None,
-//!       },
-//!       wire::ParseEvent::Numeric(_) | wire::ParseEvent::Group(_) | wire::ParseEvent::LengthDelimited(_) => {},
+//!     // From the protobuf documentation encoding guide.
+//!     // message Test1 {
+//!     //   int64 a = 1;
+//!     // }
+//!     let mut reader = wire::parse(r);
+//!     let mut found_a = None;
+//!     while let Some(event) = reader.next() {
+//!         let (field_number, event) = event?;
+//!         match event {
+//!             wire::ParseEvent::Numeric(s) if field_number == 1 => match s {
+//!                 wire::NumericField::Varint(v) => {
+//!                     found_a = Some(
+//!                         // cast bits according to protobuf encoding format
+//!                         v as i64,
+//!                     )
+//!                 }
+//!                 wire::NumericField::I64(_) | wire::NumericField::I32(_) => found_a = None,
+//!             },
+//!             wire::ParseEvent::Numeric(_)
+//!             | wire::ParseEvent::Group(_)
+//!             | wire::ParseEvent::LengthDelimited(_) => {}
+//!         }
 //!     }
-//!   }
-//!   Ok(found_a)
+//!     Ok(found_a)
 //! }
 //!
 //! fn main() {
-//!   // From the protobuf documentation encoding guide, this is a Test message
-//!   // with a = 150.
-//!   const INPUT: &[u8] = &[0x08, 0x96, 0x01];
+//!     // From the protobuf documentation encoding guide, this is a Test message
+//!     // with a = 150.
+//!     const INPUT: &[u8] = &[0x08, 0x96, 0x01];
 //!
-//!   assert_eq!(read_a(&mut &INPUT[..]), Ok(Some(150)))
+//!     assert_eq!(read_a(&mut &INPUT[..]), Ok(Some(150)))
 //! }
 //! ```
 //!
