@@ -14,13 +14,17 @@ impl<R: ReadTypes> ReadTypes for CountReader<R> {
 }
 
 impl<R: Read> Read for CountReader<R> {
-    fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
+    type ReadTypes = R::ReadTypes;
+    fn read(
+        &mut self,
+        bytes: u32,
+    ) -> Result<<Self::ReadTypes as ReadTypes>::Buffer, <Self::ReadTypes as ReadError>::Error> {
         let r = self.inner.read(bytes)?;
         self.count += r.as_ref().len();
         Ok(r)
     }
 
-    fn skip(&mut self, bytes: u32) -> Result<u32, Self::Error> {
+    fn skip(&mut self, bytes: u32) -> Result<u32, <Self::ReadTypes as ReadError>::Error> {
         let r = self.inner.skip(bytes)?;
         self.count += r as usize;
         Ok(r)

@@ -26,11 +26,15 @@ mod numeric_iter;
 ///
 /// This trait allows interpreting the contents of length-delimited field as at
 /// most one of those representations.
-pub trait LengthDelimited: ReadTypes {
+pub trait LengthDelimited {
+    type ReadTypes: ReadTypes;
+
     /// Returns the number of bytes in the field.
     fn len(&self) -> u32;
 
-    type PackedIter<W: NumericWireType>: Iterator<Item = Result<W::Repr, DecodeError<Self::Error>>>;
+    type PackedIter<W: NumericWireType>: Iterator<
+        Item = Result<W::Repr, DecodeError<<Self::ReadTypes as ReadError>::Error>>,
+    >;
 
     /// Interprets the contents of a field as packed values.
     ///
@@ -41,18 +45,24 @@ pub trait LengthDelimited: ReadTypes {
     fn into_packed<W: NumericWireType>(self) -> Self::PackedIter<W>;
 
     /// Reads the contents of the delimited field as bytes.
-    fn into_bytes(self) -> Result<Self::Buffer, DecodeError<Self::Error>>;
+    fn into_bytes(
+        self,
+    ) -> Result<
+        <Self::ReadTypes as ReadTypes>::Buffer,
+        DecodeError<<Self::ReadTypes as ReadError>::Error>,
+    >;
 
     /// Consumes the contents of the field as a sequence of [`ParseEvent`]s in
     /// the form of a [`ParseEventReader`].
-    fn into_events(self) -> impl ParseEventReader<Error = Self::Error>;
+    fn into_events(self) -> impl ParseEventReader<ReadTypes = Self::ReadTypes>;
 }
 
 /// Protobuf parser that interprets a message as a sequence of events.
 ///
 /// This acts as a lending iterator, where the [`ParseEvent`] returned by
 /// [`Self::next`] can borrow from `self`.
-pub trait ParseEventReader: ReadError {
+pub trait ParseEventReader {
+    type ReadTypes: ReadTypes;
     /// Advances the parse state and returns the next event, an error, or `None`
     /// if the underlying source is exhausted.
     fn next(
@@ -61,9 +71,9 @@ pub trait ParseEventReader: ReadError {
         Result<
             (
                 FieldNumber,
-                ParseEvent<impl LengthDelimited<Error = <Self as ReadError>::Error>>,
+                ParseEvent<impl LengthDelimited<ReadTypes = Self::ReadTypes>>,
             ),
-            DecodeError<<Self as ReadError>::Error>,
+            DecodeError<<Self::ReadTypes as ReadError>::Error>,
         >,
     >;
 }
@@ -79,7 +89,9 @@ pub enum ParseEvent<L> {
     LengthDelimited(L),
 }
 
-pub fn parse<'a, R: Read + 'a>(r: R) -> impl ParseEventReader<Error = R::Error> + 'a {
+pub fn parse<'a, R: Read + 'a>(
+    r: R,
+) -> impl ParseEventReader<ReadTypes = R::ReadTypes> + 'a {
     EventReader {
         inner: Either::Left(r),
         do_before: DoBeforeNext::DoNothing,

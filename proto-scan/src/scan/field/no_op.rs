@@ -1,5 +1,6 @@
 use std::convert::Infallible;
 
+use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
 use crate::scan::{
     GroupOp, IntoResettable, IntoScanOutput, IntoScanner, NumericField, Resettable, StopScan,
@@ -10,8 +11,9 @@ use crate::wire::LengthDelimited;
 #[derive(Default)]
 pub struct NoOp;
 
-impl OnScanField for NoOp {
+impl<R: ReadTypes> OnScanField<R> for NoOp {
     type ScanEvent = Infallible;
+
     fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
         Ok(None)
     }
@@ -40,8 +42,8 @@ impl IntoResettable for NoOp {
 }
 
 impl IntoScanner for NoOp {
-    type Scanner = Self;
-    fn into_scanner(self) -> Self::Scanner {
+    type Scanner<R: ReadTypes> = Self;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         self
     }
 }

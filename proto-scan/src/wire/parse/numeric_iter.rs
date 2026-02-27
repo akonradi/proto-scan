@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::decode_error::DecodeError;
-use crate::read::Read;
+use crate::read::{Read, ReadError};
 use crate::wire::NumericWireType;
 use crate::wire::parse::{DoBeforeNext, LengthDelimitedImpl};
 
@@ -20,7 +20,7 @@ impl<'a, R, W> NumericIter<'a, R, W> {
 }
 
 impl<'a, R: Read, W: NumericWireType> Iterator for NumericIter<'a, R, W> {
-    type Item = Result<W::Repr, DecodeError<R::Error>>;
+    type Item = Result<W::Repr, DecodeError<<R::ReadTypes as ReadError>::Error>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let Self { inner, _wire_type } = self;

@@ -1,7 +1,7 @@
 use std::ops::{BitAnd, BitOrAssign, Shl, Shr, ShrAssign};
 
 use crate::DecodeError;
-use crate::read::Read;
+use crate::read::{Read, ReadError};
 
 pub use field_number::{FieldNumber, InvalidFieldNumber};
 pub use group_op::GroupOp;
@@ -50,14 +50,13 @@ impl ParseVarint for u32 {
     }
 }
 
-fn parse_base128_varint<R: Read, V: ParseVarint>(r: &mut R) -> Result<V, DecodeError<R::Error>> {
+fn parse_base128_varint<R: Read, V: ParseVarint>(
+    r: &mut R,
+) -> Result<V, DecodeError<<R::ReadTypes as ReadError>::Error>> {
     let mut value = V::zero();
     for i in 0..V::MAX_BYTES {
         let byte = r.read(1).map_err(DecodeError::Read)?;
-        let byte = *byte
-            .as_ref()
-            .first()
-            .ok_or(DecodeError::<R::Error>::UnexpectedEnd)?;
+        let byte = *byte.as_ref().first().ok_or(DecodeError::UnexpectedEnd)?;
         let (byte, continue_flag) = (V::from(byte & !0x80), (byte & 0x80));
 
         value |= byte << (i * 7).into();

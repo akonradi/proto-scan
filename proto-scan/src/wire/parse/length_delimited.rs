@@ -13,16 +13,13 @@ pub(super) struct LengthDelimitedImpl<'a, R> {
     pub(super) write_back_to: &'a mut DoBeforeNext,
 }
 
-impl<R: Read> ReadError for LengthDelimitedImpl<'_, R> {
-    type Error = R::Error;
-}
-
-impl<R: Read> ReadTypes for LengthDelimitedImpl<'_, R> {
-    type Buffer = R::Buffer;
-}
-
 impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
-    fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
+    type ReadTypes = R::ReadTypes;
+
+    fn read(
+        &mut self,
+        bytes: u32,
+    ) -> Result<<Self::ReadTypes as ReadTypes>::Buffer, <Self::ReadTypes as ReadError>::Error> {
         match self.reader.read(bytes) {
             Ok(b) => Ok(b),
             Err(e) => {
@@ -32,7 +29,7 @@ impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
         }
     }
 
-    fn skip(&mut self, bytes: u32) -> Result<u32, Self::Error> {
+    fn skip(&mut self, bytes: u32) -> Result<u32, <Self::ReadTypes as ReadError>::Error> {
         match self.reader.skip(bytes) {
             Ok(b) => Ok(b),
             Err(e) => {
@@ -43,14 +40,20 @@ impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
     }
 }
 
-impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedImpl<'a, R> {
+impl<'a, R: Read> LengthDelimited for LengthDelimitedImpl<'a, R> {
+    type ReadTypes = R::ReadTypes;
     type PackedIter<W: NumericWireType> = NumericIter<'a, R, W>;
 
     fn len(&self) -> u32 {
         self.reader.remaining()
     }
 
-    fn into_bytes(mut self) -> Result<R::Buffer, DecodeError<R::Error>> {
+    fn into_bytes(
+        mut self,
+    ) -> Result<
+        <Self::ReadTypes as ReadTypes>::Buffer,
+        DecodeError<<Self::ReadTypes as ReadError>::Error>,
+    > {
         let remaining = self.reader.remaining();
         let bytes = self.reader.read(remaining).map_err(DecodeError::Read)?;
         if bytes.as_ref().len() != remaining as usize {
@@ -64,7 +67,7 @@ impl<'a, R: Read<Error: std::error::Error>> LengthDelimited for LengthDelimitedI
         NumericIter::<_, W>::new(self)
     }
 
-    fn into_events(self) -> impl ParseEventReader<Error = Self::Error> {
+    fn into_events(self) -> impl ParseEventReader<ReadTypes = Self::ReadTypes> {
         EventReader {
             inner: Either::Right(self),
             do_before: DoBeforeNext::DoNothing,

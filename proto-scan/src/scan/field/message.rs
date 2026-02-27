@@ -1,5 +1,6 @@
 use std::convert::Infallible;
 
+use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
 use crate::scan::{
     IntoResettable, IntoScanOutput, IntoScanner, Resettable, ScanCallbacks, StopScan, next_event,
@@ -8,13 +9,13 @@ use crate::wire::LengthDelimited;
 
 pub struct Message<F>(F);
 
-impl<F: ScanCallbacks + Resettable> Message<F> {
+impl<F: Resettable> Message<F> {
     pub fn new(scanner: impl IntoResettable<Resettable = F>) -> Self {
         Self(scanner.into_resettable())
     }
 }
 
-impl<F: ScanCallbacks<ScanOutput: Default> + Resettable> OnScanField
+impl<F: ScanCallbacks<R, ScanOutput: Default> + Resettable, R: ReadTypes> OnScanField<R>
     for Message<F>
 {
     type ScanEvent = Infallible;
@@ -32,7 +33,7 @@ impl<F: ScanCallbacks<ScanOutput: Default> + Resettable> OnScanField
 
     fn on_length_delimited(
         &mut self,
-        delimited: impl LengthDelimited,
+        delimited: impl LengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, StopScan> {
         self.0.reset();
         let mut parse = delimited.into_events();
@@ -59,15 +60,14 @@ impl<F: Resettable> Resettable for Message<F> {
 }
 
 impl<F: IntoScanner> IntoScanner for Message<F> {
-    type Scanner = Message<F::Scanner>;
-    fn into_scanner(self) -> Self::Scanner {
+    type Scanner<R: ReadTypes> = Message<F::Scanner<R>>;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         Message(self.0.into_scanner())
     }
 }
 
 #[cfg(test)]
 mod test {
-
     use assert_matches::assert_matches;
     use hex_literal::hex;
 
@@ -79,7 +79,8 @@ mod test {
     struct Scanner<T = NoOp>(u32, T);
     #[derive(Debug, Default, PartialEq)]
     struct ScanOutput<T>(T);
-    impl<T: OnScanField> ScanCallbacks for Scanner<T> {
+
+    impl<R: ReadTypes, T: OnScanField<R>> ScanCallbacks<R> for Scanner<T> {
         type ScanEvent = Option<(T::ScanEvent,)>;
 
         fn on_numeric(
@@ -109,7 +110,7 @@ mod test {
         fn on_length_delimited(
             &mut self,
             field: FieldNumber,
-            delimited: impl LengthDelimited,
+            delimited: impl LengthDelimited<ReadTypes = R>,
         ) -> Result<Self::ScanEvent, StopScan> {
             if field == self.0 {
                 self.1

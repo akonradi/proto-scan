@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use crate::read::ReadBuffer as _;
+use crate::read::{ReadBuffer as _, ReadTypes};
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
 use crate::scan::{IntoResettable, IntoScanOutput, IntoScanner, Resettable, StopScan};
@@ -17,7 +17,7 @@ impl<T: Encoding> SaveNumeric<T> {
     }
 }
 
-impl<E: Encoding> OnScanField for SaveNumeric<E> {
+impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveNumeric<E> {
     type ScanEvent = E::Repr;
 
     fn on_numeric(&mut self, value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
@@ -53,8 +53,8 @@ impl<E: Encoding> IntoResettable for SaveNumeric<E> {
 }
 
 impl<E: Encoding> IntoScanner for SaveNumeric<E> {
-    type Scanner = Self;
-    fn into_scanner(self) -> Self::Scanner {
+    type Scanner<R: ReadTypes> = Self;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         self
     }
 }
@@ -77,9 +77,16 @@ impl<T: Encoding> SaveRepeated<T> {
     }
 }
 
-impl<E: Encoding> OnScanField for SaveRepeated<E> {
-    type ScanEvent = Infallible;
+impl<E: Encoding> IntoScanOutput for SaveRepeated<E> {
+    type ScanOutput = Vec<E::Repr>;
 
+    fn into_scan_output(self) -> Self::ScanOutput {
+        self.0
+    }
+}
+
+impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveRepeated<E> {
+    type ScanEvent = Infallible;
     fn on_numeric(&mut self, value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
         let value = <E::Wire as NumericWireType>::from_value(value).ok_or(StopScan)?;
         self.0.extend([E::decode(value).map_err(Into::into)?]);
@@ -107,14 +114,6 @@ impl<E: Encoding> OnScanField for SaveRepeated<E> {
     }
 }
 
-impl<E: Encoding> IntoScanOutput for SaveRepeated<E> {
-    type ScanOutput = Vec<E::Repr>;
-
-    fn into_scan_output(self) -> Self::ScanOutput {
-        self.0
-    }
-}
-
 impl<E: Encoding> Resettable for SaveRepeated<E> {
     fn reset(&mut self) {
         self.0.clear()
@@ -122,8 +121,8 @@ impl<E: Encoding> Resettable for SaveRepeated<E> {
 }
 
 impl<E: Encoding> IntoScanner for SaveRepeated<E> {
-    type Scanner = Self;
-    fn into_scanner(self) -> Self::Scanner {
+    type Scanner<R: ReadTypes> = Self;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         self
     }
 }
@@ -149,7 +148,7 @@ impl<T: ToOwnedBytes + ?Sized> SaveBytes<T> {
     }
 }
 
-impl OnScanField for SaveBytes<str> {
+impl<R: ReadTypes> OnScanField<R> for SaveBytes<str> {
     type ScanEvent = Infallible;
     fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
@@ -161,7 +160,7 @@ impl OnScanField for SaveBytes<str> {
 
     fn on_length_delimited(
         &mut self,
-        delimited: impl LengthDelimited,
+        delimited: impl LengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, StopScan> {
         let bytes = delimited.into_bytes().map_err(|_| StopScan)?.into_bytes();
         let string = String::from_utf8(bytes.into()).map_err(|_| StopScan)?;
@@ -177,9 +176,8 @@ impl IntoScanOutput for SaveBytes<str> {
     }
 }
 
-impl OnScanField for SaveBytes<[u8]> {
+impl<R: ReadTypes> OnScanField<R> for SaveBytes<[u8]> {
     type ScanEvent = Infallible;
-
     fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
     }
@@ -190,7 +188,7 @@ impl OnScanField for SaveBytes<[u8]> {
 
     fn on_length_delimited(
         &mut self,
-        delimited: impl LengthDelimited,
+        delimited: impl LengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, StopScan> {
         let bytes = delimited.into_bytes().map_err(|_| StopScan)?.into_bytes();
         self.0 = Some(bytes);
@@ -212,8 +210,8 @@ impl<E: ToOwnedBytes + ?Sized> Resettable for SaveBytes<E> {
 }
 
 impl<E: ToOwnedBytes + ?Sized> IntoScanner for SaveBytes<E> {
-    type Scanner = Self;
-    fn into_scanner(self) -> Self::Scanner {
+    type Scanner<R: ReadTypes> = Self;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         self
     }
 }

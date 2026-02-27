@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 
+use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
 use crate::scan::{IntoScanOutput, StopScan};
 use crate::wire::{GroupOp, LengthDelimited, NumericField, NumericWireType};
@@ -11,7 +12,7 @@ use core::convert::Infallible;
 /// wrong wire type.
 pub struct InvokeOn<W, F>(F, PhantomData<W>);
 
-impl<'a, W: NumericWireType, F: FnMut(W::Repr) -> Result<(), StopScan>> OnScanField
+impl<'a, W: NumericWireType, R: ReadTypes, F: FnMut(W::Repr) -> Result<(), StopScan>> OnScanField<R>
     for InvokeOn<W, F>
 {
     type ScanEvent = Infallible;

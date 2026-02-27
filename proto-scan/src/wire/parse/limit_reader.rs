@@ -15,16 +15,12 @@ impl<R> LimitReader<R> {
     }
 }
 
-impl<R: ReadError> ReadError for LimitReader<R> {
-    type Error = R::Error;
-}
-
-impl<R: ReadTypes> ReadTypes for LimitReader<R> {
-    type Buffer = R::Buffer;
-}
-
 impl<R: Read> Read for LimitReader<R> {
-    fn read(&mut self, bytes: u32) -> Result<Self::Buffer, Self::Error> {
+    type ReadTypes = R::ReadTypes;
+    fn read(
+        &mut self,
+        bytes: u32,
+    ) -> Result<<Self::ReadTypes as ReadTypes>::Buffer, <Self::ReadTypes as ReadError>::Error> {
         let Self { inner, remaining } = self;
         let b = bytes.min(*remaining);
         let bytes = b;
@@ -33,7 +29,7 @@ impl<R: Read> Read for LimitReader<R> {
         Ok(r)
     }
 
-    fn skip(&mut self, bytes: u32) -> Result<u32, Self::Error> {
+    fn skip(&mut self, bytes: u32) -> Result<u32, <Self::ReadTypes as ReadError>::Error> {
         let skipped = self.inner.skip(bytes)?;
         self.remaining = self.remaining - skipped;
         Ok(skipped)

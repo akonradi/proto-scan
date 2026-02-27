@@ -1,14 +1,16 @@
 use std::convert::Infallible as Never;
 
 use crate::DecodeError;
-use crate::read::Read;
+use crate::read::{Read, ReadError};
 use crate::wire::NumericField;
 
 pub trait NumericWireType: sealed::Sealed {
     type Repr;
     const BYTE_LEN: std::ops::RangeInclusive<u8>;
 
-    fn read_from<R: Read>(r: &mut R) -> Result<Self::Repr, DecodeError<R::Error>>;
+    fn read_from<R: Read>(
+        r: &mut R,
+    ) -> Result<Self::Repr, DecodeError<<R::ReadTypes as ReadError>::Error>>;
 
     fn from_value(s: NumericField) -> Option<Self::Repr>;
 }
@@ -31,7 +33,9 @@ impl NumericWireType for Varint {
     type Repr = u64;
     const BYTE_LEN: std::ops::RangeInclusive<u8> = 1..=10;
 
-    fn read_from<R: Read>(r: &mut R) -> Result<Self::Repr, DecodeError<R::Error>> {
+    fn read_from<R: Read>(
+        r: &mut R,
+    ) -> Result<Self::Repr, DecodeError<<R::ReadTypes as ReadError>::Error>> {
         super::parse_base128_varint(r)
     }
 
@@ -45,14 +49,14 @@ impl NumericWireType for Varint {
 
 pub(crate) fn read_fixed_from<const N: usize, R: Read, V>(
     r: &mut R,
-) -> Result<V, DecodeError<R::Error>>
+) -> Result<V, DecodeError<<R::ReadTypes as ReadError>::Error>>
 where
     V: num_traits::FromBytes<Bytes = [u8; N]>,
 {
     let bytes = r.read(N as u32).map_err(DecodeError::Read)?;
 
     let bytes = <&V::Bytes>::try_from(bytes.as_ref())
-        .map_err(|_| DecodeError::<R::Error>::UnexpectedEnd)?;
+        .map_err(|_| DecodeError::<<R::ReadTypes as ReadError>::Error>::UnexpectedEnd)?;
 
     Ok(num_traits::FromBytes::from_le_bytes(bytes))
 }
@@ -61,7 +65,9 @@ impl NumericWireType for I64 {
     type Repr = u64;
     const BYTE_LEN: std::ops::RangeInclusive<u8> = 8..=8;
 
-    fn read_from<R: Read>(r: &mut R) -> Result<Self::Repr, DecodeError<R::Error>> {
+    fn read_from<R: Read>(
+        r: &mut R,
+    ) -> Result<Self::Repr, DecodeError<<R::ReadTypes as ReadError>::Error>> {
         read_fixed_from(r)
     }
 
@@ -77,7 +83,9 @@ impl NumericWireType for I32 {
     type Repr = u32;
     const BYTE_LEN: std::ops::RangeInclusive<u8> = 4..=4;
 
-    fn read_from<R: Read>(r: &mut R) -> Result<Self::Repr, DecodeError<R::Error>> {
+    fn read_from<R: Read>(
+        r: &mut R,
+    ) -> Result<Self::Repr, DecodeError<<R::ReadTypes as ReadError>::Error>> {
         read_fixed_from(r)
     }
 

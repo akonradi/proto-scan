@@ -152,8 +152,8 @@ impl MessageScanner<'_> {
         let field_names = self.field_names().collect::<Vec<_>>();
         quote! {
             impl<#(#generics: ::proto_scan::scan::IntoScanner),*> ::proto_scan::scan::IntoScanner for #type_name < #(#generics),* > {
-                type Scanner = #type_name < #(<#generics as ::proto_scan::scan::IntoScanner>::Scanner ),* >;
-                fn into_scanner(self) -> Self::Scanner {
+                type Scanner<R: ::proto_scan::read::ReadTypes> = #type_name < #(<#generics as ::proto_scan::scan::IntoScanner>::Scanner<R> ),* >;
+                fn into_scanner<R: ::proto_scan::read::ReadTypes>(self) -> Self::Scanner<R> {
                     let Self { #(#field_names),* } = self;
                     Self::Scanner {
                         #(#field_names: #field_names.into_scanner()),*
@@ -171,7 +171,7 @@ impl MessageScanner<'_> {
         let generics = self.generic_types().collect::<Vec<_>>();
         let generics_on_scan_bounds = generics
             .iter()
-            .map(|g| quote!(#g: ::proto_scan::scan::field::OnScanField))
+            .map(|g| quote!(#g: ::proto_scan::scan::field::OnScanField<R>))
             .collect::<Vec<_>>();
         let field_names = self.field_names().collect::<Vec<_>>();
         let field_arms = |fn_name: &str| {
@@ -203,7 +203,7 @@ impl MessageScanner<'_> {
                 }
             }
 
-            impl <#(#generics_on_scan_bounds,)*> ::proto_scan::scan::ScanCallbacks for #scanner_name<#(#generics,)*> {
+            impl <#(#generics_on_scan_bounds),* , R: ::proto_scan::read::ReadTypes> ::proto_scan::scan::ScanCallbacks<R> for #scanner_name<#(#generics,)*> {
                 type ScanEvent = Option<#scan_event_name<#(#generics :: ScanEvent),*>>;
                 fn on_numeric(
                     &mut self,
@@ -226,7 +226,7 @@ impl MessageScanner<'_> {
                 fn on_length_delimited(
                     &mut self,
                     field: ::proto_scan::wire::FieldNumber,
-                    value: impl ::proto_scan::wire::LengthDelimited,
+                    value: impl ::proto_scan::wire::LengthDelimited<ReadTypes=R>,
                 ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
                     Ok(match u32::from(field) {
                         #(#on_length_delimited_arms)*

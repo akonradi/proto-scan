@@ -2,6 +2,7 @@ use std::convert::Infallible;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
+use crate::read::ReadTypes;
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
 use crate::scan::{GroupOp, IntoScanOutput, IntoScanner, NumericField, StopScan};
@@ -31,7 +32,7 @@ impl<E, D> WriteNumeric<E, D> {
     }
 }
 
-impl<E: Encoding, D: SaveFrom<E::Repr>> OnScanField for WriteNumeric<E, D> {
+impl<E: Encoding, D: SaveFrom<E::Repr>, R: ReadTypes> OnScanField<R> for WriteNumeric<E, D> {
     type ScanEvent = Infallible;
 
     fn on_numeric(&mut self, value: NumericField) -> Result<Option<Infallible>, StopScan> {
@@ -89,8 +90,8 @@ impl<'t, E, D> Resettable for WriteNumeric<E, RestoreOnReset<'t, D>> {
 }
 
 impl<E, D> IntoScanner for WriteNumeric<E, D> {
-    type Scanner = Self;
-    fn into_scanner(self) -> Self::Scanner {
+    type Scanner<R: ReadTypes> = Self;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         self
     }
 }
@@ -104,7 +105,9 @@ impl<E, D> WriteRepeated<E, D> {
     }
 }
 
-impl<'t, E: Encoding, D: DerefMut<Target: Extend<E::Repr>>> OnScanField for WriteRepeated<E, D> {
+impl<'t, E: Encoding, R: ReadTypes, D: DerefMut<Target: Extend<E::Repr>>> OnScanField<R>
+    for WriteRepeated<E, D>
+{
     type ScanEvent = Infallible;
 
     fn on_numeric(&mut self, value: NumericField) -> Result<Option<Infallible>, StopScan> {
@@ -182,8 +185,8 @@ impl<D: Resettable, E> Resettable for WriteRepeated<E, D> {
 }
 
 impl<E, D> IntoScanner for WriteRepeated<E, D> {
-    type Scanner = Self;
-    fn into_scanner(self) -> Self::Scanner {
+    type Scanner<R: ReadTypes> = Self;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         self
     }
 }
@@ -197,7 +200,7 @@ impl<E: ?Sized, D> WriteBytes<E, D> {
     }
 }
 
-impl<D: for<'a> SaveFrom<&'a [u8]>> OnScanField for WriteBytes<[u8], D> {
+impl<D: for<'a> SaveFrom<&'a [u8]>, R: ReadTypes> OnScanField<R> for WriteBytes<[u8], D> {
     type ScanEvent = Infallible;
 
     fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Infallible>, StopScan> {
@@ -218,7 +221,7 @@ impl<D: for<'a> SaveFrom<&'a [u8]>> OnScanField for WriteBytes<[u8], D> {
     }
 }
 
-impl<D: for<'a> SaveFrom<&'a str>> OnScanField for WriteBytes<str, D> {
+impl<D: for<'a> SaveFrom<&'a str>, R: ReadTypes> OnScanField<R> for WriteBytes<str, D> {
     type ScanEvent = Infallible;
     fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Infallible>, StopScan> {
         Err(StopScan)
@@ -259,8 +262,8 @@ impl<'t, E: ?Sized, D> IntoResettable for WriteBytes<E, &'t mut D> {
 }
 
 impl<E: ?Sized, D> IntoScanner for WriteBytes<E, D> {
-    type Scanner = Self;
-    fn into_scanner(self) -> Self::Scanner {
+    type Scanner<R: ReadTypes> = Self;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         self
     }
 }

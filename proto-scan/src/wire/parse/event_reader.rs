@@ -14,20 +14,17 @@ pub(super) struct EventReader<'a, R> {
     pub(super) do_before: DoBeforeNext,
 }
 
-impl<R: ReadError> ReadError for EventReader<'_, R> {
-    type Error = R::Error;
-}
-
 impl<'a, R: Read> ParseEventReader for EventReader<'a, R> {
+    type ReadTypes = R::ReadTypes;
     fn next(
         &mut self,
     ) -> Option<
         Result<
             (
                 FieldNumber,
-                ParseEvent<impl LengthDelimited<Error = Self::Error>>,
+                ParseEvent<impl LengthDelimited<ReadTypes = Self::ReadTypes>>,
             ),
-            DecodeError<Self::Error>,
+            DecodeError<<R::ReadTypes as ReadError>::Error>,
         >,
     > {
         let Self { inner, do_before } = self;
@@ -71,7 +68,7 @@ impl<'a, R: Read> ParseEventReader for EventReader<'a, R> {
                     let to_skip = match (|| {
                         let length = Varint::read_from(&mut self.inner)?;
                         u32::try_from(length)
-                            .map_err(|_| DecodeError::<R::Error>::TooLargeLengthDelimited(length))
+                            .map_err(|_| DecodeError::TooLargeLengthDelimited(length))
                     })() {
                         Err(e) => return Some(Err(e)),
                         Ok(l) => l,

@@ -1,5 +1,5 @@
 use crate::DecodeError;
-use crate::read::Read;
+use crate::read::{Read, ReadError};
 use crate::wire::FieldNumber;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -21,12 +21,14 @@ pub(crate) enum WireType {
 }
 
 impl Tag {
-    pub(crate) fn read_from<R: Read>(r: &mut R) -> Result<Self, DecodeError<R::Error>> {
+    pub(crate) fn read_from<R: Read>(
+        r: &mut R,
+    ) -> Result<Self, DecodeError<<R::ReadTypes as ReadError>::Error>> {
         let value: u32 = super::parse_base128_varint(r)?;
         let (field_number, wire_type) = (value >> 3, (value & 0b111) as u8);
-        let wire_type = wire_type
-            .try_into()
-            .map_err(|_| DecodeError::<R::Error>::InvalidWireType(wire_type))?;
+        let wire_type = wire_type.try_into().map_err(|_| {
+            DecodeError::<<R::ReadTypes as ReadError>::Error>::InvalidWireType(wire_type)
+        })?;
 
         Ok(Self {
             field_number: FieldNumber(field_number),

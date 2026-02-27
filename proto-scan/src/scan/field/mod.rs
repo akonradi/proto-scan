@@ -1,3 +1,4 @@
+use crate::read::ReadTypes;
 use crate::scan::{IntoScanOutput, StopScan};
 #[cfg(doc)]
 use crate::wire::FieldNumber;
@@ -16,7 +17,7 @@ pub use save::{SaveBytes, SaveNumeric, SaveRepeated};
 pub use write::{SaveFrom, WriteBytes, WriteNumeric, WriteRepeated};
 
 /// Implemented by a visitor for a fixed [`FieldNumber`].
-pub trait OnScanField: IntoScanOutput {
+pub trait OnScanField<R: ReadTypes>: IntoScanOutput<ScanOutput: Default> {
     type ScanEvent;
 
     /// Called when a numeric tag is read.
@@ -28,6 +29,6 @@ pub trait OnScanField: IntoScanOutput {
     /// Called when a length-delimited tag is read.
     fn on_length_delimited(
         &mut self,
-        delimited: impl LengthDelimited,
+        delimited: impl LengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, StopScan>;
 }

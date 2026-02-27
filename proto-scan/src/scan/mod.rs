@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use crate::read::Read;
+use crate::read::{Read, ReadTypes};
 use crate::wire::{FieldNumber, GroupOp, I32, I64, NumericField, Varint};
 use crate::wire::{LengthDelimited, ParseEvent, ParseEventReader};
 
@@ -25,7 +25,7 @@ pub trait ScannerBuilder: Sized {
     /// Starts a scan over the provided input.
     ///
     /// Consumes `self` and produces a [`Scan`] over the input stream.
-    fn scan_events<P: ParseEventReader>(self, read: P) -> Scan<P, Self::Scanner>
+    fn scan_events<P: ParseEventReader>(self, read: P) -> Scan<P, Self::Scanner<P::ReadTypes>>
     where
         Self: IntoScanner,
     {
@@ -35,17 +35,20 @@ pub trait ScannerBuilder: Sized {
     /// Starts a scan over the provided input.
     ///
     /// Consumes `self` and produces a [`Scan`] over the input stream.
-    fn scan<'r>(self, read: impl Read + 'r) -> Scan<impl ParseEventReader + 'r, Self::Scanner>
+    fn scan<'r, R: Read + 'r>(
+        self,
+        read: R,
+    ) -> Scan<impl ParseEventReader + 'r, Self::Scanner<R::ReadTypes>>
     where
         Self: IntoScanner,
     {
-        Scan::new(crate::wire::parse(read), self.into_scanner())
+        self.scan_events(crate::wire::parse(read))
     }
 }
 
 pub trait IntoScanner {
-    type Scanner;
-    fn into_scanner(self) -> Self::Scanner;
+    type Scanner<R: ReadTypes>;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R>;
 }
 
 pub trait IntoScanOutput {
@@ -54,7 +57,7 @@ pub trait IntoScanOutput {
 }
 
 /// Callbacks for parse inputs encountered during a scan.
-pub trait ScanCallbacks: IntoScanOutput {
+pub trait ScanCallbacks<R: ReadTypes>: IntoScanOutput {
     type ScanEvent;
 
     /// Called when a numeric field is parsed.
@@ -71,7 +74,7 @@ pub trait ScanCallbacks: IntoScanOutput {
     fn on_length_delimited(
         &mut self,
         field: FieldNumber,
-        delimited: impl LengthDelimited,
+        delimited: impl LengthDelimited<ReadTypes = R>,
     ) -> Result<Self::ScanEvent, StopScan>;
 }
 
@@ -91,7 +94,7 @@ impl<P, S> Scan<P, S> {
 /// an error.
 pub struct IntoIter<P, S>(P, S);
 
-impl<P: ParseEventReader, S: ScanCallbacks> IntoIterator for Scan<P, S> {
+impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>> IntoIterator for Scan<P, S> {
     type Item = Result<S::ScanEvent, StopScan>;
     type IntoIter = IntoIter<P, S>;
 
@@ -100,14 +103,14 @@ impl<P: ParseEventReader, S: ScanCallbacks> IntoIterator for Scan<P, S> {
     }
 }
 
-impl<P: ParseEventReader, S: ScanCallbacks> Iterator for IntoIter<P, S> {
+impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>> Iterator for IntoIter<P, S> {
     type Item = Result<S::ScanEvent, StopScan>;
     fn next(&mut self) -> Option<Result<S::ScanEvent, StopScan>> {
         next_event(&mut self.0, &mut self.1)
     }
 }
 
-pub(crate) fn next_event<P: ParseEventReader, S: ScanCallbacks>(
+pub(crate) fn next_event<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>>(
     parse: &mut P,
     fields: &mut S,
 ) -> Option<Result<S::ScanEvent, StopScan>> {
@@ -125,7 +128,7 @@ pub(crate) fn next_event<P: ParseEventReader, S: ScanCallbacks>(
     Some(output)
 }
 
-impl<P: ParseEventReader, S: ScanCallbacks> Scan<P, S> {
+impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>> Scan<P, S> {
     pub fn read_all(self) -> Result<S::ScanOutput, StopScan> {
         let mut it = self.into_iter();
         while let Some(r) = it.next() {

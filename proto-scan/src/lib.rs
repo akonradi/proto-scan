@@ -13,7 +13,7 @@
 //! ```
 //! # use proto_scan::*;
 //! use wire::ParseEventReader;
-//! fn read_a<R: read::Read>(r: R) -> Result<Option<i64>, DecodeError<R::Error>> {
+//! fn read_a<R: read::Read>(r: R) -> Result<Option<i64>, DecodeError<<R::ReadTypes as read::ReadError>::Error>> {
 //!     // From the protobuf documentation encoding guide.
 //!     // message Test1 {
 //!     //   int64 a = 1;
