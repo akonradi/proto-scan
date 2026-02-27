@@ -1,4 +1,4 @@
-use std::convert::Infallible as Never;
+use core::convert::Infallible as Never;
 
 use crate::DecodeError;
 use crate::read::{Read, ReadError};
@@ -6,7 +6,7 @@ use crate::wire::NumericField;
 
 pub trait NumericWireType: sealed::Sealed {
     type Repr;
-    const BYTE_LEN: std::ops::RangeInclusive<u8>;
+    const BYTE_LEN: core::ops::RangeInclusive<u8>;
 
     fn read_from<R: Read>(
         r: &mut R,
@@ -31,7 +31,7 @@ mod sealed {
 
 impl NumericWireType for Varint {
     type Repr = u64;
-    const BYTE_LEN: std::ops::RangeInclusive<u8> = 1..=10;
+    const BYTE_LEN: core::ops::RangeInclusive<u8> = 1..=10;
 
     fn read_from<R: Read>(
         r: &mut R,
@@ -63,7 +63,7 @@ where
 
 impl NumericWireType for I64 {
     type Repr = u64;
-    const BYTE_LEN: std::ops::RangeInclusive<u8> = 8..=8;
+    const BYTE_LEN: core::ops::RangeInclusive<u8> = 8..=8;
 
     fn read_from<R: Read>(
         r: &mut R,
@@ -81,7 +81,7 @@ impl NumericWireType for I64 {
 
 impl NumericWireType for I32 {
     type Repr = u32;
-    const BYTE_LEN: std::ops::RangeInclusive<u8> = 4..=4;
+    const BYTE_LEN: core::ops::RangeInclusive<u8> = 4..=4;
 
     fn read_from<R: Read>(
         r: &mut R,

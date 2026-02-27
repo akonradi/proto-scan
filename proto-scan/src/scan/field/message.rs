@@ -1,4 +1,4 @@
-use std::convert::Infallible;
+use core::convert::Infallible;
 
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
@@ -72,7 +72,7 @@ mod test {
     use hex_literal::hex;
 
     use crate::scan::encoding::Varint;
-    use crate::scan::field::{NoOp, SaveNumeric, WriteRepeated};
+    use crate::scan::field::{NoOp, SaveNumeric};
     use crate::scan::{FieldNumber, NumericField, Scan};
 
     use super::*;
@@ -170,6 +170,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn save_from_embedded_repeated() {
         /// ```proto
         /// message Test1 {
@@ -191,7 +192,7 @@ mod test {
                 3,
                 Message::new(Scanner(
                     1,
-                    WriteRepeated::<Varint<i32>, _>::new(&mut saved_to),
+                    crate::scan::field::WriteRepeated::<Varint<i32>, _>::new(&mut saved_to),
                 )),
             );
 

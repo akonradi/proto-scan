@@ -155,6 +155,9 @@
 //! [high-level]: #high-level-generated-scanner-types
 //! [`prost`]: https://docs.rs/prost/latest/prost/
 //! [`proto-scan-build`]: https://docs.rs/proto-scan-build/latest/proto_scan_build/
+
+#![cfg_attr(not(feature = "std"), no_std)]
+
 pub mod read;
 pub mod scan;
 pub mod wire;

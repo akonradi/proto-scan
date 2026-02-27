@@ -13,7 +13,9 @@ mod write;
 pub use invoke_on::InvokeOn;
 pub use message::Message;
 pub use no_op::NoOp;
-pub use save::{SaveBytes, SaveNumeric, SaveRepeated};
+#[cfg(feature = "std")]
+pub use save::SaveRepeated;
+pub use save::{SaveBytes, SaveNumeric};
 pub use write::{SaveFrom, WriteBytes, WriteNumeric, WriteRepeated};
 
 /// Implemented by a visitor for a fixed [`FieldNumber`].

@@ -1,4 +1,4 @@
-use std::convert::Infallible;
+use core::convert::Infallible;
 
 use crate::read::{Read, ReadTypes};
 use crate::wire::{FieldNumber, GroupOp, I32, I64, NumericField, Varint};

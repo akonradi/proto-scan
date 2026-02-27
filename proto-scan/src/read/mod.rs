@@ -1,13 +1,13 @@
 use core::ops::Deref;
-use std::convert::Infallible as Never;
-use std::str::Utf8Error;
+use core::str::Utf8Error;
+use core::convert::Infallible as Never;
 
 use either::Either;
 
 pub(crate) mod count_reader;
 
 pub trait ReadError {
-    type Error: std::error::Error + 'static;
+    type Error: core::error::Error + 'static;
 }
 
 pub trait ReadTypes: ReadError {
@@ -64,7 +64,7 @@ impl<'a> Read for &'a [u8] {
     ) -> Result<<Self::ReadTypes as ReadTypes>::Buffer, <Self::ReadTypes as ReadError>::Error> {
         let (bytes, after) = match self.split_at_checked(bytes as usize) {
             Some(split) => split,
-            None => return Ok(std::mem::take(self)),
+            None => return Ok(core::mem::take(self)),
         };
 
         *self = after;

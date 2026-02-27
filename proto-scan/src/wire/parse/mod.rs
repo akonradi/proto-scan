@@ -1,5 +1,5 @@
-use std::fmt::Debug;
-use std::num::NonZeroU32;
+use core::fmt::Debug;
+use core::num::NonZeroU32;
 
 use either::Either;
 
@@ -108,8 +108,7 @@ enum DoBeforeNext {
 
 #[cfg(test)]
 mod test {
-    use crate::wire::serialize_base128_varint;
-    use crate::wire::{FieldNumber, NumericField, Tag, Varint, WireType};
+    use crate::wire::{FieldNumber, NumericField, Tag, Varint, WireType, serialize_base128_varint};
 
     use super::*;
 
@@ -139,7 +138,7 @@ mod test {
             }
             .serialized(),
             serialize_base128_varint(3u32),
-            vec![0, 1, 2].into_boxed_slice(),
+            [0, 1, 2].into_iter().collect(),
             Tag {
                 field_number: FieldNumber(2),
                 wire_type: WireType::I32,

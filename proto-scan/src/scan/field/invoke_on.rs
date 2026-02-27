@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;

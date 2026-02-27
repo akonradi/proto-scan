@@ -11,9 +11,10 @@ version.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["bytes", "derive"]
+default = ["bytes", "derive", "std"]
 bytes = ["dep:bytes", "dep:bytes-utils"]
 derive = ["dep:proto-scan-derive"]
+std = []
 
 [dependencies]
 assert_matches = { workspace = true }
@@ -25,6 +26,7 @@ num-traits = { workspace = true }
 proto-scan-derive = { workspace = true , optional = true }
 
 [dev-dependencies]
+arrayvec = { workspace = true, default-features = false }
 hex-literal = { workspace = true }
 # For documentation
 prost = { workspace = true }

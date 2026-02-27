@@ -1,4 +1,4 @@
-use std::ops::{BitAnd, BitOrAssign, Shl, Shr, ShrAssign};
+use core::ops::{BitAnd, BitOrAssign, Shl, Shr, ShrAssign};
 
 use crate::DecodeError;
 use crate::read::{Read, ReadError};
@@ -68,8 +68,8 @@ fn parse_base128_varint<R: Read, V: ParseVarint>(
 }
 
 #[cfg(test)]
-fn serialize_base128_varint<V: ParseVarint>(mut value: V) -> Box<[u8]> {
-    let mut bytes = Vec::with_capacity(V::MAX_BYTES.into());
+fn serialize_base128_varint<V: ParseVarint>(mut value: V) -> arrayvec::ArrayVec<u8, 10> {
+    let mut bytes = arrayvec::ArrayVec::new();
 
     loop {
         let mut v: u8 = value.low_byte() & 0x7f;
@@ -84,14 +84,16 @@ fn serialize_base128_varint<V: ParseVarint>(mut value: V) -> Box<[u8]> {
         bytes.push(v);
     }
 
-    bytes.into_boxed_slice()
+    bytes
 }
 
 #[cfg(test)]
 mod test {
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]
+    #[cfg(feature = "std")]
     fn u32_inverse() {
         const VALUES: [u32; 9] = [0, 1, 8, 127, 128, 255, 256, 1848593, u32::MAX];
 

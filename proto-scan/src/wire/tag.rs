@@ -37,7 +37,7 @@ impl Tag {
     }
 
     #[cfg(test)]
-    pub(crate) fn serialized(&self) -> Box<[u8]> {
+    pub(crate) fn serialized(&self) -> arrayvec::ArrayVec<u8, 10> {
         let Self {
             wire_type,
             field_number,

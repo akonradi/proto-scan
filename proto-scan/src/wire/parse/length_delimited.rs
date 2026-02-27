@@ -1,4 +1,4 @@
-use std::num::NonZeroU32;
+use core::num::NonZeroU32;
 
 use assert_matches::debug_assert_matches;
 use either::Either;

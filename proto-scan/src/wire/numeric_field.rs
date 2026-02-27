@@ -7,11 +7,11 @@ pub enum NumericField {
 
 impl NumericField {
     #[cfg(test)]
-    pub(crate) fn serialize(&self) -> Box<[u8]> {
+    pub(crate) fn serialize(&self) -> arrayvec::ArrayVec<u8, 10> {
         match self {
             NumericField::Varint(v) => super::serialize_base128_varint(*v),
-            NumericField::I64(v) => v.to_le_bytes().into(),
-            NumericField::I32(v) => v.to_le_bytes().into(),
+            NumericField::I64(v) => v.to_le_bytes().into_iter().collect(),
+            NumericField::I32(v) => v.to_le_bytes().into_iter().collect(),
         }
     }
 }

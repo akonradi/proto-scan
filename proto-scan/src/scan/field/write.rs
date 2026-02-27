@@ -1,6 +1,6 @@
-use std::convert::Infallible;
-use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
+use core::convert::Infallible;
+use core::marker::PhantomData;
+use core::ops::DerefMut;
 
 use crate::read::ReadTypes;
 use crate::scan::encoding::Encoding;
@@ -143,6 +143,7 @@ impl<E: Encoding, D> IntoScanOutput for WriteRepeated<E, D> {
     fn into_scan_output(self) -> Self::ScanOutput {}
 }
 
+#[cfg(feature = "std")]
 impl<'t, E, D> IntoResettable for WriteRepeated<E, &'t mut Vec<D>> {
     type Resettable = WriteRepeated<E, RestoreLenOnReset<'t, Vec<D>>>;
     fn into_resettable(self) -> Self::Resettable {
@@ -150,8 +151,10 @@ impl<'t, E, D> IntoResettable for WriteRepeated<E, &'t mut Vec<D>> {
     }
 }
 
+#[cfg(feature = "std")]
 pub struct RestoreLenOnReset<'t, T>(&'t mut T, usize);
 
+#[cfg(feature = "std")]
 impl<'t, T> RestoreLenOnReset<'t, Vec<T>> {
     pub fn new(arg: &'t mut Vec<T>) -> Self {
         let len = arg.len();
@@ -159,19 +162,22 @@ impl<'t, T> RestoreLenOnReset<'t, Vec<T>> {
     }
 }
 
+#[cfg(feature = "std")]
 impl<'t, T> Resettable for RestoreLenOnReset<'t, Vec<T>> {
     fn reset(&mut self) {
         self.0.truncate(self.1);
     }
 }
 
-impl<'t, T> Deref for RestoreLenOnReset<'t, T> {
+#[cfg(feature = "std")]
+impl<'t, T> std::ops::Deref for RestoreLenOnReset<'t, T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         &*self.0
     }
 }
 
+#[cfg(feature = "std")]
 impl<'t, T> DerefMut for RestoreLenOnReset<'t, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.0

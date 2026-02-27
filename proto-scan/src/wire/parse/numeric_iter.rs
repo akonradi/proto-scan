@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 use crate::decode_error::DecodeError;
 use crate::read::{Read, ReadError};

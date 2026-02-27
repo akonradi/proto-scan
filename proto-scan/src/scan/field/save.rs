@@ -1,5 +1,5 @@
-use std::convert::Infallible;
-use std::marker::PhantomData;
+use core::convert::Infallible;
+use core::marker::PhantomData;
 
 use crate::read::{ReadBuffer, ReadTypes};
 use crate::scan::encoding::Encoding;
@@ -67,17 +67,20 @@ impl<E: Encoding> IntoScanOutput for SaveNumeric<E> {
     }
 }
 
+#[cfg(feature = "std")]
 /// [`OnScanField`] implementation that produces the read values as the scan output.
 ///
 /// Deserializes according to the [`Encoding`] type parameter.
 pub struct SaveRepeated<E: Encoding>(Vec<E::Repr>);
 
+#[cfg(feature = "std")]
 impl<T: Encoding> SaveRepeated<T> {
     pub fn new() -> Self {
         Self(Vec::new())
     }
 }
 
+#[cfg(feature = "std")]
 impl<E: Encoding> IntoScanOutput for SaveRepeated<E> {
     type ScanOutput = Vec<E::Repr>;
 
@@ -86,6 +89,7 @@ impl<E: Encoding> IntoScanOutput for SaveRepeated<E> {
     }
 }
 
+#[cfg(feature = "std")]
 impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveRepeated<E> {
     type ScanEvent = Infallible;
     fn on_numeric(&mut self, value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
@@ -115,12 +119,14 @@ impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveRepeated<E> {
     }
 }
 
+#[cfg(feature = "std")]
 impl<E: Encoding> Resettable for SaveRepeated<E> {
     fn reset(&mut self) {
         self.0.clear()
     }
 }
 
+#[cfg(feature = "std")]
 impl<E: Encoding> IntoScanner for SaveRepeated<E> {
     type Scanner<R: ReadTypes> = Self;
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
