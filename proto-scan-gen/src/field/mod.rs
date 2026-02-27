@@ -207,7 +207,8 @@ impl MessageScannerField<'_> {
                 );
                 vec![write_fn, save_fn, custom_fn]
             }
-            FieldType::Message { number: _ } => {
+            FieldType::Message { number: _ , type_name } => {
+                let message_name = format_ident!("{type_name}");
                 let scan_fn = swap_single_field_fn(
                     format_ident!("scan_{field_name}"),
                     vec![
@@ -221,9 +222,12 @@ impl MessageScannerField<'_> {
                             [`{output_type}::{field_name}`]."
                         ),
                     ],
-                    vec![
-                        quote!(S: ::proto_scan::scan::IntoResettable<Resettable: ::proto_scan::scan::ScanCallbacks> + 't),
-                    ],
+                    vec![quote! {
+                        S:
+                            ::proto_scan::scan::Scanner<Message=#message_name> +
+                            ::proto_scan::scan::IntoResettable<Resettable: ::proto_scan::scan::ScanCallbacks> +
+                            't
+                    }],
                     vec![quote!(scanner: S)],
                     quote!(
                         ::proto_scan::scan::field::Message<
@@ -244,7 +248,7 @@ pub enum FieldType {
     Single { ty: SingleFieldType, number: u32 },
     Repeated { ty: SingleFieldType, number: u32 },
     Bytes { utf8: bool, number: u32 },
-    Message { number: u32 },
+    Message { type_name: String, number: u32 },
     Unsupported,
 }
 

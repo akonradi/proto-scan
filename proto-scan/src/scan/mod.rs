@@ -12,7 +12,7 @@ pub use resettable::{IntoResettable, Resettable};
 /// A message that can be scanned.
 pub trait ScanMessage {
     /// The scanner for the message.
-    type Scanner: Scanner;
+    type Scanner: Scanner<Message = Self>;
 
     /// Creates a new scanner.
     fn scanner() -> Self::Scanner;
@@ -26,9 +26,9 @@ pub trait ScanTypes {
 }
 
 /// A builder type for a [`Scan`] over a byte stream.
-///
-/// This is blanket-implemented for all types that implement [`ScanCallbacks`].
 pub trait Scanner: ScanTypes + Sized {
+    type Message;
+
     /// Starts a scan over the provided input.
     ///
     /// Consumes `self` and produces a [`Scan`] over the input stream.
@@ -141,5 +141,3 @@ impl From<Infallible> for StopScan {
         match value {}
     }
 }
-
-impl<S: ScanCallbacks + Sized> Scanner for S {}

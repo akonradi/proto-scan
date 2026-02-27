@@ -11,10 +11,12 @@ use std::collections::HashMap;
 use std::io::Result;
 use syn::Ident;
 
+struct Package(Option<String>);
+
 pub(crate) fn generate_module(fd: FileDescriptorProto) -> Result<String> {
     let FileDescriptorProto {
         name: _,
-        package: _,
+        package,
         dependency: _,
         public_dependency: _,
         weak_dependency: _,
@@ -27,97 +29,117 @@ pub(crate) fn generate_module(fd: FileDescriptorProto) -> Result<String> {
         syntax: _,
     } = fd;
 
+    let package = Package(package);
+
     let messages = message_type
         .iter()
-        .map(generate_message)
+        .map(|m| package.generate_message(m))
         .collect::<Result<Vec<_>>>()?;
 
     Ok(messages.join("\n"))
-}
-
-fn generate_message(message: &DescriptorProto) -> Result<String> {
-    let message = message_from_descriptor(message)?;
-    let scanner = message.scanner();
-
-    let name = &message.name;
-    let type_defn = quote! {
-        pub struct #name;
-    };
-
-    Ok([type_defn, scanner.generated_code()]
-        .into_iter()
-        .collect::<TokenStream>()
-        .to_string())
 }
 
 fn ident(s: impl AsRef<str>) -> Ident {
     Ident::new(s.as_ref(), Span::call_site())
 }
 
-fn message_from_descriptor(message: &DescriptorProto) -> Result<ScannableMessage> {
-    let DescriptorProto {
-        name,
-        field,
-        oneof_decl,
-        extension: _,
-        nested_type: _,
-        enum_type: _,
-        extension_range: _,
-        options: _,
-        reserved_range: _,
-        reserved_name: _,
-    } = message;
+impl Package {
+    fn generate_message(&self, message: &DescriptorProto) -> Result<String> {
+        let message = self.message_from_descriptor(message)?;
+        let scanner = message.scanner();
 
-    let name = ident(
-        name.as_ref()
-            .ok_or_else(|| std::io::Error::other("missing name"))?,
-    );
+        let name = &message.name;
+        let type_defn = quote! {
+            pub struct #name;
+        };
 
-    let oneofs_to_fields = {
-        let mut map = HashMap::<_, Vec<_>>::new();
-        for index in field.iter().filter_map(|f| f.oneof_index) {
-            map.entry(index).or_default().push(index);
-        }
-        map
-    };
+        Ok([type_defn, scanner.generated_code()]
+            .into_iter()
+            .collect::<TokenStream>()
+            .to_string())
+    }
 
-    let field_types = field
-        .iter()
-        .map(|value| {
-            if value
-                .oneof_index
-                .is_some_and(|index| oneofs_to_fields.get(&index).is_some_and(|v| v.len() > 1))
-            {
-                return Ok(None);
+    fn message_from_descriptor(&self, message: &DescriptorProto) -> Result<ScannableMessage> {
+        let DescriptorProto {
+            name,
+            field,
+            oneof_decl,
+            extension: _,
+            nested_type: _,
+            enum_type: _,
+            extension_range: _,
+            options: _,
+            reserved_range: _,
+            reserved_name: _,
+        } = message;
+
+        let name = ident(
+            name.as_ref()
+                .ok_or_else(|| std::io::Error::other("missing name"))?,
+        );
+
+        let oneofs_to_fields = {
+            let mut map = HashMap::<_, Vec<_>>::new();
+            for index in field.iter().filter_map(|f| f.oneof_index) {
+                map.entry(index).or_default().push(index);
             }
+            map
+        };
 
-            let field_type = extract_field_type(value)?;
+        let field_types = field
+            .iter()
+            .map(|value| {
+                if value
+                    .oneof_index
+                    .is_some_and(|index| oneofs_to_fields.get(&index).is_some_and(|v| v.len() > 1))
+                {
+                    return Ok(None);
+                }
 
-            Ok(Some((ident(value.name()), field_type)))
-        })
-        .flatten_ok()
-        .chain(oneof_decl.iter().zip(0i32..).filter_map(|(oneof, i)| {
-            let OneofDescriptorProto { name, options: _ } = oneof;
-            if oneofs_to_fields.get(&i).is_some_and(|v| v.len() == 1) {
-                return None;
-            }
-            Some(Ok((
-                ident(name.as_deref().unwrap_or_default()),
-                FieldType::Unsupported,
-            )))
-        }))
-        .collect::<Result<Vec<_>>>()?;
+                let mut field_type = extract_field_type(value)?;
+                if let FieldType::Message {
+                    type_name,
+                    number,
+                } = &field_type
+                {
+                    if let Some(t) = type_name
+                        .strip_prefix(".")
+                        .zip(self.0.as_ref())
+                        .and_then(|(t, p)| t.strip_prefix(p))
+                    {
+                        field_type = FieldType::Message {
+                            type_name: t.strip_prefix(".").unwrap_or(t).to_owned(),
+                            number: *number,
+                        }
+                    }
+                }
 
-    let fields = field_types
-        .into_iter()
-        .enumerate()
-        .map(|(i, (name, field_type))| MessageField {
-            field_name: name,
-            generic: ident(format!("T{i}")),
-            field_type,
-        })
-        .collect();
-    Ok(ScannableMessage { name, fields })
+                Ok(Some((ident(value.name()), field_type)))
+            })
+            .flatten_ok()
+            .chain(oneof_decl.iter().zip(0i32..).filter_map(|(oneof, i)| {
+                let OneofDescriptorProto { name, options: _ } = oneof;
+                if oneofs_to_fields.get(&i).is_some_and(|v| v.len() == 1) {
+                    return None;
+                }
+                Some(Ok((
+                    ident(name.as_deref().unwrap_or_default()),
+                    FieldType::Unsupported,
+                )))
+            }))
+            .collect::<Result<Vec<_>>>()?;
+
+        let fields = field_types
+            .into_iter()
+            .enumerate()
+            .map(|(i, (name, field_type))| MessageField {
+                field_name: name,
+                generic: ident(format!("T{i}")),
+                field_type,
+            })
+            .collect();
+        Ok(ScannableMessage { name, fields })
+    }
 }
 
 fn extract_field_type(value: &prost_types::FieldDescriptorProto) -> Result<FieldType> {
@@ -157,9 +179,12 @@ fn extract_field_type(value: &prost_types::FieldDescriptorProto) -> Result<Field
         (ParsedFieldType::Single(single), Label::Repeated) => {
             FieldType::Repeated { ty: single, number }
         }
-        (ParsedFieldType::Message, Label::Optional | Label::Required) => {
-            FieldType::Message { number }
-        }
+        (ParsedFieldType::Message, Label::Optional | Label::Required) => FieldType::Message {
+            number,
+            type_name: value.type_name.clone().ok_or_else(|| {
+                std::io::Error::other(format!("field {number} is a message with no type name"))
+            })?,
+        },
         (ParsedFieldType::Bytes { utf8 }, Label::Optional | Label::Required) => {
             FieldType::Bytes { utf8, number }
         }

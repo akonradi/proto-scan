@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use proc_macro2::{Span, TokenStream};
 use proto_scan_gen::ScannableMessage;
 use proto_scan_gen::field::{
@@ -56,13 +58,13 @@ fn message_impl(name: Ident, data_struct: DataStruct) -> Result<TokenStream> {
                 vis: _,
                 mutability: _,
                 colon_token: _,
-                ty: _,
+                ty,
             } = field;
 
             let field_name =
                 field_name.ok_or_else(|| syn::Error::new(span, "message fields must be named"))?;
 
-            let ProstAttrs { field_type } = attrs.try_into()?;
+            let ProstAttrs { field_type } = (attrs, ty).try_into()?;
 
             let generic = Ident::new(&format!("T{i}"), Span::call_site());
 
@@ -82,11 +84,13 @@ struct ProstAttrs {
     field_type: FieldType,
 }
 
-impl TryFrom<Vec<Attribute>> for ProstAttrs {
+impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
     type Error = syn::Error;
 
-    fn try_from(value: Vec<Attribute>) -> std::result::Result<Self, Self::Error> {
-        let attrs = prost_attrs(value)?;
+    fn try_from(
+        (attributes, rust_field_type): (Vec<Attribute>, syn::Type),
+    ) -> std::result::Result<Self, Self::Error> {
+        let attrs = prost_attrs(attributes)?;
 
         let mut field_type = None;
         let mut field_number = None;
@@ -155,7 +159,10 @@ impl TryFrom<Vec<Attribute>> for ProstAttrs {
             (Some(ParsedFieldType::Single(ty)), Some(number), false) => {
                 FieldType::Single { ty, number }
             }
-            (Some(ParsedFieldType::Message), Some(number), false) => FieldType::Message { number },
+            (Some(ParsedFieldType::Message), Some(number), false) => {
+                let type_name = extract_message_type_name(rust_field_type)?;
+                FieldType::Message { number, type_name }
+            }
             (Some(ParsedFieldType::Bytes { utf8 }), Some(number), false) => {
                 FieldType::Bytes { utf8, number }
             }
@@ -183,6 +190,44 @@ impl TryFrom<Vec<Attribute>> for ProstAttrs {
 
         Ok(Self { field_type })
     }
+}
+
+fn extract_message_type_name(ty: syn::Type) -> Result<String> {
+    let span = ty.span();
+    fn inner(ty: syn::Type) -> std::result::Result<String, Cow<'static, str>> {
+        let path = match ty {
+            syn::Type::Path(path) => path,
+            _ => Err("unsupported message field type")?,
+        };
+
+        let last = path
+            .path
+            .segments
+            .into_iter()
+            .last()
+            .ok_or("path is empty")?;
+
+        if last.ident == "Vec" || last.ident == "Option" {
+            match last.arguments {
+                syn::PathArguments::AngleBracketed(args) if args.args.len() == 1 => {
+                    match args.args.into_iter().next().unwrap() {
+                        syn::GenericArgument::Type(ty) => return inner(ty),
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+            Err(format!("unrecognized {} type param", last.ident).into())
+        } else {
+            if last.arguments.is_empty() {
+                Ok(last.ident.to_string())
+            } else {
+                Err("unrecognized type is templated")?
+            }
+        }
+    }
+
+    inner(ty).map_err(|e| syn::Error::new(span, e))
 }
 
 /// Get the items belonging to the 'prost' list attribute, e.g. `#[prost(foo, bar="baz")]`.

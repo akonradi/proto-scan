@@ -69,6 +69,7 @@ impl MessageScanner<'_> {
             self.type_definition(),
             self.scan_event_defn(),
             MessageScanOutput(*self).generated_code(),
+            self.impl_scanner(),
             self.0.impl_scan_message(),
             self.scan_callbacks_impl(),
         ]
@@ -133,6 +134,17 @@ impl MessageScanner<'_> {
         }
     }
 
+    fn impl_scanner(&self) -> TokenStream {
+        let type_name = self.type_name();
+        let generics = self.generic_types().collect::<Vec<_>>();
+        let message_name = &self.0.name;
+        quote! {
+            impl<#(#generics: ::proto_scan::scan::field::OnScanField),*> ::proto_scan::scan::Scanner for #type_name < #(#generics),* > {
+                type Message = #message_name;
+            }
+        }
+    }
+
     fn scan_callbacks_impl(&self) -> TokenStream {
         let scanner_name = self.type_name();
         let output_name = MessageScanOutput(*self).type_name();
@@ -149,7 +161,7 @@ impl MessageScanner<'_> {
             self.fields().map(move |MessageScannerField { parent: _, index, field: MessageField { field_name, generic: _, field_type } }| {
                 let event_variant_name = format_ident!("Event{index}");
                 match field_type {
-                    FieldType::Single { ty: _, number } | FieldType::Repeated { ty: _, number } | FieldType::Message { number } | FieldType::Bytes { utf8: _, number } => quote! {
+                    FieldType::Single { ty: _, number } | FieldType::Repeated { ty: _, number } | FieldType::Message { number, type_name: _ } | FieldType::Bytes { utf8: _, number } => quote! {
                         #number => self.#field_name.#fn_name(value)?.map(#scan_event_name::#event_variant_name),
                     },
                     FieldType::Unsupported => TokenStream::new()
