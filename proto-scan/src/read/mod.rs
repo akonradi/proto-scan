@@ -99,6 +99,15 @@ impl<R: Read> Read for &mut R {
     }
 }
 
+#[cfg(feature = "bytes")]
+impl ReadBuffer for ::bytes::Bytes {
+    type String = bytes_utils::Str;
+
+    fn into_string(self) -> Result<Self::String, core::str::Utf8Error> {
+        bytes_utils::Str::try_from(self).map_err(|e| e.utf8_error())
+    }
+}
+
 impl<R: Read, L: Read<ReadTypes = R::ReadTypes>> Read for Either<L, R> {
     type ReadTypes = R::ReadTypes;
     fn read(
