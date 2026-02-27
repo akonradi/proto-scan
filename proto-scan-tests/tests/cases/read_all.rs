@@ -1,5 +1,5 @@
 use prost::Message as _;
-use proto_scan::scan::{ScanMessage as _, Scanner as _};
+use proto_scan::scan::{ScanMessage as _, ScannerBuilder as _};
 use test_case::test_case;
 
 use super::*;

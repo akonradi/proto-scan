@@ -2,7 +2,7 @@ use std::convert::Infallible;
 
 use crate::scan::field::OnScanField;
 use crate::scan::{
-    GroupOp, IntoResettable, IntoScan, NumericField, Resettable, ScanTypes, StopScan,
+    GroupOp, IntoResettable, IntoScanner, NumericField, Resettable, ScanTypes, StopScan,
 };
 use crate::wire::LengthDelimited;
 
@@ -45,9 +45,9 @@ impl IntoResettable for NoOp {
     }
 }
 
-impl IntoScan for NoOp {
-    type Scan = Self;
-    fn into_scan(self) -> Self::Scan {
+impl IntoScanner for NoOp {
+    type Scanner = Self;
+    fn into_scanner(self) -> Self::Scanner {
         self
     }
 }

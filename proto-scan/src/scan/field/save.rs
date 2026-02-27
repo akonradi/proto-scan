@@ -3,7 +3,7 @@ use std::convert::Infallible;
 use crate::read::ReadBuffer as _;
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
-use crate::scan::{IntoResettable, IntoScan, Resettable, ScanTypes, StopScan};
+use crate::scan::{IntoResettable, IntoScanner, Resettable, ScanTypes, StopScan};
 use crate::wire::{GroupOp, LengthDelimited, NumericField, NumericWireType};
 
 /// [`OnScanField`] implementation that produces the read value as the event output.
@@ -58,9 +58,9 @@ impl<E: Encoding> IntoResettable for SaveNumeric<E> {
     }
 }
 
-impl<E: Encoding> IntoScan for SaveNumeric<E> {
-    type Scan = Self;
-    fn into_scan(self) -> Self::Scan {
+impl<E: Encoding> IntoScanner for SaveNumeric<E> {
+    type Scanner = Self;
+    fn into_scanner(self) -> Self::Scanner {
         self
     }
 }
@@ -118,9 +118,9 @@ impl<E: Encoding> Resettable for SaveRepeated<E> {
     }
 }
 
-impl<E: Encoding> IntoScan for SaveRepeated<E> {
-    type Scan = Self;
-    fn into_scan(self) -> Self::Scan {
+impl<E: Encoding> IntoScanner for SaveRepeated<E> {
+    type Scanner = Self;
+    fn into_scanner(self) -> Self::Scanner {
         self
     }
 }
@@ -202,9 +202,9 @@ impl<E: ToOwnedBytes + ?Sized> Resettable for SaveBytes<E> {
     }
 }
 
-impl<E: ToOwnedBytes + ?Sized> IntoScan for SaveBytes<E> {
-    type Scan = Self;
-    fn into_scan(self) -> Self::Scan {
+impl<E: ToOwnedBytes + ?Sized> IntoScanner for SaveBytes<E> {
+    type Scanner = Self;
+    fn into_scanner(self) -> Self::Scanner {
         self
     }
 }

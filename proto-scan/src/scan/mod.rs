@@ -12,10 +12,10 @@ pub use resettable::{IntoResettable, Resettable};
 /// A message that can be scanned.
 pub trait ScanMessage {
     /// The scanner for the message.
-    type Scanner: Scanner<Message = Self>;
+    type ScannerBuilder: ScannerBuilder<Message = Self>;
 
-    /// Creates a new scanner.
-    fn scanner() -> Self::Scanner;
+    /// Creates a new scanner builder
+    fn scanner() -> Self::ScannerBuilder;
 }
 
 pub trait ScanTypes {
@@ -26,33 +26,33 @@ pub trait ScanTypes {
 }
 
 /// A builder type for a [`Scan`] over a byte stream.
-pub trait Scanner: ScanTypes + Sized {
+pub trait ScannerBuilder: ScanTypes + Sized {
     type Message;
 
     /// Starts a scan over the provided input.
     ///
     /// Consumes `self` and produces a [`Scan`] over the input stream.
-    fn scan_events<P: ParseEventReader>(self, read: P) -> Scan<P, Self::Scan>
+    fn scan_events<P: ParseEventReader>(self, read: P) -> Scan<P, Self::Scanner>
     where
-        Self: IntoScan,
+        Self: IntoScanner,
     {
-        Scan::new(read, self.into_scan())
+        Scan::new(read, self.into_scanner())
     }
 
     /// Starts a scan over the provided input.
     ///
     /// Consumes `self` and produces a [`Scan`] over the input stream.
-    fn scan<'r>(self, read: impl Read + 'r) -> Scan<impl ParseEventReader + 'r, Self::Scan>
+    fn scan<'r>(self, read: impl Read + 'r) -> Scan<impl ParseEventReader + 'r, Self::Scanner>
     where
-        Self: IntoScan,
+        Self: IntoScanner,
     {
-        Scan::new(crate::wire::parse(read), self.into_scan())
+        Scan::new(crate::wire::parse(read), self.into_scanner())
     }
 }
 
-pub trait IntoScan {
-    type Scan;
-    fn into_scan(self) -> Self::Scan;
+pub trait IntoScanner {
+    type Scanner;
+    fn into_scanner(self) -> Self::Scanner;
 }
 
 /// Callbacks for parse inputs encountered during a scan.

@@ -224,7 +224,7 @@ impl MessageScannerField<'_> {
                     ],
                     vec![quote! {
                         S:
-                            ::proto_scan::scan::Scanner<Message=#message_name> +
+                            ::proto_scan::scan::ScannerBuilder<Message=#message_name> +
                             ::proto_scan::scan::IntoResettable<Resettable: ::proto_scan::scan::ScanCallbacks> +
                             't
                     }],

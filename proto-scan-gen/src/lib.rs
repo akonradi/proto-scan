@@ -23,9 +23,9 @@ impl ScannableMessage {
         let no_ops = std::iter::repeat_n(&no_op, self.fields.len());
         quote! {
             impl ::proto_scan::scan::ScanMessage for #name {
-                type Scanner = #scanner_name <#(#no_ops),*>;
+                type ScannerBuilder = #scanner_name <#(#no_ops),*>;
 
-                fn scanner() -> Self::Scanner {
+                fn scanner() -> Self::ScannerBuilder {
                     ::core::default::Default::default()
                 }
             }
@@ -69,7 +69,7 @@ impl MessageScanner<'_> {
             self.type_definition(),
             self.scan_event_defn(),
             MessageScanOutput(*self).generated_code(),
-            self.impl_scanner(),
+            self.impl_scanner_builder(),
             self.impl_into_scan(),
             self.0.impl_scan_message(),
             self.scan_callbacks_impl(),
@@ -135,12 +135,12 @@ impl MessageScanner<'_> {
         }
     }
 
-    fn impl_scanner(&self) -> TokenStream {
+    fn impl_scanner_builder(&self) -> TokenStream {
         let type_name = self.type_name();
         let generics = self.generic_types().collect::<Vec<_>>();
         let message_name = &self.0.name;
         quote! {
-            impl<#(#generics: ::proto_scan::scan::field::OnScanField),*> ::proto_scan::scan::Scanner for #type_name < #(#generics),* > {
+            impl<#(#generics: ::proto_scan::scan::IntoScanner + ::proto_scan::scan::ScanTypes ),*> ::proto_scan::scan::ScannerBuilder for #type_name < #(#generics),* > {
                 type Message = #message_name;
             }
         }
@@ -151,12 +151,12 @@ impl MessageScanner<'_> {
         let generics = self.generic_types().collect::<Vec<_>>();
         let field_names = self.field_names().collect::<Vec<_>>();
         quote! {
-            impl<#(#generics: ::proto_scan::scan::IntoScan),*> ::proto_scan::scan::IntoScan for #type_name < #(#generics),* > {
-                type Scan = #type_name < #(<#generics as ::proto_scan::scan::IntoScan>::Scan ),* >;
-                fn into_scan(self) -> Self::Scan {
+            impl<#(#generics: ::proto_scan::scan::IntoScanner),*> ::proto_scan::scan::IntoScanner for #type_name < #(#generics),* > {
+                type Scanner = #type_name < #(<#generics as ::proto_scan::scan::IntoScanner>::Scanner ),* >;
+                fn into_scanner(self) -> Self::Scanner {
                     let Self { #(#field_names),* } = self;
-                    Self::Scan {
-                        #(#field_names: #field_names.into_scan()),*
+                    Self::Scanner {
+                        #(#field_names: #field_names.into_scanner()),*
                     }
 
                 }
@@ -192,7 +192,7 @@ impl MessageScanner<'_> {
         let on_group_arms = field_arms("on_group");
         let on_length_delimited_arms = field_arms("on_length_delimited");
         quote! {
-            impl <#(#generics_on_scan_bounds,)*> ::proto_scan::scan::ScanTypes for #scanner_name<#(#generics,)*> {
+            impl <#(#generics: ::proto_scan::scan::ScanTypes,)*> ::proto_scan::scan::ScanTypes for #scanner_name<#(#generics,)*> {
                 type ScanEvent = Option<#scan_event_name<#(#generics :: ScanEvent),*>>;
                 type ScanOutput = #output_name<#(#generics::ScanOutput),*>;
             }

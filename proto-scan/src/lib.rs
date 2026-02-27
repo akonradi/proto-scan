@@ -70,7 +70,7 @@
 //! Usage of the high-level scanner API looks like this:
 //! ```
 //! # use proto_scan::*;
-//! use scan::{ScanMessage, Scanner};
+//! use scan::{ScanMessage, ScannerBuilder};
 //! // From the protobuf documentation encoding guide.
 //! // message Test1 {
 //! //   int64 a = 1;
@@ -115,7 +115,7 @@
 //! message field:
 //! ```
 //! # use proto_scan::*;
-//! use scan::{ScanMessage, Scanner};
+//! use scan::{ScanMessage, ScannerBuilder};
 //! // From the protobuf documentation encoding guide.
 //! // message Test3 {
 //! //   Test1 c = 3;

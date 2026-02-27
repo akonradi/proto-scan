@@ -1,6 +1,6 @@
 use prost::Message as _;
 use proto_scan::scan::field::OnScanField;
-use proto_scan::scan::{IntoScan, ScanMessage as _, ScanTypes, Scanner as _};
+use proto_scan::scan::{IntoScanner, ScanMessage as _, ScanTypes, ScannerBuilder as _};
 use proto_scan::wire::NumericField;
 use test_case::test_case;
 
@@ -46,9 +46,9 @@ impl OnScanField for CustomScanner<'_> {
     }
 }
 
-impl IntoScan for CustomScanner<'_> {
-    type Scan = Self;
-    fn into_scan(self) -> Self::Scan {
+impl IntoScanner for CustomScanner<'_> {
+    type Scanner = Self;
+    fn into_scanner(self) -> Self::Scanner {
         self
     }
 }

@@ -2,7 +2,7 @@ use std::convert::Infallible;
 
 use crate::scan::field::OnScanField;
 use crate::scan::{
-    IntoResettable, IntoScan, Resettable, ScanCallbacks, ScanTypes, StopScan, next_event,
+    IntoResettable, IntoScanner, Resettable, ScanCallbacks, ScanTypes, StopScan, next_event,
 };
 use crate::wire::LengthDelimited;
 
@@ -57,10 +57,10 @@ impl<F: Resettable> Resettable for Message<F> {
     }
 }
 
-impl<F: IntoScan> IntoScan for Message<F> {
-    type Scan = Message<F::Scan>;
-    fn into_scan(self) -> Self::Scan {
-        Message(self.0.into_scan())
+impl<F: IntoScanner> IntoScanner for Message<F> {
+    type Scanner = Message<F::Scanner>;
+    fn into_scanner(self) -> Self::Scanner {
+        Message(self.0.into_scanner())
     }
 }
 

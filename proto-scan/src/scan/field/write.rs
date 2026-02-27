@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
-use crate::scan::{GroupOp, IntoScan, NumericField, ScanTypes, StopScan};
+use crate::scan::{GroupOp, IntoScanner, NumericField, ScanTypes, StopScan};
 use crate::scan::{IntoResettable, Resettable};
 use crate::wire::{LengthDelimited, NumericWireType};
 
@@ -88,9 +88,9 @@ impl<'t, E, D> Resettable for WriteNumeric<E, RestoreOnReset<'t, D>> {
     }
 }
 
-impl<E, D> IntoScan for WriteNumeric<E, D> {
-    type Scan = Self;
-    fn into_scan(self) -> Self::Scan {
+impl<E, D> IntoScanner for WriteNumeric<E, D> {
+    type Scanner = Self;
+    fn into_scanner(self) -> Self::Scanner {
         self
     }
 }
@@ -181,9 +181,9 @@ impl<D: Resettable, E> Resettable for WriteRepeated<E, D> {
     }
 }
 
-impl<E, D> IntoScan for WriteRepeated<E, D> {
-    type Scan = Self;
-    fn into_scan(self) -> Self::Scan {
+impl<E, D> IntoScanner for WriteRepeated<E, D> {
+    type Scanner = Self;
+    fn into_scanner(self) -> Self::Scanner {
         self
     }
 }
@@ -259,9 +259,9 @@ impl<'t, E: ?Sized, D> IntoResettable for WriteBytes<E, &'t mut D> {
     }
 }
 
-impl<E: ?Sized, D> IntoScan for WriteBytes<E, D> {
-    type Scan = Self;
-    fn into_scan(self) -> Self::Scan {
+impl<E: ?Sized, D> IntoScanner for WriteBytes<E, D> {
+    type Scanner = Self;
+    fn into_scanner(self) -> Self::Scanner {
         self
     }
 }
