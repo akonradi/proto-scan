@@ -140,7 +140,7 @@ impl MessageScanner<'_> {
         let generics = self.generic_types().collect::<Vec<_>>();
         let message_name = &self.0.name;
         quote! {
-            impl<#(#generics: ::proto_scan::scan::IntoScanner + ::proto_scan::scan::ScanTypes ),*> ::proto_scan::scan::ScannerBuilder for #type_name < #(#generics),* > {
+            impl<#(#generics: ::proto_scan::scan::IntoScanner ),*> ::proto_scan::scan::ScannerBuilder for #type_name < #(#generics),* > {
                 type Message = #message_name;
             }
         }
@@ -192,11 +192,6 @@ impl MessageScanner<'_> {
         let on_group_arms = field_arms("on_group");
         let on_length_delimited_arms = field_arms("on_length_delimited");
         quote! {
-            impl <#(#generics: ::proto_scan::scan::ScanTypes,)*> ::proto_scan::scan::ScanTypes for #scanner_name<#(#generics,)*> {
-                type ScanEvent = Option<#scan_event_name<#(#generics :: ScanEvent),*>>;
-                type ScanOutput = #output_name<#(#generics::ScanOutput),*>;
-            }
-
             impl <#(#generics_on_scan_bounds,)*> ::core::convert::From<#scanner_name<#(#generics,)*>> for #output_name<#(#generics::ScanOutput),*> {
                 fn from(scanner: #scanner_name<#(#generics),*>) -> Self {
                     let #scanner_name { #(#field_names),* } = scanner;
@@ -207,6 +202,9 @@ impl MessageScanner<'_> {
             }
 
             impl <#(#generics_on_scan_bounds,)*> ::proto_scan::scan::ScanCallbacks for #scanner_name<#(#generics,)*> {
+                type ScanEvent = Option<#scan_event_name<#(#generics :: ScanEvent),*>>;
+                type ScanOutput = #output_name<#(#generics::ScanOutput),*>;
+
                 fn on_numeric(
                     &mut self,
                     field: ::proto_scan::wire::FieldNumber,

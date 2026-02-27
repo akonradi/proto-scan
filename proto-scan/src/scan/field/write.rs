@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
-use crate::scan::{GroupOp, IntoScanner, NumericField, ScanTypes, StopScan};
+use crate::scan::{GroupOp, IntoScanner, NumericField, StopScan};
 use crate::scan::{IntoResettable, Resettable};
 use crate::wire::{LengthDelimited, NumericWireType};
 
@@ -31,12 +31,9 @@ impl<E, D> WriteNumeric<E, D> {
     }
 }
 
-impl<E, D> ScanTypes for WriteNumeric<E, D> {
+impl<E: Encoding, D: SaveFrom<E::Repr>> OnScanField for WriteNumeric<E, D> {
     type ScanEvent = Infallible;
     type ScanOutput = ();
-}
-
-impl<E: Encoding, D: SaveFrom<E::Repr>> OnScanField for WriteNumeric<E, D> {
     fn into_output(self) -> Self::ScanOutput {}
 
     fn on_numeric(&mut self, value: NumericField) -> Result<Option<Infallible>, StopScan> {
@@ -104,12 +101,10 @@ impl<E, D> WriteRepeated<E, D> {
     }
 }
 
-impl<E: Encoding, D> ScanTypes for WriteRepeated<E, D> {
+impl<'t, E: Encoding, D: DerefMut<Target: Extend<E::Repr>>> OnScanField for WriteRepeated<E, D> {
     type ScanEvent = Infallible;
     type ScanOutput = ();
-}
 
-impl<'t, E: Encoding, D: DerefMut<Target: Extend<E::Repr>>> OnScanField for WriteRepeated<E, D> {
     fn into_output(self) -> Self::ScanOutput {}
 
     fn on_numeric(&mut self, value: NumericField) -> Result<Option<Infallible>, StopScan> {
@@ -197,12 +192,10 @@ impl<E: ?Sized, D> WriteBytes<E, D> {
     }
 }
 
-impl<E: ?Sized, D> ScanTypes for WriteBytes<E, D> {
+impl<D: for<'a> SaveFrom<&'a [u8]>> OnScanField for WriteBytes<[u8], D> {
     type ScanEvent = Infallible;
     type ScanOutput = ();
-}
 
-impl<D: for<'a> SaveFrom<&'a [u8]>> OnScanField for WriteBytes<[u8], D> {
     fn into_output(self) -> Self::ScanOutput {}
 
     fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Infallible>, StopScan> {
@@ -224,6 +217,8 @@ impl<D: for<'a> SaveFrom<&'a [u8]>> OnScanField for WriteBytes<[u8], D> {
 }
 
 impl<D: for<'a> SaveFrom<&'a str>> OnScanField for WriteBytes<str, D> {
+    type ScanEvent = Infallible;
+    type ScanOutput = ();
     fn into_output(self) -> Self::ScanOutput {}
 
     fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Infallible>, StopScan> {

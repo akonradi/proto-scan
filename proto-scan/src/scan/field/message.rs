@@ -1,9 +1,7 @@
 use std::convert::Infallible;
 
 use crate::scan::field::OnScanField;
-use crate::scan::{
-    IntoResettable, IntoScanner, Resettable, ScanCallbacks, ScanTypes, StopScan, next_event,
-};
+use crate::scan::{IntoResettable, IntoScanner, Resettable, ScanCallbacks, StopScan, next_event};
 use crate::wire::LengthDelimited;
 
 pub struct Message<F>(F);
@@ -14,14 +12,12 @@ impl<F: ScanCallbacks + Resettable> Message<F> {
     }
 }
 
-impl<F: ScanCallbacks + Resettable> ScanTypes for Message<F> {
-    type ScanEvent = Infallible;
-    type ScanOutput = F::ScanOutput;
-}
-
-impl<F: ScanCallbacks<ScanOutput: Default> + Into<Self::ScanOutput> + Resettable> OnScanField
+impl<F: ScanCallbacks<ScanOutput: Default> + Into<F::ScanOutput> + Resettable> OnScanField
     for Message<F>
 {
+    type ScanEvent = Infallible;
+    type ScanOutput = F::ScanOutput;
+
     fn into_output(self) -> Self::ScanOutput {
         self.0.into()
     }
@@ -78,11 +74,10 @@ mod test {
     struct Scanner<T = NoOp>(u32, T);
     #[derive(Debug, Default, PartialEq)]
     struct ScanOutput<T>(T);
-    impl<T: ScanTypes> ScanTypes for Scanner<T> {
+    impl<T: OnScanField> ScanCallbacks for Scanner<T> {
         type ScanEvent = Option<(T::ScanEvent,)>;
         type ScanOutput = ScanOutput<T::ScanOutput>;
-    }
-    impl<T: OnScanField> ScanCallbacks for Scanner<T> {
+
         fn on_numeric(
             &mut self,
             field: FieldNumber,

@@ -3,7 +3,7 @@ use std::convert::Infallible;
 use crate::read::ReadBuffer as _;
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
-use crate::scan::{IntoResettable, IntoScanner, Resettable, ScanTypes, StopScan};
+use crate::scan::{IntoResettable, IntoScanner, Resettable,  StopScan};
 use crate::wire::{GroupOp, LengthDelimited, NumericField, NumericWireType};
 
 /// [`OnScanField`] implementation that produces the read value as the event output.
@@ -11,18 +11,17 @@ use crate::wire::{GroupOp, LengthDelimited, NumericField, NumericWireType};
 /// Deserializes according to the [`Encoding`] type parameter.
 pub struct SaveNumeric<E: Encoding>(Option<E::Repr>);
 
-impl<E: Encoding> ScanTypes for SaveNumeric<E> {
-    type ScanEvent = E::Repr;
-    type ScanOutput = Option<E::Repr>;
-}
-
 impl<T: Encoding> SaveNumeric<T> {
     pub fn new() -> Self {
         Self(None)
     }
 }
 
+
 impl<E: Encoding> OnScanField for SaveNumeric<E> {
+    type ScanEvent = E::Repr;
+    type ScanOutput = Option<E::Repr>;
+
     fn into_output(self) -> Self::ScanOutput {
         self.0
     }
@@ -70,11 +69,6 @@ impl<E: Encoding> IntoScanner for SaveNumeric<E> {
 /// Deserializes according to the [`Encoding`] type parameter.
 pub struct SaveRepeated<E: Encoding>(Vec<E::Repr>);
 
-impl<E: Encoding> ScanTypes for SaveRepeated<E> {
-    type ScanEvent = Infallible;
-    type ScanOutput = Vec<E::Repr>;
-}
-
 impl<T: Encoding> SaveRepeated<T> {
     pub fn new() -> Self {
         Self(Vec::new())
@@ -82,6 +76,9 @@ impl<T: Encoding> SaveRepeated<T> {
 }
 
 impl<E: Encoding> OnScanField for SaveRepeated<E> {
+    type ScanEvent = Infallible;
+    type ScanOutput = Vec<E::Repr>;
+
     fn into_output(self) -> Self::ScanOutput {
         self.0
     }
@@ -140,10 +137,6 @@ impl ToOwnedBytes for [u8] {
     type Owned = Box<[u8]>;
 }
 
-impl<E: ToOwnedBytes + ?Sized> ScanTypes for SaveBytes<E> {
-    type ScanEvent = Infallible;
-    type ScanOutput = Option<E::Owned>;
-}
 
 impl<T: ToOwnedBytes + ?Sized> SaveBytes<T> {
     pub fn new() -> Self {
@@ -152,6 +145,9 @@ impl<T: ToOwnedBytes + ?Sized> SaveBytes<T> {
 }
 
 impl OnScanField for SaveBytes<str> {
+    type ScanEvent = Infallible;
+    type ScanOutput = Option<String>;
+
     fn into_output(self) -> Self::ScanOutput {
         self.0
     }
@@ -175,6 +171,8 @@ impl OnScanField for SaveBytes<str> {
 }
 
 impl OnScanField for SaveBytes<[u8]> {
+    type ScanEvent = Infallible;
+    type ScanOutput = Option<Box<[u8]>>;
     fn into_output(self) -> Self::ScanOutput {
         self.0
     }

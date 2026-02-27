@@ -18,15 +18,8 @@ pub trait ScanMessage {
     fn scanner() -> Self::ScannerBuilder;
 }
 
-pub trait ScanTypes {
-    /// Output on processing a scan event.
-    type ScanEvent;
-    /// Result of collecting a sequence of parse events.
-    type ScanOutput;
-}
-
 /// A builder type for a [`Scan`] over a byte stream.
-pub trait ScannerBuilder: ScanTypes + Sized {
+pub trait ScannerBuilder: Sized {
     type Message;
 
     /// Starts a scan over the provided input.
@@ -56,7 +49,10 @@ pub trait IntoScanner {
 }
 
 /// Callbacks for parse inputs encountered during a scan.
-pub trait ScanCallbacks: ScanTypes {
+pub trait ScanCallbacks {
+    type ScanEvent;
+    type ScanOutput;
+
     /// Called when a numeric field is parsed.
     fn on_numeric(
         &mut self,
@@ -82,11 +78,6 @@ impl<P, S> Scan<P, S> {
     pub fn new(input: P, scanner: S) -> Self {
         Self(input, scanner)
     }
-}
-
-impl<P: ParseEventReader, S: ScanCallbacks> ScanTypes for Scan<P, S> {
-    type ScanEvent = S::ScanEvent;
-    type ScanOutput = S::ScanOutput;
 }
 
 /// [`IntoIterator::IntoIter`] type for [`Scan`].
@@ -131,7 +122,7 @@ pub(crate) fn next_event<P: ParseEventReader, S: ScanCallbacks>(
 }
 
 impl<P: ParseEventReader, S: ScanCallbacks + Into<S::ScanOutput>> Scan<P, S> {
-    pub fn read_all(self) -> Result<<Self as ScanTypes>::ScanOutput, StopScan> {
+    pub fn read_all(self) -> Result<S::ScanOutput, StopScan> {
         let mut it = self.into_iter();
         while let Some(r) = it.next() {
             let _ = r?;
