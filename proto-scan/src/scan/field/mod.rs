@@ -1,4 +1,4 @@
-use crate::scan::StopScan;
+use crate::scan::{IntoScanOutput, StopScan};
 #[cfg(doc)]
 use crate::wire::FieldNumber;
 use crate::wire::{GroupOp, LengthDelimited, NumericField};
@@ -16,11 +16,8 @@ pub use save::{SaveBytes, SaveNumeric, SaveRepeated};
 pub use write::{SaveFrom, WriteBytes, WriteNumeric, WriteRepeated};
 
 /// Implemented by a visitor for a fixed [`FieldNumber`].
-pub trait OnScanField {
+pub trait OnScanField: IntoScanOutput {
     type ScanEvent;
-    type ScanOutput: Default;
-
-    fn into_output(self) -> Self::ScanOutput;
 
     /// Called when a numeric tag is read.
     fn on_numeric(&mut self, value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan>;

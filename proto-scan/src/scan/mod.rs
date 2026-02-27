@@ -48,10 +48,14 @@ pub trait IntoScanner {
     fn into_scanner(self) -> Self::Scanner;
 }
 
-/// Callbacks for parse inputs encountered during a scan.
-pub trait ScanCallbacks {
-    type ScanEvent;
+pub trait IntoScanOutput {
     type ScanOutput;
+    fn into_scan_output(self) -> Self::ScanOutput;
+}
+
+/// Callbacks for parse inputs encountered during a scan.
+pub trait ScanCallbacks: IntoScanOutput {
+    type ScanEvent;
 
     /// Called when a numeric field is parsed.
     fn on_numeric(
@@ -121,13 +125,13 @@ pub(crate) fn next_event<P: ParseEventReader, S: ScanCallbacks>(
     Some(output)
 }
 
-impl<P: ParseEventReader, S: ScanCallbacks + Into<S::ScanOutput>> Scan<P, S> {
+impl<P: ParseEventReader, S: ScanCallbacks> Scan<P, S> {
     pub fn read_all(self) -> Result<S::ScanOutput, StopScan> {
         let mut it = self.into_iter();
         while let Some(r) = it.next() {
             let _ = r?;
         }
-        Ok(it.1.into())
+        Ok(it.1.into_scan_output())
     }
 }
 

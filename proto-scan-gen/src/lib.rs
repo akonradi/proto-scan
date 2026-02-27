@@ -192,19 +192,19 @@ impl MessageScanner<'_> {
         let on_group_arms = field_arms("on_group");
         let on_length_delimited_arms = field_arms("on_length_delimited");
         quote! {
-            impl <#(#generics_on_scan_bounds,)*> ::core::convert::From<#scanner_name<#(#generics,)*>> for #output_name<#(#generics::ScanOutput),*> {
-                fn from(scanner: #scanner_name<#(#generics),*>) -> Self {
-                    let #scanner_name { #(#field_names),* } = scanner;
-                    Self {
-                        #(#field_names: #field_names.into_output(),)*
+            impl <#(#generics: ::proto_scan::scan::IntoScanOutput,)*> ::proto_scan::scan::IntoScanOutput for #scanner_name<#(#generics,)*> {
+                type ScanOutput = #output_name<#(#generics::ScanOutput),*>;
+
+                fn into_scan_output(self) -> Self::ScanOutput {
+                    let Self { #(#field_names),* } = self;
+                    Self::ScanOutput {
+                        #(#field_names: #field_names.into_scan_output(),)*
                     }
                 }
             }
 
             impl <#(#generics_on_scan_bounds,)*> ::proto_scan::scan::ScanCallbacks for #scanner_name<#(#generics,)*> {
                 type ScanEvent = Option<#scan_event_name<#(#generics :: ScanEvent),*>>;
-                type ScanOutput = #output_name<#(#generics::ScanOutput),*>;
-
                 fn on_numeric(
                     &mut self,
                     field: ::proto_scan::wire::FieldNumber,

@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
-use crate::scan::StopScan;
 use crate::scan::field::OnScanField;
+use crate::scan::{IntoScanOutput, StopScan};
 use crate::wire::{GroupOp, LengthDelimited, NumericField, NumericWireType};
 use core::convert::Infallible;
 
@@ -15,9 +15,6 @@ impl<'a, W: NumericWireType, F: FnMut(W::Repr) -> Result<(), StopScan>> OnScanFi
     for InvokeOn<W, F>
 {
     type ScanEvent = Infallible;
-    type ScanOutput = ();
-
-    fn into_output(self) -> Self::ScanOutput {}
 
     fn on_numeric(&mut self, value: NumericField) -> Result<Option<Infallible>, StopScan> {
         let value = W::from_value(value).ok_or(StopScan)?;
@@ -33,4 +30,9 @@ impl<'a, W: NumericWireType, F: FnMut(W::Repr) -> Result<(), StopScan>> OnScanFi
     ) -> Result<Option<Infallible>, StopScan> {
         Ok(None)
     }
+}
+
+impl<W, F> IntoScanOutput for InvokeOn<W, F> {
+    type ScanOutput = ();
+    fn into_scan_output(self) -> Self::ScanOutput {}
 }

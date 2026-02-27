@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
-use crate::scan::{GroupOp, IntoScanner, NumericField, StopScan};
+use crate::scan::{GroupOp, IntoScanOutput, IntoScanner, NumericField, StopScan};
 use crate::scan::{IntoResettable, Resettable};
 use crate::wire::{LengthDelimited, NumericWireType};
 
@@ -33,8 +33,6 @@ impl<E, D> WriteNumeric<E, D> {
 
 impl<E: Encoding, D: SaveFrom<E::Repr>> OnScanField for WriteNumeric<E, D> {
     type ScanEvent = Infallible;
-    type ScanOutput = ();
-    fn into_output(self) -> Self::ScanOutput {}
 
     fn on_numeric(&mut self, value: NumericField) -> Result<Option<Infallible>, StopScan> {
         let value = <E::Wire as NumericWireType>::from_value(value).ok_or(StopScan)?;
@@ -52,6 +50,11 @@ impl<E: Encoding, D: SaveFrom<E::Repr>> OnScanField for WriteNumeric<E, D> {
     ) -> Result<Option<Infallible>, StopScan> {
         Err(StopScan)
     }
+}
+
+impl<E: Encoding, D> IntoScanOutput for WriteNumeric<E, D> {
+    type ScanOutput = ();
+    fn into_scan_output(self) -> Self::ScanOutput {}
 }
 
 /// Implements [`WriteFrom`] and [`Resettable`] to save and restore a previous value.
@@ -103,9 +106,6 @@ impl<E, D> WriteRepeated<E, D> {
 
 impl<'t, E: Encoding, D: DerefMut<Target: Extend<E::Repr>>> OnScanField for WriteRepeated<E, D> {
     type ScanEvent = Infallible;
-    type ScanOutput = ();
-
-    fn into_output(self) -> Self::ScanOutput {}
 
     fn on_numeric(&mut self, value: NumericField) -> Result<Option<Infallible>, StopScan> {
         let value = <E::Wire as NumericWireType>::from_value(value).ok_or(StopScan)?;
@@ -133,6 +133,11 @@ impl<'t, E: Encoding, D: DerefMut<Target: Extend<E::Repr>>> OnScanField for Writ
         }));
         result
     }
+}
+
+impl<E: Encoding, D> IntoScanOutput for WriteRepeated<E, D> {
+    type ScanOutput = ();
+    fn into_scan_output(self) -> Self::ScanOutput {}
 }
 
 impl<'t, E, D> IntoResettable for WriteRepeated<E, &'t mut Vec<D>> {
@@ -194,9 +199,6 @@ impl<E: ?Sized, D> WriteBytes<E, D> {
 
 impl<D: for<'a> SaveFrom<&'a [u8]>> OnScanField for WriteBytes<[u8], D> {
     type ScanEvent = Infallible;
-    type ScanOutput = ();
-
-    fn into_output(self) -> Self::ScanOutput {}
 
     fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Infallible>, StopScan> {
         Err(StopScan)
@@ -218,9 +220,6 @@ impl<D: for<'a> SaveFrom<&'a [u8]>> OnScanField for WriteBytes<[u8], D> {
 
 impl<D: for<'a> SaveFrom<&'a str>> OnScanField for WriteBytes<str, D> {
     type ScanEvent = Infallible;
-    type ScanOutput = ();
-    fn into_output(self) -> Self::ScanOutput {}
-
     fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Infallible>, StopScan> {
         Err(StopScan)
     }
@@ -238,6 +237,11 @@ impl<D: for<'a> SaveFrom<&'a str>> OnScanField for WriteBytes<str, D> {
         self.0.save_from(bytes.into());
         Ok(None)
     }
+}
+
+impl<S: ?Sized, D> IntoScanOutput for WriteBytes<S, D> {
+    type ScanOutput = ();
+    fn into_scan_output(self) -> Self::ScanOutput {}
 }
 
 impl<D: Resettable, E: ?Sized> Resettable for WriteBytes<E, D> {

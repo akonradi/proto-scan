@@ -3,7 +3,7 @@ use std::convert::Infallible;
 use crate::read::ReadBuffer as _;
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
-use crate::scan::{IntoResettable, IntoScanner, Resettable,  StopScan};
+use crate::scan::{IntoResettable, IntoScanOutput, IntoScanner, Resettable, StopScan};
 use crate::wire::{GroupOp, LengthDelimited, NumericField, NumericWireType};
 
 /// [`OnScanField`] implementation that produces the read value as the event output.
@@ -17,14 +17,9 @@ impl<T: Encoding> SaveNumeric<T> {
     }
 }
 
-
 impl<E: Encoding> OnScanField for SaveNumeric<E> {
     type ScanEvent = E::Repr;
-    type ScanOutput = Option<E::Repr>;
 
-    fn into_output(self) -> Self::ScanOutput {
-        self.0
-    }
     fn on_numeric(&mut self, value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
         let value = <E::Wire as NumericWireType>::from_value(value).ok_or(StopScan)?;
         let value = E::decode(value).map_err(Into::into)?;
@@ -64,6 +59,13 @@ impl<E: Encoding> IntoScanner for SaveNumeric<E> {
     }
 }
 
+impl<E: Encoding> IntoScanOutput for SaveNumeric<E> {
+    type ScanOutput = Option<E::Repr>;
+    fn into_scan_output(self) -> Self::ScanOutput {
+        self.0
+    }
+}
+
 /// [`OnScanField`] implementation that produces the read values as the scan output.
 ///
 /// Deserializes according to the [`Encoding`] type parameter.
@@ -77,11 +79,7 @@ impl<T: Encoding> SaveRepeated<T> {
 
 impl<E: Encoding> OnScanField for SaveRepeated<E> {
     type ScanEvent = Infallible;
-    type ScanOutput = Vec<E::Repr>;
 
-    fn into_output(self) -> Self::ScanOutput {
-        self.0
-    }
     fn on_numeric(&mut self, value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
         let value = <E::Wire as NumericWireType>::from_value(value).ok_or(StopScan)?;
         self.0.extend([E::decode(value).map_err(Into::into)?]);
@@ -106,6 +104,14 @@ impl<E: Encoding> OnScanField for SaveRepeated<E> {
 
     fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
+    }
+}
+
+impl<E: Encoding> IntoScanOutput for SaveRepeated<E> {
+    type ScanOutput = Vec<E::Repr>;
+
+    fn into_scan_output(self) -> Self::ScanOutput {
+        self.0
     }
 }
 
@@ -137,7 +143,6 @@ impl ToOwnedBytes for [u8] {
     type Owned = Box<[u8]>;
 }
 
-
 impl<T: ToOwnedBytes + ?Sized> SaveBytes<T> {
     pub fn new() -> Self {
         Self(None)
@@ -146,11 +151,6 @@ impl<T: ToOwnedBytes + ?Sized> SaveBytes<T> {
 
 impl OnScanField for SaveBytes<str> {
     type ScanEvent = Infallible;
-    type ScanOutput = Option<String>;
-
-    fn into_output(self) -> Self::ScanOutput {
-        self.0
-    }
     fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
     }
@@ -170,12 +170,16 @@ impl OnScanField for SaveBytes<str> {
     }
 }
 
-impl OnScanField for SaveBytes<[u8]> {
-    type ScanEvent = Infallible;
-    type ScanOutput = Option<Box<[u8]>>;
-    fn into_output(self) -> Self::ScanOutput {
+impl IntoScanOutput for SaveBytes<str> {
+    type ScanOutput = Option<String>;
+    fn into_scan_output(self) -> Self::ScanOutput {
         self.0
     }
+}
+
+impl OnScanField for SaveBytes<[u8]> {
+    type ScanEvent = Infallible;
+
     fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
     }
@@ -191,6 +195,13 @@ impl OnScanField for SaveBytes<[u8]> {
         let bytes = delimited.into_bytes().map_err(|_| StopScan)?.into_bytes();
         self.0 = Some(bytes);
         Ok(None)
+    }
+}
+
+impl IntoScanOutput for SaveBytes<[u8]> {
+    type ScanOutput = Option<Box<[u8]>>;
+    fn into_scan_output(self) -> Self::ScanOutput {
+        self.0
     }
 }
 

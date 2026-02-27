@@ -1,6 +1,6 @@
 use prost::Message as _;
 use proto_scan::scan::field::OnScanField;
-use proto_scan::scan::{IntoScanner, ScanMessage as _, ScannerBuilder as _};
+use proto_scan::scan::{IntoScanOutput, IntoScanner, ScanMessage as _, ScannerBuilder as _};
 use proto_scan::wire::NumericField;
 use test_case::test_case;
 
@@ -15,11 +15,6 @@ struct CustomOutput;
 
 impl OnScanField for CustomScanner<'_> {
     type ScanEvent = CustomEvent;
-    type ScanOutput = CustomOutput;
-
-    fn into_output(self) -> Self::ScanOutput {
-        CustomOutput
-    }
 
     fn on_numeric(
         &mut self,
@@ -48,6 +43,14 @@ impl IntoScanner for CustomScanner<'_> {
     type Scanner = Self;
     fn into_scanner(self) -> Self::Scanner {
         self
+    }
+}
+
+impl IntoScanOutput for CustomScanner<'_> {
+    type ScanOutput = CustomOutput;
+
+    fn into_scan_output(self) -> Self::ScanOutput {
+        CustomOutput
     }
 }
 

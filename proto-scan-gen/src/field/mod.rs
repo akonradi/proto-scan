@@ -105,7 +105,7 @@ impl MessageScannerField<'_> {
                     [`{output_type}::{field_name}`]."
                 ),
             ],
-            vec![quote!(S: ::proto_scan::scan::field::OnScanField + 't)],
+            vec![quote!(S: ::proto_scan::scan::IntoScanner + 't)],
             vec![quote!(scanner: S)],
             quote!(S),
             quote!(scanner),
