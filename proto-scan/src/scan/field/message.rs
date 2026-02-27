@@ -1,7 +1,9 @@
 use std::convert::Infallible;
 
 use crate::scan::field::OnScanField;
-use crate::scan::{IntoResettable, Resettable, ScanCallbacks, ScanTypes, StopScan, next_event};
+use crate::scan::{
+    IntoResettable, IntoScan, Resettable, ScanCallbacks, ScanTypes, StopScan, next_event,
+};
 use crate::wire::LengthDelimited;
 
 pub struct Message<F>(F);
@@ -52,6 +54,13 @@ impl<F: ScanCallbacks<ScanOutput: Default> + Into<Self::ScanOutput> + Resettable
 impl<F: Resettable> Resettable for Message<F> {
     fn reset(&mut self) {
         self.0.reset()
+    }
+}
+
+impl<F: IntoScan> IntoScan for Message<F> {
+    type Scan = Message<F::Scan>;
+    fn into_scan(self) -> Self::Scan {
+        Message(self.0.into_scan())
     }
 }
 

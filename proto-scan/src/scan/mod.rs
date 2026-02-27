@@ -32,16 +32,27 @@ pub trait Scanner: ScanTypes + Sized {
     /// Starts a scan over the provided input.
     ///
     /// Consumes `self` and produces a [`Scan`] over the input stream.
-    fn scan_events<P: ParseEventReader>(self, read: P) -> Scan<P, Self> {
-        Scan::new(read, self)
+    fn scan_events<P: ParseEventReader>(self, read: P) -> Scan<P, Self::Scan>
+    where
+        Self: IntoScan,
+    {
+        Scan::new(read, self.into_scan())
     }
 
     /// Starts a scan over the provided input.
     ///
     /// Consumes `self` and produces a [`Scan`] over the input stream.
-    fn scan<'r>(self, read: impl Read + 'r) -> Scan<impl ParseEventReader + 'r, Self> {
-        Scan::new(crate::wire::parse(read), self)
+    fn scan<'r>(self, read: impl Read + 'r) -> Scan<impl ParseEventReader + 'r, Self::Scan>
+    where
+        Self: IntoScan,
+    {
+        Scan::new(crate::wire::parse(read), self.into_scan())
     }
+}
+
+pub trait IntoScan {
+    type Scan;
+    fn into_scan(self) -> Self::Scan;
 }
 
 /// Callbacks for parse inputs encountered during a scan.

@@ -70,6 +70,7 @@ impl MessageScanner<'_> {
             self.scan_event_defn(),
             MessageScanOutput(*self).generated_code(),
             self.impl_scanner(),
+            self.impl_into_scan(),
             self.0.impl_scan_message(),
             self.scan_callbacks_impl(),
         ]
@@ -141,6 +142,24 @@ impl MessageScanner<'_> {
         quote! {
             impl<#(#generics: ::proto_scan::scan::field::OnScanField),*> ::proto_scan::scan::Scanner for #type_name < #(#generics),* > {
                 type Message = #message_name;
+            }
+        }
+    }
+
+    fn impl_into_scan(&self) -> TokenStream {
+        let type_name = self.type_name();
+        let generics = self.generic_types().collect::<Vec<_>>();
+        let field_names = self.field_names().collect::<Vec<_>>();
+        quote! {
+            impl<#(#generics: ::proto_scan::scan::IntoScan),*> ::proto_scan::scan::IntoScan for #type_name < #(#generics),* > {
+                type Scan = #type_name < #(<#generics as ::proto_scan::scan::IntoScan>::Scan ),* >;
+                fn into_scan(self) -> Self::Scan {
+                    let Self { #(#field_names),* } = self;
+                    Self::Scan {
+                        #(#field_names: #field_names.into_scan()),*
+                    }
+
+                }
             }
         }
     }

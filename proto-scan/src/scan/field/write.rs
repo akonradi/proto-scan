@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
-use crate::scan::{GroupOp, NumericField, ScanTypes, StopScan};
+use crate::scan::{GroupOp, IntoScan, NumericField, ScanTypes, StopScan};
 use crate::scan::{IntoResettable, Resettable};
 use crate::wire::{LengthDelimited, NumericWireType};
 
@@ -85,6 +85,13 @@ impl<'t, E, D> IntoResettable for WriteNumeric<E, &'t mut D> {
 impl<'t, E, D> Resettable for WriteNumeric<E, RestoreOnReset<'t, D>> {
     fn reset(&mut self) {
         self.0.reset();
+    }
+}
+
+impl<E, D> IntoScan for WriteNumeric<E, D> {
+    type Scan = Self;
+    fn into_scan(self) -> Self::Scan {
+        self
     }
 }
 
@@ -174,6 +181,13 @@ impl<D: Resettable, E> Resettable for WriteRepeated<E, D> {
     }
 }
 
+impl<E, D> IntoScan for WriteRepeated<E, D> {
+    type Scan = Self;
+    fn into_scan(self) -> Self::Scan {
+        self
+    }
+}
+
 /// [`OnScanField`] that writes the decoded values to the provided location.
 pub struct WriteBytes<E: ?Sized, D>(D, PhantomData<E>);
 
@@ -242,5 +256,12 @@ impl<'t, E: ?Sized, D> IntoResettable for WriteBytes<E, &'t mut D> {
 
     fn into_resettable(self) -> Self::Resettable {
         WriteBytes(RestoreOnReset(self.0, None), PhantomData)
+    }
+}
+
+impl<E: ?Sized, D> IntoScan for WriteBytes<E, D> {
+    type Scan = Self;
+    fn into_scan(self) -> Self::Scan {
+        self
     }
 }
