@@ -38,7 +38,7 @@ pub trait ScannerBuilder: Sized {
     fn scan<'r, R: Read + 'r>(
         self,
         read: R,
-    ) -> Scan<impl ParseEventReader + 'r, Self::Scanner<R::ReadTypes>>
+    ) -> Scan<impl ParseEventReader<ReadTypes = R::ReadTypes> + 'r, Self::Scanner<R::ReadTypes>>
     where
         Self: IntoScanner,
     {

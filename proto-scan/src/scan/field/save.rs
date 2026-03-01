@@ -1,6 +1,7 @@
 use std::convert::Infallible;
+use std::marker::PhantomData;
 
-use crate::read::{ReadBuffer as _, ReadTypes};
+use crate::read::ReadTypes;
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
 use crate::scan::{IntoResettable, IntoScanOutput, IntoScanner, Resettable, StopScan};
@@ -127,28 +128,48 @@ impl<E: Encoding> IntoScanner for SaveRepeated<E> {
     }
 }
 
-/// [`OnScanField`] implementation that produces the read value as the event output.
-pub struct SaveBytes<E: ToOwnedBytes + ?Sized>(Option<E::Owned>);
+/// [`IntoScanner`] implementation whose `Scanner` type produces the read value as the event output.
+pub struct SaveBytes<E: DecodeFromBytes + ?Sized>(PhantomData<E>);
 
-pub trait ToOwnedBytes {
-    type Owned: for<'a> From<&'a Self>;
+/// [`OnScanField`] impl that produces the read value as the event output.
+pub struct SaveBytesScanner<E: DecodeFromBytes + ?Sized, R: ReadTypes>(Option<E::Decoded<R>>);
+
+pub trait DecodeFromBytes {
+    type Error;
+    type Decoded<R: ReadTypes>;
+    fn decode<R: ReadTypes>(bytes: R::Buffer) -> Result<Self::Decoded<R>, Self::Error>;
 }
 
-impl ToOwnedBytes for str {
-    type Owned = String;
+impl DecodeFromBytes for str {
+    type Error = core::str::Utf8Error;
+    type Decoded<R: ReadTypes> = String;
+    fn decode<R: ReadTypes>(bytes: R::Buffer) -> Result<Self::Decoded<R>, Self::Error> {
+        str::from_utf8(bytes.as_ref()).map(Into::into)
+    }
 }
 
-impl ToOwnedBytes for [u8] {
-    type Owned = Box<[u8]>;
+impl DecodeFromBytes for [u8] {
+    type Error = Infallible;
+    type Decoded<R: ReadTypes> = Box<[u8]>;
+    fn decode<R: ReadTypes>(bytes: R::Buffer) -> Result<Self::Decoded<R>, Self::Error> {
+        Ok(bytes.as_ref().into())
+    }
 }
 
-impl<T: ToOwnedBytes + ?Sized> SaveBytes<T> {
+impl<T: DecodeFromBytes + ?Sized> SaveBytes<T> {
     pub fn new() -> Self {
-        Self(None)
+        Self(PhantomData)
     }
 }
 
-impl<R: ReadTypes> OnScanField<R> for SaveBytes<str> {
+impl<T: DecodeFromBytes + ?Sized> IntoScanner for SaveBytes<T> {
+    type Scanner<R: ReadTypes> = SaveBytesScanner<T, R>;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+        SaveBytesScanner(None)
+    }
+}
+
+impl<T: DecodeFromBytes + ?Sized, R: ReadTypes> OnScanField<R> for SaveBytesScanner<T, R> {
     type ScanEvent = Infallible;
     fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
         Err(StopScan)
@@ -162,56 +183,22 @@ impl<R: ReadTypes> OnScanField<R> for SaveBytes<str> {
         &mut self,
         delimited: impl LengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, StopScan> {
-        let bytes = delimited.into_bytes().map_err(|_| StopScan)?.into_bytes();
-        let string = String::from_utf8(bytes.into()).map_err(|_| StopScan)?;
-        self.0 = Some(string);
+        let bytes = delimited.into_bytes().map_err(|_| StopScan)?;
+        let decoded = T::decode(bytes).map_err(|_| StopScan)?;
+        self.0 = Some(decoded);
         Ok(None)
     }
 }
 
-impl IntoScanOutput for SaveBytes<str> {
-    type ScanOutput = Option<String>;
+impl<T: DecodeFromBytes + ?Sized, R: ReadTypes> IntoScanOutput for SaveBytesScanner<T, R> {
+    type ScanOutput = Option<T::Decoded<R>>;
     fn into_scan_output(self) -> Self::ScanOutput {
         self.0
     }
 }
 
-impl<R: ReadTypes> OnScanField<R> for SaveBytes<[u8]> {
-    type ScanEvent = Infallible;
-    fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
-        Err(StopScan)
-    }
-
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan> {
-        Err(StopScan)
-    }
-
-    fn on_length_delimited(
-        &mut self,
-        delimited: impl LengthDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, StopScan> {
-        let bytes = delimited.into_bytes().map_err(|_| StopScan)?.into_bytes();
-        self.0 = Some(bytes);
-        Ok(None)
-    }
-}
-
-impl IntoScanOutput for SaveBytes<[u8]> {
-    type ScanOutput = Option<Box<[u8]>>;
-    fn into_scan_output(self) -> Self::ScanOutput {
-        self.0
-    }
-}
-
-impl<E: ToOwnedBytes + ?Sized> Resettable for SaveBytes<E> {
+impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> Resettable for SaveBytesScanner<E, R> {
     fn reset(&mut self) {
         self.0 = None;
-    }
-}
-
-impl<E: ToOwnedBytes + ?Sized> IntoScanner for SaveBytes<E> {
-    type Scanner<R: ReadTypes> = Self;
-    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-        self
     }
 }
