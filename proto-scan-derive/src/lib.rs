@@ -3,7 +3,8 @@ use std::borrow::Cow;
 use proc_macro2::{Span, TokenStream};
 use proto_scan_gen::ScannableMessage;
 use proto_scan_gen::field::{
-    FieldType, FixedFieldType, MessageField, ParsedFieldType, VarintFieldType,
+    BytesField, Field, FieldType, FixedFieldType, MessageField, ParsedFieldType, SingleField,
+    VarintFieldType,
 };
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -68,7 +69,7 @@ fn message_impl(name: Ident, data_struct: DataStruct) -> Result<TokenStream> {
 
             let generic = Ident::new(&format!("T{i}"), Span::call_site());
 
-            Ok(MessageField {
+            Ok(Field {
                 field_name,
                 field_type,
                 generic,
@@ -157,14 +158,14 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                 FieldType::Repeated { ty, number }
             }
             (Some(ParsedFieldType::Single(ty)), Some(number), false) => {
-                FieldType::Single { ty, number }
+                FieldType::Single(SingleField { ty, number })
             }
             (Some(ParsedFieldType::Message), Some(number), false) => {
                 let type_name = extract_message_type_name(rust_field_type)?;
-                FieldType::Message { number, type_name }
+                FieldType::Message(MessageField { number, type_name })
             }
             (Some(ParsedFieldType::Bytes { utf8 }), Some(number), false) => {
-                FieldType::Bytes { utf8, number }
+                FieldType::Bytes(BytesField { utf8, number })
             }
             (
                 Some(ParsedFieldType::Message | ParsedFieldType::Bytes { utf8: _ }),

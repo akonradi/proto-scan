@@ -5,7 +5,7 @@ use syn::{Ident, parse_quote};
 use crate::MessageScanOutput;
 
 #[derive(Debug)]
-pub struct MessageField {
+pub struct Field {
     pub field_name: Ident,
     pub generic: Ident,
     pub field_type: FieldType,
@@ -14,10 +14,10 @@ pub struct MessageField {
 pub(crate) struct MessageScannerField<'m> {
     pub(crate) parent: super::MessageScanner<'m>,
     pub(crate) index: usize,
-    pub(crate) field: &'m MessageField,
+    pub(crate) field: &'m Field,
 }
 
-impl MessageField {
+impl Field {
     pub(crate) fn generic(&self) -> &Ident {
         &self.generic
     }
@@ -50,7 +50,7 @@ impl MessageScannerField<'_> {
             parent,
             index,
             field:
-                MessageField {
+                Field {
                     field_name,
                     field_type,
                     ..
@@ -136,10 +136,10 @@ impl MessageScannerField<'_> {
         };
 
         match field_type {
-            FieldType::Single {
+            FieldType::Single(SingleField {
                 ty: single,
                 number: _,
-            } => {
+            }) => {
                 let encoding_type = single.encoding_type();
                 let repr_type = single.repr_type();
 
@@ -183,7 +183,7 @@ impl MessageScannerField<'_> {
                 );
                 vec![write_fn, save_fn, custom_fn]
             }
-            FieldType::Bytes { utf8, number: _ } => {
+            FieldType::Bytes(BytesField { utf8, number: _ }) => {
                 let borrow_type = if *utf8 {
                     quote! {::core::primitive::str}
                 } else {
@@ -207,7 +207,10 @@ impl MessageScannerField<'_> {
                 );
                 vec![write_fn, save_fn, custom_fn]
             }
-            FieldType::Message { number: _ , type_name } => {
+            FieldType::Message(MessageField {
+                number: _,
+                type_name,
+            }) => {
                 let message_name = format_ident!("{type_name}");
                 let scan_fn = swap_single_field_fn(
                     format_ident!("scan_{field_name}"),
@@ -224,7 +227,7 @@ impl MessageScannerField<'_> {
                     ],
                     vec![quote! {
                         S:
-                            ::proto_scan::scan::IntoResettable<Resettable: 
+                            ::proto_scan::scan::IntoResettable<Resettable:
                                 ::proto_scan::scan::ScannerBuilder<Message=#message_name>
                             > + 't
                     }],
@@ -244,11 +247,32 @@ impl MessageScannerField<'_> {
 }
 
 #[derive(Debug)]
+pub struct SingleField {
+    pub ty: SingleFieldType,
+    pub number: u32,
+}
+
+#[derive(Debug)]
+pub struct MessageField {
+    pub type_name: String,
+    pub number: u32,
+}
+
+#[derive(Debug)]
+pub struct BytesField {
+    pub utf8: bool,
+    pub number: u32,
+}
+
+#[derive(Debug)]
 pub enum FieldType {
-    Single { ty: SingleFieldType, number: u32 },
-    Repeated { ty: SingleFieldType, number: u32 },
-    Bytes { utf8: bool, number: u32 },
-    Message { type_name: String, number: u32 },
+    Single(SingleField),
+    Repeated {
+        ty: SingleFieldType,
+        number: u32,
+    },
+    Bytes(BytesField),
+    Message(MessageField),
     Unsupported,
 }
 

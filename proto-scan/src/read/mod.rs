@@ -1,6 +1,6 @@
+use core::convert::Infallible as Never;
 use core::ops::Deref;
 use core::str::Utf8Error;
-use core::convert::Infallible as Never;
 
 use either::Either;
 

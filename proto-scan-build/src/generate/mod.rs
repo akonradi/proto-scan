@@ -4,7 +4,8 @@ use prost_types::FileDescriptorProto;
 use prost_types::{DescriptorProto, OneofDescriptorProto};
 use proto_scan_gen::ScannableMessage;
 use proto_scan_gen::field::{
-    FieldType, FixedFieldType, MessageField, ParsedFieldType, VarintFieldType,
+    BytesField, Field, FieldType, FixedFieldType, MessageField, ParsedFieldType, SingleField,
+    VarintFieldType,
 };
 use quote::quote;
 use std::collections::HashMap;
@@ -97,20 +98,16 @@ impl Package {
                 }
 
                 let mut field_type = extract_field_type(value)?;
-                if let FieldType::Message {
-                    type_name,
-                    number,
-                } = &field_type
-                {
+                if let FieldType::Message(MessageField { type_name, number }) = &field_type {
                     if let Some(t) = type_name
                         .strip_prefix(".")
                         .zip(self.0.as_ref())
                         .and_then(|(t, p)| t.strip_prefix(p))
                     {
-                        field_type = FieldType::Message {
+                        field_type = FieldType::Message(MessageField {
                             type_name: t.strip_prefix(".").unwrap_or(t).to_owned(),
                             number: *number,
-                        }
+                        })
                     }
                 }
 
@@ -132,7 +129,7 @@ impl Package {
         let fields = field_types
             .into_iter()
             .enumerate()
-            .map(|(i, (name, field_type))| MessageField {
+            .map(|(i, (name, field_type))| Field {
                 field_name: name,
                 generic: ident(format!("T{i}")),
                 field_type,
@@ -174,19 +171,21 @@ fn extract_field_type(value: &prost_types::FieldDescriptorProto) -> Result<Field
 
     Ok(match (parsed_field_type, label) {
         (ParsedFieldType::Single(single), Label::Optional | Label::Required) => {
-            FieldType::Single { ty: single, number }
+            FieldType::Single(SingleField { ty: single, number })
         }
         (ParsedFieldType::Single(single), Label::Repeated) => {
             FieldType::Repeated { ty: single, number }
         }
-        (ParsedFieldType::Message, Label::Optional | Label::Required) => FieldType::Message {
-            number,
-            type_name: value.type_name.clone().ok_or_else(|| {
-                std::io::Error::other(format!("field {number} is a message with no type name"))
-            })?,
-        },
+        (ParsedFieldType::Message, Label::Optional | Label::Required) => {
+            FieldType::Message(MessageField {
+                number,
+                type_name: value.type_name.clone().ok_or_else(|| {
+                    std::io::Error::other(format!("field {number} is a message with no type name"))
+                })?,
+            })
+        }
         (ParsedFieldType::Bytes { utf8 }, Label::Optional | Label::Required) => {
-            FieldType::Bytes { utf8, number }
+            FieldType::Bytes(BytesField { utf8, number })
         }
         (ParsedFieldType::Message, Label::Repeated)
         | (ParsedFieldType::Bytes { utf8: _ }, Label::Repeated) => FieldType::Unsupported,

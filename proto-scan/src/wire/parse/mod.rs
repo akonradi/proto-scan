@@ -89,9 +89,7 @@ pub enum ParseEvent<L> {
     LengthDelimited(L),
 }
 
-pub fn parse<'a, R: Read + 'a>(
-    r: R,
-) -> impl ParseEventReader<ReadTypes = R::ReadTypes> + 'a {
+pub fn parse<'a, R: Read + 'a>(r: R) -> impl ParseEventReader<ReadTypes = R::ReadTypes> + 'a {
     EventReader {
         inner: Either::Left(r),
         do_before: DoBeforeNext::DoNothing,

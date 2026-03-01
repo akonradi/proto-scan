@@ -2,13 +2,13 @@ use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::Ident;
 
-use crate::field::{FieldType, MessageField, MessageScannerField};
+use crate::field::{BytesField, Field, FieldType, MessageField, MessageScannerField, SingleField};
 
 pub mod field;
 
 pub struct ScannableMessage {
     pub name: Ident,
-    pub fields: Vec<field::MessageField>,
+    pub fields: Vec<field::Field>,
 }
 
 impl ScannableMessage {
@@ -103,7 +103,7 @@ impl MessageScanner<'_> {
         let scanner_name = self.type_name();
         let scan_types = self.generic_types();
         let scan_fields = self.0.fields.iter().map(
-            |MessageField {
+            |Field {
                  field_name,
                  generic,
                  ..
@@ -177,10 +177,13 @@ impl MessageScanner<'_> {
         let field_arms = |fn_name: &str| {
             let scan_event_name = &scan_event_name;
             let fn_name = format_ident!("{fn_name}");
-            self.fields().map(move |MessageScannerField { parent: _, index, field: MessageField { field_name, generic: _, field_type } }| {
+            self.fields().map(move |MessageScannerField { parent: _, index, field: Field { field_name, generic: _, field_type } }| {
                 let event_variant_name = format_ident!("Event{index}");
                 match field_type {
-                    FieldType::Single { ty: _, number } | FieldType::Repeated { ty: _, number } | FieldType::Message { number, type_name: _ } | FieldType::Bytes { utf8: _, number } => quote! {
+                    FieldType::Single(SingleField { ty: _, number })
+                    | FieldType::Repeated { ty: _, number }
+                    | FieldType::Message(MessageField { number, type_name: _ })
+                    | FieldType::Bytes(BytesField { utf8: _, number }) => quote! {
                         #number => self.#field_name.#fn_name(value)?.map(#scan_event_name::#event_variant_name),
                     },
                     FieldType::Unsupported => TokenStream::new()
