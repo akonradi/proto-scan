@@ -5,10 +5,10 @@ use syn::{Ident, parse_quote};
 use crate::MessageScanOutput;
 
 #[derive(Debug)]
-pub struct Field {
+pub struct Field<F = FieldType> {
     pub field_name: Ident,
     pub generic: Ident,
-    pub field_type: FieldType,
+    pub field_type: F,
 }
 
 pub(crate) struct MessageScannerField<'m> {
@@ -38,11 +38,12 @@ impl<'a> FieldGeneric<'a> {
             field_name: _,
         }) = self;
         match field_type {
+            FieldType::OneOf { .. } => parse_quote!(::proto_scan::scan::OnScanOneof<R>),
             FieldType::Single(_)
             | FieldType::Repeated { .. }
             | FieldType::Bytes(_)
             | FieldType::Message(_)
-            | FieldType::Unsupported => parse_quote! { ::proto_scan::scan::field::OnScanField<R> },
+            | FieldType::Unsupported => parse_quote!(::proto_scan::scan::field::OnScanField<R>),
         }
     }
 }
@@ -268,6 +269,28 @@ impl MessageScannerField<'_> {
                 );
                 vec![scan_fn, custom_fn]
             }
+            FieldType::OneOf { type_name, numbers } => {
+                let custom_fn = swap_single_field_fn(
+                    format_ident!("{field_name}"),
+                    vec![
+                        format!("Sets the field scanner for the oneof `{field_name}`."),
+                        "".to_owned(),
+                        format!(
+                            "This allows the caller to specify the behavior on
+                    encountering any of the fields in the oneof `{field_name}`
+                    defined in the source message. The output of the provided
+                    field scanner will be included in the overall scan output as
+                    [`{output_type}::{field_name}`]."
+                        ),
+                    ],
+                    vec![quote!(S: ::proto_scan::scan::IntoScanner + 't)],
+                    vec![quote!(scanner: S)],
+                    quote!(S),
+                    quote!(scanner),
+                );
+
+                vec![custom_fn]
+            }
             FieldType::Unsupported => vec![],
         }
     }
@@ -292,11 +315,25 @@ pub struct BytesField {
 }
 
 #[derive(Debug)]
-pub enum FieldType {
+pub enum OneOfField {
     Single(SingleField),
-    Repeated { ty: SingleFieldType, number: u32 },
     Bytes(BytesField),
     Message(MessageField),
+}
+
+#[derive(Debug)]
+pub enum FieldType {
+    Single(SingleField),
+    Repeated {
+        ty: SingleFieldType,
+        number: u32,
+    },
+    Bytes(BytesField),
+    Message(MessageField),
+    OneOf {
+        type_name: syn::Path,
+        numbers: Vec<u32>,
+    },
     Unsupported,
 }
 
@@ -306,13 +343,16 @@ pub enum SingleFieldType {
     Fixed(FixedFieldType),
 }
 
-#[derive(Clone, Copy, Debug, derive_more::From)]
+#[derive(Clone, Debug, derive_more::From)]
 pub enum ParsedFieldType {
     #[from(SingleFieldType, VarintFieldType, FixedFieldType)]
     Single(SingleFieldType),
     Message,
     Bytes {
         utf8: bool,
+    },
+    OneOf {
+        ty: syn::Path,
     },
 }
 

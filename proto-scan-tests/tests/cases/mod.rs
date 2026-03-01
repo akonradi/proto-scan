@@ -3,6 +3,7 @@ use crate::proto;
 mod bytes;
 mod custom_field_scanner;
 mod embedded_message;
+mod oneof;
 mod read_all;
 mod repeated_numeric;
 mod single_numeric;

@@ -3,12 +3,15 @@ use std::borrow::Cow;
 use proc_macro2::{Span, TokenStream};
 use proto_scan_gen::ScannableMessage;
 use proto_scan_gen::field::{
-    BytesField, Field, FieldType, FixedFieldType, MessageField, ParsedFieldType, SingleField,
-    VarintFieldType,
+    BytesField, Field, FieldType, FixedFieldType, MessageField, OneOfField, ParsedFieldType,
+    SingleField, VarintFieldType,
 };
+use proto_scan_gen::oneof::ScannableOneof;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{Attribute, DataStruct, DeriveInput, Ident, Meta, Result, Token};
+use syn::{
+    Attribute, DataEnum, DataStruct, DeriveInput, Expr, Ident, Meta, MetaNameValue, Result, Token,
+};
 
 #[proc_macro_derive(ScanMessage)]
 pub fn scan_message_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -23,7 +26,7 @@ fn derive_impl(input: DeriveInput) -> Result<TokenStream> {
         ident,
         generics,
         data,
-        attrs: _,
+        attrs,
         vis: _,
     } = input;
 
@@ -36,7 +39,12 @@ fn derive_impl(input: DeriveInput) -> Result<TokenStream> {
 
     match data {
         syn::Data::Struct(data_struct) => message_impl(ident, data_struct),
-        syn::Data::Enum(_data_enum) => todo!(),
+        syn::Data::Enum(data_enum)
+            if attrs.iter().find(|a| a.path().is_ident("repr")).is_none() =>
+        {
+            enum_impl(ident, data_enum)
+        }
+        syn::Data::Enum(_) => Ok(TokenStream::new()),
         syn::Data::Union(u) => {
             return Err(syn::Error::new(
                 u.union_token.span(),
@@ -44,6 +52,69 @@ fn derive_impl(input: DeriveInput) -> Result<TokenStream> {
             ));
         }
     }
+}
+
+fn enum_impl(name: Ident, data_enum: DataEnum) -> Result<TokenStream> {
+    let DataEnum {
+        brace_token,
+        enum_token,
+        variants,
+    } = data_enum;
+    let fields = variants
+        .into_iter()
+        .enumerate()
+        .map(|(i, field)| {
+            let span = field.span();
+            let syn::Variant {
+                attrs,
+                ident: field_name,
+                fields,
+                discriminant,
+            } = field;
+            let field = match fields {
+                syn::Fields::Unnamed(fields) if fields.unnamed.len() == 1 => {
+                    fields.unnamed.into_iter().next().unwrap()
+                }
+                syn::Fields::Unnamed(_) | syn::Fields::Named(_) | syn::Fields::Unit => {
+                    return Err(syn::Error::new(
+                        field_name.span(),
+                        "expected a single unnamed field",
+                    ));
+                }
+            };
+            let syn::Field {
+                attrs: _,
+                vis,
+                mutability,
+                ident,
+                colon_token,
+                ty,
+            } = field;
+
+            let ProstAttrs { field_type } = (attrs, ty).try_into()?;
+            let field_type = match field_type {
+                FieldType::Single(single_field) => OneOfField::Single(single_field),
+                FieldType::Bytes(bytes_field) => OneOfField::Bytes(bytes_field),
+                FieldType::Message(message_field) => OneOfField::Message(message_field),
+                FieldType::Repeated { .. } | FieldType::OneOf { .. } | FieldType::Unsupported => {
+                    return Err(syn::Error::new(
+                        span,
+                        format!("oneof has {field_type:?} field"),
+                    ));
+                }
+            };
+
+            let generic = Ident::new(&format!("T{i}"), Span::call_site());
+
+            Ok(Field {
+                field_name,
+                field_type,
+                generic,
+            })
+        })
+        .collect::<Result<_>>()?;
+    let oneof = ScannableOneof { name, fields };
+    Ok(oneof.scanner().generated_code())
 }
 
 fn message_impl(name: Ident, data_struct: DataStruct) -> Result<TokenStream> {
@@ -78,7 +149,7 @@ fn message_impl(name: Ident, data_struct: DataStruct) -> Result<TokenStream> {
         .collect::<Result<_>>()?;
 
     let message = ScannableMessage { name, fields };
-    Ok([message.scanner().generated_code()].into_iter().collect())
+    Ok(message.scanner().generated_code())
 }
 
 struct ProstAttrs {
@@ -92,6 +163,11 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
         (attributes, rust_field_type): (Vec<Attribute>, syn::Type),
     ) -> std::result::Result<Self, Self::Error> {
         let attrs = prost_attrs(attributes)?;
+
+        enum FieldNumber {
+            Single(u32),
+            Multiple(Vec<u32>),
+        }
 
         let mut field_type = None;
         let mut field_number = None;
@@ -120,12 +196,30 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
             for (name, found_type) in &field_type_names {
                 if attr.path().is_ident(name) {
                     let _ = attr.require_path_only();
-                    if let Some(t) = field_type.replace(*found_type) {
+                    if let Some(t) = field_type.replace(found_type.clone()) {
                         return Err(syn::Error::new(
                             attr.span(),
                             format!("already found type {t:?}"),
                         ));
                     }
+                }
+            }
+            if attr.path().is_ident("oneof") {
+                let value = &attr.require_name_value()?.value;
+                let Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(value),
+                    ..
+                }) = value
+                else {
+                    return Err(syn::Error::new(attr.span(), "oneof has a non-path value"));
+                };
+                if let Some(t) = field_type.replace(ParsedFieldType::OneOf {
+                    ty: syn::parse_str(&value.value())?,
+                }) {
+                    return Err(syn::Error::new(
+                        attr.span(),
+                        format!("already found type {t:?}"),
+                    ));
                 }
             }
             if attr.path().is_ident("repeated") {
@@ -147,25 +241,83 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                         format!("unsupported tag value {:?}", value.span().source_text()),
                     )
                 })?;
-                if let Some(_) = field_number.replace(value) {
+                if let Some(_) = field_number.replace(FieldNumber::Single(value)) {
+                    return Err(syn::Error::new(value.span(), "more than one tag number"));
+                }
+            }
+            if attr.path().is_ident("tags") {
+                let value = &attr.require_name_value()?.value;
+                let values = match value {
+                    syn::Expr::Lit(syn::ExprLit {
+                        lit: syn::Lit::Str(value),
+                        ..
+                    }) => {
+                        value
+                            .value()
+                            .split(',')
+                            .map(|v| v.trim().parse())
+                            .collect::<std::result::Result<Vec<_>, _>>()
+                    }
+                    .ok(),
+                    _ => None,
+                }
+                .ok_or_else(|| {
+                    syn::Error::new(
+                        attr.span(),
+                        format!("unsupported tags value {:?}", value.span().source_text()),
+                    )
+                })?;
+                if let Some(_) = field_number.replace(FieldNumber::Multiple(values)) {
                     return Err(syn::Error::new(value.span(), "more than one tag number"));
                 }
             }
         }
 
         let field_type = match (field_type, field_number, repeated) {
-            (Some(ParsedFieldType::Single(ty)), Some(number), true) => {
+            (Some(ParsedFieldType::Single(ty)), Some(FieldNumber::Single(number)), true) => {
                 FieldType::Repeated { ty, number }
             }
-            (Some(ParsedFieldType::Single(ty)), Some(number), false) => {
+            (Some(ParsedFieldType::Single(ty)), Some(FieldNumber::Single(number)), false) => {
                 FieldType::Single(SingleField { ty, number })
             }
-            (Some(ParsedFieldType::Message), Some(number), false) => {
+            (Some(ParsedFieldType::Message), Some(FieldNumber::Single(number)), false) => {
                 let type_name = extract_message_type_name(rust_field_type)?;
                 FieldType::Message(MessageField { number, type_name })
             }
-            (Some(ParsedFieldType::Bytes { utf8 }), Some(number), false) => {
+            (Some(ParsedFieldType::Bytes { utf8 }), Some(FieldNumber::Single(number)), false) => {
                 FieldType::Bytes(BytesField { utf8, number })
+            }
+            (
+                Some(
+                    ParsedFieldType::Single(_)
+                    | ParsedFieldType::Message
+                    | ParsedFieldType::Bytes { .. },
+                ),
+                Some(FieldNumber::Multiple(_)),
+                _,
+            ) => {
+                return Err(syn::Error::new(
+                    Span::call_site(),
+                    "only oneofs support multiple tags",
+                ));
+            }
+            (Some(ParsedFieldType::OneOf { ty }), Some(FieldNumber::Multiple(numbers)), false) => {
+                FieldType::OneOf {
+                    type_name: ty,
+                    numbers,
+                }
+            }
+            (Some(ParsedFieldType::OneOf { .. }), Some(FieldNumber::Single(_)), _) => {
+                return Err(syn::Error::new(
+                    Span::call_site(),
+                    "oneofs require multiple tags",
+                ));
+            }
+            (Some(ParsedFieldType::OneOf { .. }), _, true) => {
+                return Err(syn::Error::new(
+                    Span::call_site(),
+                    "oneofs can't be repeated",
+                ));
             }
             (
                 Some(ParsedFieldType::Message | ParsedFieldType::Bytes { utf8: _ }),
@@ -177,7 +329,8 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                 Some(
                     ft @ (ParsedFieldType::Single(_)
                     | ParsedFieldType::Message
-                    | ParsedFieldType::Bytes { .. }),
+                    | ParsedFieldType::Bytes { .. }
+                    | ParsedFieldType::OneOf { .. }),
                 ),
                 None,
                 _repeated,
@@ -191,6 +344,14 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
 
         Ok(Self { field_type })
     }
+}
+
+fn parse_tags(value: &str) -> Option<Vec<u32>> {
+    value
+        .split(',')
+        .map(|v| v.trim().parse())
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .ok()
 }
 
 fn extract_message_type_name(ty: syn::Type) -> Result<String> {

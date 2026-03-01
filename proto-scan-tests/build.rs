@@ -10,7 +10,7 @@ fn main() -> Result<()> {
     let prost_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("prost");
     std::fs::create_dir_all(&prost_dir)?;
     config.out_dir(prost_dir);
-    config.message_attribute(".", "#[derive(::proto_scan::ScanMessage)]");
+    config.type_attribute(".", "#[derive(::proto_scan::ScanMessage)]");
     config.compile_protos(&["src/proto/testing.proto"], &["src/"])?;
     Ok(())
 }

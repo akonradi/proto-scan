@@ -78,6 +78,31 @@ pub trait ScanCallbacks<R: ReadTypes>: IntoScanOutput {
     ) -> Result<Self::ScanEvent, StopScan>;
 }
 
+pub trait OnScanOneof<R: ReadTypes>: IntoScanOutput {
+    type ScanEvent;
+
+    /// Called when a numeric field is parsed.
+    fn on_numeric(
+        &mut self,
+        field: FieldNumber,
+        value: NumericField,
+    ) -> Result<Option<Self::ScanEvent>, StopScan>;
+
+    /// Called when a SGROUP or EGROUP tag is read.
+    fn on_group(
+        &mut self,
+        field: FieldNumber,
+        op: GroupOp,
+    ) -> Result<Option<Self::ScanEvent>, StopScan>;
+
+    /// Called when a length-delimited field tag is encountered.
+    fn on_length_delimited(
+        &mut self,
+        field: FieldNumber,
+        delimited: impl LengthDelimited<ReadTypes = R>,
+    ) -> Result<Option<Self::ScanEvent>, StopScan>;
+}
+
 /// A scan in progress.
 pub struct Scan<P, S>(P, S);
 

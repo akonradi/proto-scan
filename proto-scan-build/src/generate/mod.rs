@@ -116,12 +116,17 @@ impl Package {
             .flatten_ok()
             .chain(oneof_decl.iter().zip(0i32..).filter_map(|(oneof, i)| {
                 let OneofDescriptorProto { name, options: _ } = oneof;
-                if oneofs_to_fields.get(&i).is_some_and(|v| v.len() == 1) {
+                let numbers = oneofs_to_fields.get(&i)?;
+                if numbers.len() == 1 {
                     return None;
                 }
+                let name = name.as_deref().unwrap_or_default();
                 Some(Ok((
-                    ident(name.as_deref().unwrap_or_default()),
-                    FieldType::Unsupported,
+                    ident(name),
+                    FieldType::OneOf {
+                        type_name: ident(name).into(),
+                        numbers: numbers.iter().map(|v| *v as u32).collect(),
+                    },
                 )))
             }))
             .collect::<Result<Vec<_>>>()?;
@@ -189,5 +194,6 @@ fn extract_field_type(value: &prost_types::FieldDescriptorProto) -> Result<Field
         }
         (ParsedFieldType::Message, Label::Repeated)
         | (ParsedFieldType::Bytes { utf8: _ }, Label::Repeated) => FieldType::Unsupported,
+        (ParsedFieldType::OneOf { .. }, _) => unreachable!(),
     })
 }

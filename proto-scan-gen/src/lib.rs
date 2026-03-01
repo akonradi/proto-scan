@@ -7,6 +7,7 @@ use crate::field::{
 };
 
 pub mod field;
+pub mod oneof;
 
 pub struct ScannableMessage {
     pub name: Ident,
@@ -200,6 +201,9 @@ impl MessageScanner<'_> {
                     | FieldType::Message(MessageField { number, type_name: _ })
                     | FieldType::Bytes(BytesField { utf8: _, number }) => quote! {
                         #number => self.#field_name.#fn_name(value)?.map(#scan_event_name::#event_variant_name),
+                    },
+                    | FieldType::OneOf { type_name: _, numbers } => quote! {
+                        ((#(#numbers )|*) ) => self.#field_name.#fn_name(field, value)?.map(#scan_event_name::#event_variant_name),
                     },
                     FieldType::Unsupported => TokenStream::new()
                 }
