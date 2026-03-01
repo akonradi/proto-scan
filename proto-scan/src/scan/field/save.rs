@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 use std::marker::PhantomData;
 
-use crate::read::ReadTypes;
+use crate::read::{ReadBuffer, ReadTypes};
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
 use crate::scan::{IntoResettable, IntoScanOutput, IntoScanner, Resettable, StopScan};
@@ -142,17 +142,17 @@ pub trait DecodeFromBytes {
 
 impl DecodeFromBytes for str {
     type Error = core::str::Utf8Error;
-    type Decoded<R: ReadTypes> = String;
+    type Decoded<R: ReadTypes> = <R::Buffer as ReadBuffer>::String;
     fn decode<R: ReadTypes>(bytes: R::Buffer) -> Result<Self::Decoded<R>, Self::Error> {
-        str::from_utf8(bytes.as_ref()).map(Into::into)
+        bytes.into_string()
     }
 }
 
 impl DecodeFromBytes for [u8] {
     type Error = Infallible;
-    type Decoded<R: ReadTypes> = Box<[u8]>;
+    type Decoded<R: ReadTypes> = R::Buffer;
     fn decode<R: ReadTypes>(bytes: R::Buffer) -> Result<Self::Decoded<R>, Self::Error> {
-        Ok(bytes.as_ref().into())
+        Ok(bytes)
     }
 }
 

@@ -1,4 +1,6 @@
+use core::ops::Deref;
 use std::convert::Infallible as Never;
+use std::str::Utf8Error;
 
 use either::Either;
 
@@ -13,7 +15,8 @@ pub trait ReadTypes: ReadError {
 }
 
 pub trait ReadBuffer: AsRef<[u8]> {
-    fn into_bytes(self) -> Box<[u8]>;
+    type String: Deref<Target = str>;
+    fn into_string(self) -> Result<Self::String, core::str::Utf8Error>;
 }
 
 pub trait Read {
@@ -43,9 +46,13 @@ impl<'a> ReadTypes for &'a [u8] {
     type Buffer = Self;
 }
 
-impl ReadBuffer for &[u8] {
-    fn into_bytes(self) -> Box<[u8]> {
-        self.to_owned().into_boxed_slice()
+impl<'a> ReadBuffer for &'a [u8] {
+    type String = &'a str;
+    fn into_string(self) -> Result<Self::String, Utf8Error>
+    where
+        Self: Sized,
+    {
+        core::str::from_utf8(self)
     }
 }
 

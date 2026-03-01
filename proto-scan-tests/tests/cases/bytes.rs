@@ -45,14 +45,12 @@ fn save_bytes(input: InputKind) {
     let scanner = proto::BytesFieldTypes::scanner()
         .save_bytes_field()
         .save_string_field();
-    let output = {
-        let bytes = input.encode_to_vec();
-        scanner.scan(bytes.as_slice()).read_all().unwrap()
-    };
+    let bytes = input.encode_to_vec();
+    let output = { scanner.scan(bytes.as_slice()).read_all().unwrap() };
 
     let expected = proto::ScanBytesFieldTypesOutput {
-        bytes_field: Some(input.bytes_field.into_boxed_slice()),
-        string_field: Some(input.string_field),
+        bytes_field: Some(input.bytes_field.as_slice()),
+        string_field: Some(input.string_field.as_ref()),
         repeated_bytes_field: (),
         repeated_string_field: (),
     };
