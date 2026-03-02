@@ -135,10 +135,21 @@ impl<E: Encoding> IntoScanner for SaveRepeated<E> {
 }
 
 /// [`IntoScanner`] implementation whose `Scanner` type produces the read value as the event output.
-pub struct SaveBytes<E: DecodeFromBytes + ?Sized>(PhantomData<E>);
+pub struct SaveBytes<E: ?Sized>(PhantomData<E>);
 
 /// [`OnScanField`] impl that produces the read value as the event output.
 pub struct SaveBytesScanner<E: DecodeFromBytes + ?Sized, R: ReadTypes>(Option<E::Decoded<R>>);
+
+impl<E: ?Sized> IntoResettable for SaveBytes<E> {
+    type Resettable = Self;
+    fn into_resettable(self) -> Self::Resettable {
+        self
+    }
+}
+
+impl<E: ?Sized> Resettable for SaveBytes<E> {
+    fn reset(&mut self) {}
+}
 
 pub trait DecodeFromBytes {
     type Error;

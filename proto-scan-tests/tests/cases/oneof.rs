@@ -2,7 +2,6 @@ use std::convert::Infallible;
 
 use prost::Message as _;
 use proto_scan::read::ReadTypes;
-use proto_scan::scan::field::Message;
 use proto_scan::scan::{
     IntoScanOutput, IntoScanner, OnScanOneof, ScanMessage as _, ScannerBuilder as _,
 };
@@ -21,7 +20,8 @@ fn save_field(input: InputKind) {
     let scanner = proto::ScanExample::scanner().oneof_group(
         proto::scan_example::OneofGroup::scanner()
             .save_OneofBool()
-            .save_OneofFixed32(),
+            .save_OneofFixed32()
+            .scan_OneofMessage(proto::MultiFieldMessage::scanner().save_id()),
     );
     let scan = scanner.scan(bytes.as_slice());
 
@@ -35,7 +35,6 @@ fn save_field(input: InputKind) {
         single_fixed64: (),
     } = read_all.unwrap();
 
-    let input = dbg!(input);
     assert_eq!(
         oneof_group,
         input.oneof_group.map(|g| match g {
@@ -44,9 +43,40 @@ fn save_field(input: InputKind) {
             proto::scan_example::OneofGroup::OneofFixed32(f) =>
                 proto::scan_example::ScanOneofGroupOutput::OneofFixed32(Some(f)),
             proto::scan_example::OneofGroup::OneofMessage(_) =>
-                proto::scan_example::ScanOneofGroupOutput::OneofMessage(()),
+                proto::scan_example::ScanOneofGroupOutput::OneofMessage(
+                    proto::ScanMultiFieldMessageOutput {
+                        id: None,
+                        ..Default::default()
+                    }
+                ),
         })
     );
+}
+
+#[test]
+fn save_oneof_message_field() {
+    let bytes = crate::prost_proto::ScanExample {
+        oneof_group: Some(crate::prost_proto::scan_example::OneofGroup::OneofMessage(
+            crate::prost_proto::MultiFieldMessage {
+                name: "abc123".into(),
+                ..Default::default()
+            },
+        )),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    let scanner = proto::ScanExample::scanner().oneof_group(
+        proto::scan_example::OneofGroup::scanner()
+            .scan_OneofMessage(proto::MultiFieldMessage::scanner().save_name()),
+    );
+    let scan = scanner.scan(bytes.as_slice());
+
+    let oneof_group = scan.read_all().unwrap().oneof_group;
+    let found = oneof_group.and_then(|g| match g {
+        proto::scan_example::ScanOneofGroupOutput::OneofMessage(m) => m.name,
+        _ => None,
+    });
+    assert_eq!(found, Some("abc123"));
 }
 
 #[test_case(Empty)]
