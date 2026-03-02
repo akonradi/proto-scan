@@ -8,6 +8,7 @@ use crate::field::{
 
 pub mod field;
 pub mod oneof;
+pub mod prost;
 
 pub struct ScannableMessage {
     pub name: Ident,

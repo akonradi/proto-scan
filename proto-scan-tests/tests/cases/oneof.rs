@@ -38,11 +38,11 @@ fn save_field(input: InputKind) {
     assert_eq!(
         oneof_group,
         input.oneof_group.map(|g| match g {
-            proto::scan_example::OneofGroup::OneofBool(b) =>
+            crate::prost_proto::scan_example::OneofGroup::OneofBool(b) =>
                 proto::scan_example::ScanOneofGroupOutput::OneofBool(b.then_some(true)),
-            proto::scan_example::OneofGroup::OneofFixed32(f) =>
+            crate::prost_proto::scan_example::OneofGroup::OneofFixed32(f) =>
                 proto::scan_example::ScanOneofGroupOutput::OneofFixed32(Some(f)),
-            proto::scan_example::OneofGroup::OneofMessage(_) =>
+            crate::prost_proto::scan_example::OneofGroup::OneofMessage(_) =>
                 proto::scan_example::ScanOneofGroupOutput::OneofMessage(
                     proto::ScanMultiFieldMessageOutput {
                         id: None,
@@ -103,9 +103,9 @@ fn custom_scanner(input: InputKind) {
     assert_eq!(
         oneof_field,
         input.oneof_group.map(|g| FieldNumber::new(match g {
-            proto::scan_example::OneofGroup::OneofBool(_) => 5,
-            proto::scan_example::OneofGroup::OneofFixed32(_) => 6,
-            proto::scan_example::OneofGroup::OneofMessage(_) => 7,
+            crate::prost_proto::scan_example::OneofGroup::OneofBool(_) => 5,
+            crate::prost_proto::scan_example::OneofGroup::OneofFixed32(_) => 6,
+            crate::prost_proto::scan_example::OneofGroup::OneofMessage(_) => 7,
         })
         .unwrap())
     );
