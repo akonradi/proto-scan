@@ -35,7 +35,6 @@ associated data in the protobuf binary format.
 # TODO items remaining
 This is still a work in progress. A non-exhaustive list of things remaining:
 
-- Support oneofs in generated code.
 - Handle proto2 groups in some way.
 - Make `scan::StopScan` a meaningful enum.
 - Implement `Read` for `std::io::Read`.
