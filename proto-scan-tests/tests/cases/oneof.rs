@@ -14,6 +14,43 @@ use InputKind::*;
 
 #[test_case(Empty)]
 #[test_case(Full)]
+fn save_field(input: InputKind) {
+    let input = input.into_example_msg();
+    let bytes = input.encode_to_vec();
+
+    let scanner = proto::ScanExample::scanner().oneof_group(
+        proto::scan_example::OneofGroup::scanner()
+            .save_OneofBool()
+            .save_OneofFixed32(),
+    );
+    let scan = scanner.scan(bytes.as_slice());
+
+    let read_all = scan.read_all();
+    let proto::ScanScanExampleOutput {
+        single_bool: (),
+        repeated_msg: (),
+        single_msg: (),
+        repeated_bool: (),
+        oneof_group,
+        single_fixed64: (),
+    } = read_all.unwrap();
+
+    let input = dbg!(input);
+    assert_eq!(
+        oneof_group,
+        input.oneof_group.map(|g| match g {
+            proto::scan_example::OneofGroup::OneofBool(b) =>
+                proto::scan_example::ScanOneofGroupOutput::OneofBool(b.then_some(true)),
+            proto::scan_example::OneofGroup::OneofFixed32(f) =>
+                proto::scan_example::ScanOneofGroupOutput::OneofFixed32(Some(f)),
+            proto::scan_example::OneofGroup::OneofMessage(_) =>
+                proto::scan_example::ScanOneofGroupOutput::OneofMessage(()),
+        })
+    );
+}
+
+#[test_case(Empty)]
+#[test_case(Full)]
 fn custom_scanner(input: InputKind) {
     let input = input.into_example_msg();
     let bytes = input.encode_to_vec();

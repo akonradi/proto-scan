@@ -378,7 +378,7 @@ pub enum FixedFieldType {
 }
 
 impl SingleFieldType {
-    fn repr_type(&self) -> syn::Path {
+    pub(crate) fn repr_type(&self) -> syn::Path {
         use SingleFieldType::*;
         match self {
             Varint(VarintFieldType::Bool) => parse_quote!(::core::primitive::bool),
@@ -403,7 +403,7 @@ impl SingleFieldType {
         }
     }
 
-    fn encoding_type(&self) -> syn::Path {
+    pub(crate) fn encoding_type(&self) -> syn::Path {
         use SingleFieldType::*;
         let repr_type = self.repr_type();
         match self {

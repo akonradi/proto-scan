@@ -38,6 +38,15 @@ pub trait Read {
     fn skip(&mut self, bytes: u32) -> Result<u32, <Self::ReadTypes as ReadError>::Error>;
 }
 
+pub struct BoundsOnlyReadTypes(Never);
+
+impl ReadError for BoundsOnlyReadTypes {
+    type Error = Never;
+}
+impl ReadTypes for BoundsOnlyReadTypes {
+    type Buffer = NeverBuffer;
+}
+
 impl ReadError for &[u8] {
     type Error = Never;
 }
@@ -123,5 +132,29 @@ impl<R: Read, L: Read<ReadTypes = R::ReadTypes>> Read for Either<L, R> {
         self.as_mut()
             .map_either(|r| r.skip(bytes), |r| r.skip(bytes))
             .into_inner()
+    }
+}
+
+pub struct NeverBuffer(Never);
+
+impl AsRef<[u8]> for NeverBuffer {
+    fn as_ref(&self) -> &[u8] {
+        match self.0 {}
+    }
+}
+
+impl core::ops::Deref for NeverBuffer {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        match self.0 {}
+    }
+}
+
+impl ReadBuffer for NeverBuffer {
+    type String = NeverBuffer;
+
+    fn into_string(self) -> Result<Self::String, core::str::Utf8Error> {
+        todo!()
     }
 }
