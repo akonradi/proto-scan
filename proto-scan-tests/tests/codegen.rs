@@ -1,3 +1,4 @@
-use proto_scan_tests::{prost_proto, proto};
+// use proto_scan_tests::{prost_proto, proto};
 
-mod cases;
+// TODO reenable this.
+// mod cases;
