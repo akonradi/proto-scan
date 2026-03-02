@@ -2,7 +2,9 @@ use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::Ident;
 
-use crate::field::{BytesField, Field, FieldType, MessageField, MessageScannerField, SingleField};
+use crate::field::{
+    BytesField, Field, FieldGeneric, FieldType, MessageField, MessageScannerField, SingleField,
+};
 
 pub mod field;
 
@@ -50,7 +52,11 @@ impl MessageScanOutput<'_> {
 
     fn scan_output_definition(&self) -> TokenStream {
         let name = self.type_name();
-        let scan_types = self.0.generic_types().collect::<Vec<_>>();
+        let scan_types = self
+            .0
+            .generic_types()
+            .map(|f| f.ident())
+            .collect::<Vec<_>>();
         let scan_fields = self.0.fields().map(|m| &m.field.field_name);
         quote! {
             #[derive(Copy, Clone, Debug, Default, PartialEq, Hash)]
@@ -83,7 +89,7 @@ impl MessageScanner<'_> {
         Ident::new(&format!("Scan{}", self.0.name), Span::call_site())
     }
 
-    fn generic_types(&self) -> impl Iterator<Item = &Ident> + Clone {
+    fn generic_types(&self) -> impl Iterator<Item = FieldGeneric<'_>> + Clone {
         self.0.fields.iter().map(|f| f.generic())
     }
 
@@ -101,7 +107,7 @@ impl MessageScanner<'_> {
 
     fn type_definition(&self) -> TokenStream {
         let scanner_name = self.type_name();
-        let scan_types = self.generic_types();
+        let scan_types = self.generic_types().map(|f| f.ident());
         let scan_fields = self.0.fields.iter().map(
             |Field {
                  field_name,
@@ -123,7 +129,7 @@ impl MessageScanner<'_> {
 
     fn scan_event_defn(&self) -> TokenStream {
         let scan_event_name = self.scan_event_name();
-        let generics = self.generic_types();
+        let generics = self.generic_types().map(|f| f.ident());
         let variants = generics.clone().enumerate().map(|(i, t)| {
             let name = format_ident!("Event{i}");
             quote!(#name(#t))
@@ -137,7 +143,10 @@ impl MessageScanner<'_> {
 
     fn impl_scanner_builder(&self) -> TokenStream {
         let type_name = self.type_name();
-        let generics = self.generic_types().collect::<Vec<_>>();
+        let generics = self
+            .generic_types()
+            .map(FieldGeneric::ident)
+            .collect::<Vec<_>>();
         let message_name = &self.0.name;
         quote! {
             impl<#(#generics: ::proto_scan::scan::IntoScanner ),*> ::proto_scan::scan::ScannerBuilder for #type_name < #(#generics),* > {
@@ -148,7 +157,10 @@ impl MessageScanner<'_> {
 
     fn impl_into_scan(&self) -> TokenStream {
         let type_name = self.type_name();
-        let generics = self.generic_types().collect::<Vec<_>>();
+        let generics = self
+            .generic_types()
+            .map(FieldGeneric::ident)
+            .collect::<Vec<_>>();
         let field_names = self.field_names().collect::<Vec<_>>();
         quote! {
             impl<#(#generics: ::proto_scan::scan::IntoScanner),*> ::proto_scan::scan::IntoScanner for #type_name < #(#generics),* > {
@@ -168,10 +180,13 @@ impl MessageScanner<'_> {
         let scanner_name = self.type_name();
         let output_name = MessageScanOutput(*self).type_name();
         let scan_event_name = self.scan_event_name();
-        let generics = self.generic_types().collect::<Vec<_>>();
-        let generics_on_scan_bounds = generics
-            .iter()
-            .map(|g| quote!(#g: ::proto_scan::scan::field::OnScanField<R>))
+        let generics = self.generic_types().map(FieldGeneric::ident).collect::<Vec<_>>();
+        let generics_on_scan_bounds = self
+            .generic_types()
+            .map(|g| {
+                let (ident, bound) = (g.ident(), g.scan_callbacks_trait_for_bound());
+                quote!(#ident: #bound)
+            })
             .collect::<Vec<_>>();
         let field_names = self.field_names().collect::<Vec<_>>();
         let field_arms = |fn_name: &str| {

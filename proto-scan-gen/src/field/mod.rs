@@ -18,8 +18,32 @@ pub(crate) struct MessageScannerField<'m> {
 }
 
 impl Field {
-    pub(crate) fn generic(&self) -> &Ident {
-        &self.generic
+    pub(crate) fn generic(&self) -> FieldGeneric<'_> {
+        FieldGeneric(self)
+    }
+}
+
+#[derive(Copy, Clone)]
+pub(crate) struct FieldGeneric<'a>(&'a Field);
+
+impl<'a> FieldGeneric<'a> {
+    pub(crate) fn ident(self) -> &'a Ident {
+        &self.0.generic
+    }
+
+    pub(crate) fn scan_callbacks_trait_for_bound(&self) -> syn::Path {
+        let Self(Field {
+            generic,
+            field_type,
+            field_name: _,
+        }) = self;
+        match field_type {
+            FieldType::Single(_)
+            | FieldType::Repeated { .. }
+            | FieldType::Bytes(_)
+            | FieldType::Message(_)
+            | FieldType::Unsupported => parse_quote! { ::proto_scan::scan::field::OnScanField<R> },
+        }
     }
 }
 
@@ -32,7 +56,10 @@ impl MessageScannerField<'_> {
         } = self;
         let scanner = parent.0.scanner();
         let scanner_name = scanner.type_name();
-        let generic_types = scanner.generic_types().collect::<Vec<_>>();
+        let generic_types = scanner
+            .generic_types()
+            .map(FieldGeneric::ident)
+            .collect::<Vec<_>>();
         let (before_no_op, tail) = generic_types.split_at(*index);
         let (_, after_no_op) = tail.split_first().unwrap();
 
@@ -59,7 +86,7 @@ impl MessageScannerField<'_> {
         let scanner_name = parent.type_name();
         let scanner_fields = parent.field_names().collect::<Vec<_>>();
         let (before_no_op, after_no_op) = {
-            let mut generic_types = parent.generic_types();
+            let mut generic_types = parent.generic_types().map(FieldGeneric::ident);
             (
                 (&mut generic_types).take(*index).collect::<Vec<_>>(),
                 generic_types.skip(1).collect::<Vec<_>>(),
@@ -267,10 +294,7 @@ pub struct BytesField {
 #[derive(Debug)]
 pub enum FieldType {
     Single(SingleField),
-    Repeated {
-        ty: SingleFieldType,
-        number: u32,
-    },
+    Repeated { ty: SingleFieldType, number: u32 },
     Bytes(BytesField),
     Message(MessageField),
     Unsupported,
