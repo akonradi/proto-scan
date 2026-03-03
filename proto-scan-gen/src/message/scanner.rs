@@ -46,16 +46,14 @@ impl<'m> MessageScanner<'m> {
 
     pub fn scan_event_defn(&self) -> TokenStream {
         let scan_event_name = self.scan_event_name();
-        let variants = self
-            .generic_types()
-            .map(|f| f.ident())
-            .enumerate()
-            .map(|(i, t)| {
-                let name = format_ident!("Event{i}");
-                quote!(#name(#t))
-            });
+        let variants = self.fields().map(|f| {
+            let name = f.variant_name();
+            let generic = f.generic();
+            quote!(#name(#generic))
+        });
         let generics = self.generic_types().map(|f| f.ident());
         quote! {
+            #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
             pub enum #scan_event_name<#(#generics,)*> {
                 #(#variants),*
             }
@@ -134,21 +132,34 @@ impl<'m> MessageScanner<'m> {
         let field_arms = |fn_name: &str| {
             let scan_event_name = &scan_event_name;
             let fn_name = format_ident!("{fn_name}");
-            self.0.fields.iter().enumerate().map(move |(index, Field { field_name, generic: _, field_type, variant_name: _, })| {
-                let event_variant_name = format_ident!("Event{index}");
-                match field_type {
-                    MessageFieldType::Single(SingleField { ty: _, number })
-                    | MessageFieldType::Repeated { ty: _, number }
-                    | MessageFieldType::Message(MessageField { number, type_name: _ })
-                    | MessageFieldType::Bytes(BytesField { utf8: _, number }) => quote! {
-                        #number => self.#field_name.#fn_name(value)?.map(#scan_event_name::#event_variant_name),
+            self.0.fields.iter()
+                .map(
+                    move |Field {
+                              field_name,
+                              generic: _,
+                              field_type,
+                              variant_name,
+                          }| {
+                        match field_type {
+                            MessageFieldType::Single(SingleField { ty: _, number })
+                            | MessageFieldType::Repeated { ty: _, number }
+                            | MessageFieldType::Message(MessageField {
+                                number,
+                                type_name: _,
+                            })
+                            | MessageFieldType::Bytes(BytesField { utf8: _, number }) => quote! {
+                                #number => self.#field_name.#fn_name(value)?.map(#scan_event_name::#variant_name),
+                            },
+                            MessageFieldType::OneOf {
+                                type_name: _,
+                                numbers,
+                            } => quote! {
+                                ((#(#numbers )|*) ) => self.#field_name.#fn_name(field, value)?.map(#scan_event_name::#variant_name),
+                            },
+                            MessageFieldType::Unsupported => TokenStream::new(),
+                        }
                     },
-                    | MessageFieldType::OneOf { type_name: _, numbers } => quote! {
-                        ((#(#numbers )|*) ) => self.#field_name.#fn_name(field, value)?.map(#scan_event_name::#event_variant_name),
-                    },
-                    MessageFieldType::Unsupported => TokenStream::new()
-                }
-            })
+                )
         };
 
         let on_numeric_arms = field_arms("on_numeric");
