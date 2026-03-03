@@ -5,6 +5,7 @@ pub mod scanner;
 #[derive(Debug)]
 pub struct Field<F = MessageFieldType> {
     pub field_name: Ident,
+    pub variant_name: Ident,
     pub generic: Ident,
     pub field_type: F,
 }
@@ -37,6 +38,7 @@ impl<'a> FieldGeneric<'a, MessageFieldType> {
             generic: _,
             field_type,
             field_name: _,
+            variant_name: _,
         }) = self;
         match field_type {
             MessageFieldType::OneOf { .. } => parse_quote!(::proto_scan::scan::OnScanOneof<R>),

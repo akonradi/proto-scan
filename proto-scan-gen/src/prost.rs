@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use convert_case::ccase;
 use proc_macro2::{Span, TokenStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned as _;
@@ -56,7 +57,7 @@ fn enum_impl(name: Ident, data_enum: DataEnum) -> Result<TokenStream> {
             let span = field.span();
             let syn::Variant {
                 attrs,
-                ident: field_name,
+                ident: variant_name,
                 fields,
                 discriminant: _,
             } = field;
@@ -66,7 +67,7 @@ fn enum_impl(name: Ident, data_enum: DataEnum) -> Result<TokenStream> {
                 }
                 syn::Fields::Unnamed(_) | syn::Fields::Named(_) | syn::Fields::Unit => {
                     return Err(syn::Error::new(
-                        field_name.span(),
+                        variant_name.span(),
                         "expected a single unnamed field",
                     ));
                 }
@@ -95,10 +96,12 @@ fn enum_impl(name: Ident, data_enum: DataEnum) -> Result<TokenStream> {
                 }
             };
 
-            let generic = Ident::new(&format!("T{i}"), Span::call_site());
+            let generic = Ident::new(&format!("T{i}"), span);
+            let field_name = Ident::new(&ccase!(snake, variant_name.to_string()), span);
 
             Ok(Field {
                 field_name,
+                variant_name,
                 field_type,
                 generic,
             })
@@ -137,6 +140,7 @@ fn message_impl(name: Ident, data_struct: DataStruct) -> Result<TokenStream> {
 
             let field_name =
                 field_name.ok_or_else(|| syn::Error::new(span, "message fields must be named"))?;
+            let variant_name = Ident::new(&ccase!(pascal, field_name.to_string()), span);
 
             let ProstAttrs { field_type } = (attrs, ty).try_into()?;
 
@@ -144,6 +148,7 @@ fn message_impl(name: Ident, data_struct: DataStruct) -> Result<TokenStream> {
 
             Ok(Field {
                 field_name,
+                variant_name,
                 field_type,
                 generic,
             })

@@ -134,7 +134,7 @@ impl<'m> MessageScanner<'m> {
         let field_arms = |fn_name: &str| {
             let scan_event_name = &scan_event_name;
             let fn_name = format_ident!("{fn_name}");
-            self.0.fields.iter().enumerate().map(move |(index, Field { field_name, generic: _, field_type })| {
+            self.0.fields.iter().enumerate().map(move |(index, Field { field_name, generic: _, field_type, variant_name: _, })| {
                 let event_variant_name = format_ident!("Event{index}");
                 match field_type {
                     MessageFieldType::Single(SingleField { ty: _, number })

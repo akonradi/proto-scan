@@ -19,9 +19,9 @@ fn save_field(input: InputKind) {
 
     let scanner = proto::ScanExample::scanner().oneof_group(
         proto::scan_example::OneofGroup::scanner()
-            .save_OneofBool()
-            .save_OneofFixed32()
-            .scan_OneofMessage(proto::MultiFieldMessage::scanner().save_id()),
+            .save_oneof_bool()
+            .save_oneof_fixed_32()
+            .scan_oneof_message(proto::MultiFieldMessage::scanner().save_id()),
     );
     let scan = scanner.scan(bytes.as_slice());
 
@@ -67,7 +67,7 @@ fn save_oneof_message_field() {
     .encode_to_vec();
     let scanner = proto::ScanExample::scanner().oneof_group(
         proto::scan_example::OneofGroup::scanner()
-            .scan_OneofMessage(proto::MultiFieldMessage::scanner().save_name()),
+            .scan_oneof_message(proto::MultiFieldMessage::scanner().save_name()),
     );
     let scan = scanner.scan(bytes.as_slice());
 

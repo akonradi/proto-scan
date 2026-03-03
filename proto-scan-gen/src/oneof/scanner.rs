@@ -59,10 +59,10 @@ impl<'a> OneofScanner<'a> {
         let type_name = self.scan_output_name();
         let generics = self.fields().map(|f| &f.inner.field.generic);
         let fields = self.fields().map(|f| {
-            let name = &f.inner.field.field_name;
+            let variant = &f.inner.field.variant_name;
             let generic = &f.inner.field.generic;
             quote! {
-                #name(#generic)
+                #variant(#generic)
             }
         });
         quote! {
@@ -104,10 +104,10 @@ impl<'a> OneofScanner<'a> {
         let type_name = self.scan_event_name();
         let generics = self.fields().map(|f| &f.inner.field.generic);
         let fields = self.fields().map(|f| {
-            let name = &f.inner.field.field_name;
+            let variant = &f.inner.field.variant_name;
             let generic = &f.inner.field.generic;
             quote! {
-                #name(#generic)
+                #variant(#generic)
             }
         });
         quote! {
@@ -137,16 +137,18 @@ impl<'a> OneofScanner<'a> {
             },
         );
         let last_set_arms = self.fields().map(|OneofScannerField {inner }| {
+            let variant = &inner.field.variant_name;
             let field_name = &inner.field.field_name;
             quote! {
-                #output_type::#field_name(()) => #output_type::#field_name(#field_name.into_scan_output())
+                #output_type::#variant(()) => #output_type::#variant(#field_name.into_scan_output())
             }
         });
 
         let reset_last_set_arms = self.fields().map(|OneofScannerField {inner }| {
             let field_name = &inner.field.field_name;
+            let variant = &inner.field.variant_name;
             quote! {
-                #output_type::#field_name(()) => #field_name.reset(),
+                #output_type::#variant(()) => #field_name.reset(),
             }
         });
 
@@ -156,8 +158,7 @@ impl<'a> OneofScanner<'a> {
             let output_type = &output_type;
             let fn_name = format_ident!("{fn_name}");
             self.fields().map(move |OneofScannerField { inner } | {
-                let Field {field_type, field_name, generic: _} = &inner.field;
-                let event_variant_name = field_name;
+                let Field {field_type, field_name, generic: _, variant_name } = &inner.field;
                 match field_type {
                     OneOfField::Single(SingleField { ty: _, number })
                     | OneOfField::Message(MessageField{ number, type_name: _ })
@@ -165,8 +166,8 @@ impl<'a> OneofScanner<'a> {
                         #number => {
                             ::proto_scan::scan::Resettable::reset(self);
                             let event = self.#field_name.#fn_name(value)?;
-                            self.proto_scan_last_set = ::core::option::Option::Some(#output_type::#event_variant_name(()));
-                            event.map(#scan_event_name::#event_variant_name)
+                            self.proto_scan_last_set = ::core::option::Option::Some(#output_type::#variant_name(()));
+                            event.map(#scan_event_name::#variant_name)
                         },
                     },
                 }
