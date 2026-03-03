@@ -5,11 +5,11 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned as _;
 use syn::{Attribute, DataEnum, DataStruct, DeriveInput, Expr, Ident, Meta, Result, Token};
 
-use crate::ScannableMessage;
 use crate::field::{
-    BytesField, Field, FieldType, FixedFieldType, MessageField, OneOfField, ParsedFieldType,
+    BytesField, Field, FixedFieldType, MessageField, MessageFieldType, OneOfField, ParsedFieldType,
     SingleField, VarintFieldType,
 };
+use crate::message::ScannableMessage;
 use crate::oneof::ScannableOneof;
 
 pub fn derive_impl(input: DeriveInput) -> Result<TokenStream> {
@@ -84,10 +84,12 @@ fn enum_impl(name: Ident, data_enum: DataEnum) -> Result<TokenStream> {
 
             let ProstAttrs { field_type } = (attrs, ty).try_into()?;
             let field_type = match field_type {
-                FieldType::Single(single_field) => OneOfField::Single(single_field),
-                FieldType::Bytes(bytes_field) => OneOfField::Bytes(bytes_field),
-                FieldType::Message(message_field) => OneOfField::Message(message_field),
-                FieldType::Repeated { .. } | FieldType::OneOf { .. } | FieldType::Unsupported => {
+                MessageFieldType::Single(single_field) => OneOfField::Single(single_field),
+                MessageFieldType::Bytes(bytes_field) => OneOfField::Bytes(bytes_field),
+                MessageFieldType::Message(message_field) => OneOfField::Message(message_field),
+                MessageFieldType::Repeated { .. }
+                | MessageFieldType::OneOf { .. }
+                | MessageFieldType::Unsupported => {
                     return Err(syn::Error::new(
                         span,
                         format!("oneof has {field_type:?} field"),
@@ -105,7 +107,18 @@ fn enum_impl(name: Ident, data_enum: DataEnum) -> Result<TokenStream> {
         })
         .collect::<Result<_>>()?;
     let oneof = ScannableOneof { name, fields };
-    Ok(oneof.scanner().generated_code())
+    let scanner = oneof.scanner();
+    Ok([
+        scanner.scanner_type_definition(),
+        scanner.output_type_definition(),
+        oneof.impl_scan_message(),
+        scanner.impl_scanner_builder(),
+        scanner.event_type_definition(),
+        scanner.impl_scan_callbacks(),
+        scanner.scanner_impl_fns(),
+    ]
+    .into_iter()
+    .collect())
 }
 
 fn message_impl(name: Ident, data_struct: DataStruct) -> Result<TokenStream> {
@@ -140,11 +153,25 @@ fn message_impl(name: Ident, data_struct: DataStruct) -> Result<TokenStream> {
         .collect::<Result<_>>()?;
 
     let message = ScannableMessage { name, fields };
-    Ok(message.scanner().generated_code())
+    let scanner = message.scanner();
+    Ok([
+        message.impl_scan_message(),
+        scanner.type_definition(),
+        scanner.scan_event_defn(),
+        scanner.impl_scanner_builder(),
+        scanner.impl_into_scan(),
+        scanner.impl_into_scan_output(),
+        scanner.impl_scan_callbacks(),
+        scanner.output_type().scan_output_definition(),
+    ]
+    .into_iter()
+    .chain(scanner.fields().map(|m| m.impl_()))
+    .flatten()
+    .collect())
 }
 
 struct ProstAttrs {
-    field_type: FieldType,
+    field_type: MessageFieldType,
 }
 
 impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
@@ -266,17 +293,17 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
 
         let field_type = match (field_type, field_number, repeated) {
             (Some(ParsedFieldType::Single(ty)), Some(FieldNumber::Single(number)), true) => {
-                FieldType::Repeated { ty, number }
+                MessageFieldType::Repeated { ty, number }
             }
             (Some(ParsedFieldType::Single(ty)), Some(FieldNumber::Single(number)), false) => {
-                FieldType::Single(SingleField { ty, number })
+                MessageFieldType::Single(SingleField { ty, number })
             }
             (Some(ParsedFieldType::Message), Some(FieldNumber::Single(number)), false) => {
                 let type_name = extract_message_type_name(rust_field_type)?;
-                FieldType::Message(MessageField { number, type_name })
+                MessageFieldType::Message(MessageField { number, type_name })
             }
             (Some(ParsedFieldType::Bytes { utf8 }), Some(FieldNumber::Single(number)), false) => {
-                FieldType::Bytes(BytesField { utf8, number })
+                MessageFieldType::Bytes(BytesField { utf8, number })
             }
             (
                 Some(
@@ -293,7 +320,7 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                 ));
             }
             (Some(ParsedFieldType::OneOf { ty }), Some(FieldNumber::Multiple(numbers)), false) => {
-                FieldType::OneOf {
+                MessageFieldType::OneOf {
                     type_name: ty,
                     numbers,
                 }
@@ -314,8 +341,8 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                 Some(ParsedFieldType::Message | ParsedFieldType::Bytes { utf8: _ }),
                 Some(_number),
                 true,
-            ) => FieldType::Unsupported,
-            (None, _, _) => FieldType::Unsupported,
+            ) => MessageFieldType::Unsupported,
+            (None, _, _) => MessageFieldType::Unsupported,
             (
                 Some(
                     ft @ (ParsedFieldType::Single(_)

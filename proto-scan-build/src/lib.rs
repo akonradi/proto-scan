@@ -109,7 +109,9 @@ fn visit_mod(mod_items: &[syn::Item]) -> syn::Result<TokenStream> {
                         return Ok(None);
                     }
                     let name = &item_enum.ident;
-                    quote! {pub struct #name (::core::convert::Infallible); }
+                    quote! {pub enum #name {
+                        
+                    } }
                         .into_iter()
                         .chain(proto_scan_gen::prost::derive_impl(
                             parse_quote!(#item_enum),

@@ -1,0 +1,233 @@
+use proc_macro2::{Span, TokenStream};
+use quote::{format_ident, quote};
+use syn::Ident;
+
+use crate::field::scanner::MessageScannerField;
+use crate::field::{BytesField, Field, FieldGeneric, MessageField, MessageFieldType, SingleField};
+use crate::message::ScannableMessage;
+
+/// Generates the scanner for the inner message.
+#[derive(Copy, Clone)]
+pub(crate) struct MessageScanner<'m>(&'m ScannableMessage);
+
+impl<'m> MessageScanner<'m> {
+    pub fn new(msg: &'m ScannableMessage) -> Self {
+        Self(msg)
+    }
+
+    pub(crate) fn type_name(&self) -> Ident {
+        Ident::new(&format!("Scan{}", self.0.name), Span::call_site())
+    }
+
+    pub(crate) fn generic_types(&self) -> impl Iterator<Item = FieldGeneric<'_>> + Clone {
+        self.0.fields.iter().map(|f| f.generic())
+    }
+
+    pub fn fields(&self) -> impl Iterator<Item = MessageScannerField<'_>> + Clone {
+        self.0
+            .fields
+            .iter()
+            .enumerate()
+            .map(|(index, field)| MessageScannerField {
+                parent: *self,
+                index,
+                field,
+            })
+    }
+
+    pub fn type_definition(&self) -> TokenStream {
+        let scanner_name = self.type_name();
+        let scan_types = self.generic_types().map(|f| f.ident());
+        let scan_fields = self.0.fields.iter().map(
+            |Field {
+                 field_name,
+                 generic,
+                 ..
+             }| quote!(#field_name: #generic),
+        );
+        quote! {
+            #[derive(Default)]
+            pub struct #scanner_name <#(#scan_types),*> {
+                #(#scan_fields, )*
+            }
+        }
+    }
+
+    pub(crate) fn field_names(&self) -> impl Iterator<Item = &Ident> + Clone {
+        self.fields().map(|m| &m.field.field_name)
+    }
+
+    pub fn scan_event_defn(&self) -> TokenStream {
+        let scan_event_name = self.scan_event_name();
+        let generics = self.generic_types().map(|f| f.ident());
+        let variants = generics.clone().enumerate().map(|(i, t)| {
+            let name = format_ident!("Event{i}");
+            quote!(#name(#t))
+        });
+        quote! {
+            pub enum #scan_event_name<#(#generics,)*> {
+                #(#variants),*
+            }
+        }
+    }
+
+    pub fn impl_scanner_builder(&self) -> TokenStream {
+        let type_name = self.type_name();
+        let generics = self
+            .generic_types()
+            .map(FieldGeneric::ident)
+            .collect::<Vec<_>>();
+        let message_name = &self.0.name;
+        quote! {
+            impl<#(#generics: ::proto_scan::scan::IntoScanner ),*> ::proto_scan::scan::ScannerBuilder for #type_name < #(#generics),* > {
+                type Message = #message_name;
+            }
+        }
+    }
+
+    pub fn impl_into_scan(&self) -> TokenStream {
+        let type_name = self.type_name();
+        let generics = self
+            .generic_types()
+            .map(FieldGeneric::ident)
+            .collect::<Vec<_>>();
+        let field_names = self.field_names().collect::<Vec<_>>();
+        quote! {
+            impl<#(#generics: ::proto_scan::scan::IntoScanner),*> ::proto_scan::scan::IntoScanner for #type_name < #(#generics),* > {
+                type Scanner<R: ::proto_scan::read::ReadTypes> = #type_name < #(<#generics as ::proto_scan::scan::IntoScanner>::Scanner<R> ),* >;
+                fn into_scanner<R: ::proto_scan::read::ReadTypes>(self) -> Self::Scanner<R> {
+                    let Self { #(#field_names),* } = self;
+                    Self::Scanner {
+                        #(#field_names: #field_names.into_scanner()),*
+                    }
+
+                }
+            }
+        }
+    }
+
+    pub fn impl_into_scan_output(&self) -> TokenStream {
+        let scanner_name = self.type_name();
+        let output_name = self.output_type().type_name();
+        let field_names = self.field_names().collect::<Vec<_>>();
+        let generics = self
+            .generic_types()
+            .map(FieldGeneric::ident)
+            .collect::<Vec<_>>();
+        quote! {
+            impl <#(#generics: ::proto_scan::scan::IntoScanOutput,)*> ::proto_scan::scan::IntoScanOutput for #scanner_name<#(#generics,)*> {
+                type ScanOutput = #output_name<#(#generics::ScanOutput),*>;
+
+                fn into_scan_output(self) -> Self::ScanOutput {
+                    let Self { #(#field_names),* } = self;
+                    Self::ScanOutput {
+                        #(#field_names: #field_names.into_scan_output(),)*
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn impl_scan_callbacks(&self) -> TokenStream {
+        let scanner_name = self.type_name();
+        let scan_event_name = self.scan_event_name();
+        let generics = self
+            .generic_types()
+            .map(FieldGeneric::ident)
+            .collect::<Vec<_>>();
+        let generics_on_scan_bounds = self
+            .generic_types()
+            .map(|g| {
+                let (ident, bound) = (g.ident(), g.scan_callbacks_trait_for_bound());
+                quote!(#ident: #bound)
+            })
+            .collect::<Vec<_>>();
+        let field_names = self.field_names().collect::<Vec<_>>();
+        let field_arms = |fn_name: &str| {
+            let scan_event_name = &scan_event_name;
+            let fn_name = format_ident!("{fn_name}");
+            self.fields().map(move |MessageScannerField { parent: _, index, field: Field { field_name, generic: _, field_type } }| {
+            let event_variant_name = format_ident!("Event{index}");
+            match field_type {
+                MessageFieldType::Single(SingleField { ty: _, number })
+                | MessageFieldType::Repeated { ty: _, number }
+                | MessageFieldType::Message(MessageField { number, type_name: _ })
+                | MessageFieldType::Bytes(BytesField { utf8: _, number }) => quote! {
+                    #number => self.#field_name.#fn_name(value)?.map(#scan_event_name::#event_variant_name),
+                },
+                | MessageFieldType::OneOf { type_name: _, numbers } => quote! {
+                    ((#(#numbers )|*) ) => self.#field_name.#fn_name(field, value)?.map(#scan_event_name::#event_variant_name),
+                },
+                MessageFieldType::Unsupported => TokenStream::new()
+            }
+        })
+        };
+
+        let on_numeric_arms = field_arms("on_numeric");
+        let on_group_arms = field_arms("on_group");
+        let on_length_delimited_arms = field_arms("on_length_delimited");
+        quote! {
+
+            impl <#(#generics_on_scan_bounds),* , R: ::proto_scan::read::ReadTypes> ::proto_scan::scan::ScanCallbacks<R> for #scanner_name<#(#generics,)*> {
+                type ScanEvent = Option<#scan_event_name<#(#generics :: ScanEvent),*>>;
+                fn on_numeric(
+                    &mut self,
+                    field: ::proto_scan::wire::FieldNumber,
+                    value: ::proto_scan::wire::NumericField,
+                ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
+                    Ok(match u32::from(field) {
+                        #(#on_numeric_arms)*
+                        _ => None,
+                    })
+                }
+
+                fn on_group(&mut self, field: ::proto_scan::wire::FieldNumber, value: ::proto_scan::wire::GroupOp) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
+                    Ok(match u32::from(field) {
+                        #(#on_group_arms)*
+                        _ => None,
+                    })
+                }
+
+                fn on_length_delimited(
+                    &mut self,
+                    field: ::proto_scan::wire::FieldNumber,
+                    value: impl ::proto_scan::wire::LengthDelimited<ReadTypes=R>,
+                ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
+                    Ok(match u32::from(field) {
+                        #(#on_length_delimited_arms)*
+                        _ => None,
+                    })
+                }
+            }
+            impl <#(#generics: ::proto_scan::scan::IntoResettable),*> ::proto_scan::scan::IntoResettable for #scanner_name<#(#generics,)*> {
+                type Resettable = #scanner_name<#(<#generics as ::proto_scan::scan::IntoResettable>::Resettable),*>;
+
+                fn into_resettable(self) -> Self::Resettable {
+                    let Self { #(#field_names),* } = self;
+                    #scanner_name {
+                        #(#field_names: #field_names.into_resettable()),*
+                    }
+                }
+            }
+
+            impl <#(#generics: ::proto_scan::scan::Resettable),*> ::proto_scan::scan::Resettable for #scanner_name<#(#generics,)*> {
+                fn reset(&mut self) {
+                    #(self.#field_names.reset();)*
+                }
+            }
+        }
+    }
+
+    fn scan_event_name(&self) -> Ident {
+        let scanner_name = self.type_name();
+        Ident::new(&format!("{scanner_name}Event"), Span::call_site())
+    }
+
+    pub(crate) fn scanner(&self) -> MessageScanner<'_> {
+        self.0.scanner()
+    }
+
+    pub(crate) fn output_type(&self) -> super::MessageScanOutput<'_> {
+        super::MessageScanOutput(*self)
+    }
+}
