@@ -25,13 +25,13 @@ impl<R: Read> Read for LimitReader<R> {
         let b = bytes.min(*remaining);
         let bytes = b;
         let r = inner.read(bytes)?;
-        *remaining = *remaining - bytes;
+        *remaining -= bytes;
         Ok(r)
     }
 
     fn skip(&mut self, bytes: u32) -> Result<u32, <Self::ReadTypes as ReadError>::Error> {
         let skipped = self.inner.skip(bytes)?;
-        self.remaining = self.remaining - skipped;
+        self.remaining -= skipped;
         Ok(skipped)
     }
 }

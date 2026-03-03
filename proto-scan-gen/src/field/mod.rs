@@ -1,5 +1,3 @@
-use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
 use syn::{Ident, parse_quote};
 
 pub mod scanner;
@@ -28,7 +26,7 @@ impl<'a> FieldGeneric<'a> {
 
     pub(crate) fn scan_callbacks_trait_for_bound(&self) -> syn::Path {
         let Self(Field {
-            generic,
+            generic: _,
             field_type,
             field_name: _,
         }) = self;

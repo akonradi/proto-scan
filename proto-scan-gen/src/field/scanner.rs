@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{Ident, parse_quote};
+use syn::Ident;
 
 use crate::field::{BytesField, Field, FieldGeneric, MessageField, MessageFieldType, SingleField};
 
@@ -232,7 +232,7 @@ impl MessageScannerField<'_> {
                 );
                 vec![scan_fn, custom_fn]
             }
-            MessageFieldType::OneOf { type_name, numbers } => {
+            MessageFieldType::OneOf { type_name: _, numbers: _ } => {
                 let custom_fn = swap_single_field_fn(
                     format_ident!("{field_name}"),
                     vec![

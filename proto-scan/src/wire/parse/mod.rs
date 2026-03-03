@@ -32,6 +32,10 @@ pub trait LengthDelimited {
     /// Returns the number of bytes in the field.
     fn len(&self) -> u32;
 
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     type PackedIter<W: NumericWireType>: Iterator<
         Item = Result<W::Repr, DecodeError<<Self::ReadTypes as ReadError>::Error>>,
     >;
@@ -68,15 +72,12 @@ pub trait ParseEventReader {
     fn next(
         &mut self,
     ) -> Option<
-        Result<
-            (
-                FieldNumber,
-                ParseEvent<impl LengthDelimited<ReadTypes = Self::ReadTypes>>,
-            ),
-            DecodeError<<Self::ReadTypes as ReadError>::Error>,
-        >,
+        ParseEventReaderOutput<Self::ReadTypes, impl LengthDelimited<ReadTypes = Self::ReadTypes>>,
     >;
 }
+
+type ParseEventReaderOutput<RT, LD> =
+    Result<(FieldNumber, ParseEvent<LD>), DecodeError<<RT as ReadError>::Error>>;
 
 /// An event returned by [`ParseEventReader::next`].
 #[derive(Debug)]

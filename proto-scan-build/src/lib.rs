@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::io::{Error, ErrorKind, Result};
+use std::io::{Error, Result};
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
@@ -30,7 +30,7 @@ impl CompileScan for prost_build::Config {
 
         let mut target_is_env = false;
         let target: PathBuf = env::var_os("OUT_DIR")
-            .ok_or_else(|| Error::new(ErrorKind::Other, "OUT_DIR environment variable is not set"))
+            .ok_or_else(|| Error::other("OUT_DIR environment variable is not set"))
             .map(|val| {
                 target_is_env = true;
                 Into::into(val)
@@ -55,7 +55,6 @@ impl CompileScan for prost_build::Config {
             let file_name = module.to_file_name_or("_");
             let output_path = target.join(file_name);
 
-            println!("writing to {output_path:?}: {}", content.to_string());
             fs::write(&output_path, content.to_string().as_bytes())?;
 
             if let Some(cargo_cmd) = &cargo_cmd {
@@ -79,7 +78,7 @@ fn generate_prost(prost_gen: HashMap<Module, String>) -> Result<HashMap<Module, 
 
         let parsed: syn::ItemMod = syn::parse_str(&format!("mod m {{ {prost_gen} }}")).unwrap();
 
-        let contents = visit_mod(&parsed.content.unwrap().1).map_err(|e| Error::other(e))?;
+        let contents = visit_mod(&parsed.content.unwrap().1).map_err(Error::other)?;
 
         output.insert(module, contents);
     }
@@ -91,7 +90,9 @@ fn visit_mod(mod_items: &[syn::Item]) -> syn::Result<TokenStream> {
     let prost_message: syn::Path = parse_quote!(::prost::Message);
     let prost_oneof: syn::Path = parse_quote!(::prost::Oneof);
 
-    let mod_items = mod_items
+    
+
+    mod_items
         .iter()
         .map(|item| {
             let item: TokenStream = match item {
@@ -144,7 +145,7 @@ fn visit_mod(mod_items: &[syn::Item]) -> syn::Result<TokenStream> {
                     let module_tokens = module
                         .content
                         .as_ref()
-                        .map(|(_, t)| visit_mod(&t))
+                        .map(|(_, t)| visit_mod(t))
                         .transpose()?;
                     let items: syn::ItemMod = syn::parse_quote! { mod m { #module_tokens } };
                     let module = syn::ItemMod {
@@ -159,7 +160,5 @@ fn visit_mod(mod_items: &[syn::Item]) -> syn::Result<TokenStream> {
             Ok(Some(item))
         })
         .flatten_ok()
-        .try_collect();
-
-    mod_items
+        .try_collect()
 }

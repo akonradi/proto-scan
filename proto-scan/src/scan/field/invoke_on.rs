@@ -12,7 +12,7 @@ use core::convert::Infallible;
 /// wrong wire type.
 pub struct InvokeOn<W, F>(F, PhantomData<W>);
 
-impl<'a, W: NumericWireType, R: ReadTypes, F: FnMut(W::Repr) -> Result<(), StopScan>> OnScanField<R>
+impl<W: NumericWireType, R: ReadTypes, F: FnMut(W::Repr) -> Result<(), StopScan>> OnScanField<R>
     for InvokeOn<W, F>
 {
     type ScanEvent = Infallible;

@@ -156,7 +156,7 @@ pub(crate) fn next_event<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>>(
 impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>> Scan<P, S> {
     pub fn read_all(self) -> Result<S::ScanOutput, StopScan> {
         let mut it = self.into_iter();
-        while let Some(r) = it.next() {
+        for r in it.by_ref() {
             let _ = r?;
         }
         Ok(it.1.into_scan_output())

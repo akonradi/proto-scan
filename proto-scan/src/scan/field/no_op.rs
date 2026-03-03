@@ -36,24 +36,24 @@ impl<R: ReadTypes> OnScanOneof<R> for NoOp {
 
     fn on_numeric(
         &mut self,
-        field: crate::wire::FieldNumber,
-        value: NumericField,
+        _field: crate::wire::FieldNumber,
+        _value: NumericField,
     ) -> Result<Option<Self::ScanEvent>, StopScan> {
         Ok(None)
     }
 
     fn on_group(
         &mut self,
-        field: crate::wire::FieldNumber,
-        op: GroupOp,
+        _field: crate::wire::FieldNumber,
+        _op: GroupOp,
     ) -> Result<Option<Self::ScanEvent>, StopScan> {
         Ok(None)
     }
 
     fn on_length_delimited(
         &mut self,
-        field: crate::wire::FieldNumber,
-        delimited: impl LengthDelimited<ReadTypes = R>,
+        _field: crate::wire::FieldNumber,
+        _delimited: impl LengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, StopScan> {
         Ok(None)
     }

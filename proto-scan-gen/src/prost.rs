@@ -37,18 +37,18 @@ pub fn derive_impl(input: DeriveInput) -> Result<TokenStream> {
         }
         syn::Data::Enum(_) => Ok(TokenStream::new()),
         syn::Data::Union(u) => {
-            return Err(syn::Error::new(
+            Err(syn::Error::new(
                 u.union_token.span(),
                 "union types are not supported",
-            ));
+            ))
         }
     }
 }
 
 fn enum_impl(name: Ident, data_enum: DataEnum) -> Result<TokenStream> {
     let DataEnum {
-        brace_token,
-        enum_token,
+        brace_token: _,
+        enum_token: _,
         variants,
     } = data_enum;
     let fields = variants
@@ -60,7 +60,7 @@ fn enum_impl(name: Ident, data_enum: DataEnum) -> Result<TokenStream> {
                 attrs,
                 ident: field_name,
                 fields,
-                discriminant,
+                discriminant: _,
             } = field;
             let field = match fields {
                 syn::Fields::Unnamed(fields) if fields.unnamed.len() == 1 => {
@@ -75,10 +75,10 @@ fn enum_impl(name: Ident, data_enum: DataEnum) -> Result<TokenStream> {
             };
             let syn::Field {
                 attrs: _,
-                vis,
-                mutability,
-                ident,
-                colon_token,
+                vis: _,
+                mutability: _,
+                ident: _,
+                colon_token: _,
                 ty,
             } = field;
 
@@ -259,7 +259,7 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                         format!("unsupported tag value {:?}", value.span().source_text()),
                     )
                 })?;
-                if let Some(_) = field_number.replace(FieldNumber::Single(value)) {
+                if field_number.replace(FieldNumber::Single(value)).is_some() {
                     return Err(syn::Error::new(value.span(), "more than one tag number"));
                 }
             }
@@ -285,7 +285,7 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                         format!("unsupported tags value {:?}", value.span().source_text()),
                     )
                 })?;
-                if let Some(_) = field_number.replace(FieldNumber::Multiple(values)) {
+                if field_number.replace(FieldNumber::Multiple(values)).is_some() {
                     return Err(syn::Error::new(value.span(), "more than one tag number"));
                 }
             }
@@ -382,10 +382,7 @@ fn extract_message_type_name(ty: syn::Type) -> Result<String> {
         if last.ident == "Vec" || last.ident == "Option" {
             match last.arguments {
                 syn::PathArguments::AngleBracketed(args) if args.args.len() == 1 => {
-                    match args.args.into_iter().next().unwrap() {
-                        syn::GenericArgument::Type(ty) => return inner(ty),
-                        _ => {}
-                    }
+                    if let syn::GenericArgument::Type(ty) = args.args.into_iter().next().unwrap() { return inner(ty) }
                 }
                 _ => {}
             }

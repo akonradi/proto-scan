@@ -51,7 +51,7 @@ impl ReadError for &[u8] {
     type Error = Never;
 }
 
-impl<'a> ReadTypes for &'a [u8] {
+impl ReadTypes for &[u8] {
     type Buffer = Self;
 }
 
@@ -65,7 +65,7 @@ impl<'a> ReadBuffer for &'a [u8] {
     }
 }
 
-impl<'a> Read for &'a [u8] {
+impl Read for &[u8] {
     type ReadTypes = Self;
     fn read(
         &mut self,

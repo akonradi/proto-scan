@@ -12,6 +12,12 @@ use crate::wire::{GroupOp, LengthDelimited, NumericField, NumericWireType};
 /// Deserializes according to the [`Encoding`] type parameter.
 pub struct SaveNumeric<E: Encoding>(Option<E::Repr>);
 
+impl<T: Encoding> Default for SaveNumeric<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Encoding> SaveNumeric<T> {
     pub fn new() -> Self {
         Self(None)
@@ -74,6 +80,12 @@ impl<E: Encoding> IntoScanOutput for SaveNumeric<E> {
 pub struct SaveRepeated<E: Encoding>(Vec<E::Repr>);
 
 #[cfg(feature = "std")]
+impl<T: Encoding> Default for SaveRepeated<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Encoding> SaveRepeated<T> {
     pub fn new() -> Self {
         Self(Vec::new())
@@ -170,6 +182,12 @@ impl DecodeFromBytes for [u8] {
     type Decoded<R: ReadTypes> = R::Buffer;
     fn decode<R: ReadTypes>(bytes: R::Buffer) -> Result<Self::Decoded<R>, Self::Error> {
         Ok(bytes)
+    }
+}
+
+impl<T: DecodeFromBytes + ?Sized> Default for SaveBytes<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

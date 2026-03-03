@@ -71,7 +71,7 @@ impl<'t, D> Resettable for RestoreOnReset<'t, D> {
 
 impl<'t, T: Into<D>, D> SaveFrom<T> for RestoreOnReset<'t, D> {
     fn save_from(&mut self, value: T) {
-        self.1 = Some(core::mem::replace(&mut self.0, value.into()));
+        self.1 = Some(core::mem::replace(self.0, value.into()));
     }
 }
 
@@ -105,14 +105,14 @@ impl<E, D> WriteRepeated<E, D> {
     }
 }
 
-impl<'t, E: Encoding, R: ReadTypes, D: DerefMut<Target: Extend<E::Repr>>> OnScanField<R>
+impl<E: Encoding, R: ReadTypes, D: DerefMut<Target: Extend<E::Repr>>> OnScanField<R>
     for WriteRepeated<E, D>
 {
     type ScanEvent = Infallible;
 
     fn on_numeric(&mut self, value: NumericField) -> Result<Option<Infallible>, StopScan> {
         let value = <E::Wire as NumericWireType>::from_value(value).ok_or(StopScan)?;
-        let decoded = E::decode(value).map_err(Into::into)?.into();
+        let decoded = E::decode(value).map_err(Into::into)?;
         self.0.extend([decoded]);
         Ok(None)
     }
@@ -222,7 +222,7 @@ impl<D: for<'a> SaveFrom<&'a [u8]>, R: ReadTypes> OnScanField<R> for WriteBytes<
         delimited: impl LengthDelimited,
     ) -> Result<Option<Infallible>, StopScan> {
         let bytes = delimited.into_bytes().ok().ok_or(StopScan)?;
-        self.0.save_from(bytes.as_ref().into());
+        self.0.save_from(bytes.as_ref());
         Ok(None)
     }
 }
@@ -243,7 +243,7 @@ impl<D: for<'a> SaveFrom<&'a str>, R: ReadTypes> OnScanField<R> for WriteBytes<s
     ) -> Result<Option<Infallible>, StopScan> {
         let bytes = delimited.into_bytes().ok().ok_or(StopScan)?;
         let bytes = core::str::from_utf8(bytes.as_ref()).map_err(|_| StopScan)?;
-        self.0.save_from(bytes.into());
+        self.0.save_from(bytes);
         Ok(None)
     }
 }
