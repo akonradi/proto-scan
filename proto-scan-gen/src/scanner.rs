@@ -73,6 +73,7 @@ impl<'m, P: Parent, F> SwapSingleFieldInherentImpl<'m, P, F> {
                 let fn_name = format_ident!("{fn_verb}{sep}{field_name}");
                 quote! {
                     #( #[doc = #docs] )*
+                    #[allow(clippy::type_complexity)]
                     pub fn #fn_name <#(#generics),*>(
                         self,
                         #(#args),*
