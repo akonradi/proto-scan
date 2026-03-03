@@ -120,16 +120,15 @@ impl<'a> OneofScanner<'a> {
     pub fn impl_scan_callbacks(&self) -> TokenStream {
         let type_name = self.type_name();
         let output_type = self.scan_output_name();
-        let fields = self.fields().collect::<Vec<_>>();
-        let field_names = fields
-            .iter()
+        let field_names = self
+            .fields()
             .map(|f| &f.inner.field.field_name)
             .collect::<Vec<_>>();
-        let generics = fields
-            .iter()
+        let generics = self
+            .fields()
             .map(|f| &f.inner.field.generic)
             .collect::<Vec<_>>();
-        let generics_with_bounds = fields.iter().map(
+        let generics_with_bounds = self.fields().map(
             |OneofScannerField {
                 inner
              }| {
@@ -137,7 +136,7 @@ impl<'a> OneofScanner<'a> {
                 quote! { #generic: ::proto_scan::scan::field::OnScanField<R> + ::proto_scan::scan::Resettable }
             },
         );
-        let last_set_arms = fields.iter().map(|OneofScannerField {inner }| {
+        let last_set_arms = self.fields().map(|OneofScannerField {inner }| {
             let field_name = &inner.field.field_name;
             quote! {
                 #output_type::#field_name(()) => #output_type::#field_name(#field_name.into_scan_output())

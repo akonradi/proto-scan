@@ -51,10 +51,10 @@ impl OneofScannerField<'_> {
 
         let custom_fn = SwapSingleFieldFn {
             fn_verb: "",
-            docs: vec![
-                format!("Sets the field scanner for oneof field `{field_name}`."),
-                "".to_owned(),
-                format!(
+            docs: &[
+                &format!("Sets the field scanner for oneof field `{field_name}`."),
+                "",
+                &format!(
                     "This allows the caller to specify the behavior on
                     encountering the field `{field_name}` defined in the source
                     oneof. The output of the provided field scanner will be
@@ -62,11 +62,11 @@ impl OneofScannerField<'_> {
                     [`{output_type}::{field_name}`]."
                 ),
             ],
-            generics: vec![
+            generics: &[
                 quote!('t),
                 quote!(S: ::proto_scan::scan::IntoScanner<Scanner<::proto_scan::read::BoundsOnlyReadTypes>: ::proto_scan::scan::Resettable> + 't),
             ],
-            args: vec![quote!(scanner: S)],
+            args: &[quote!(scanner: S)],
             output_type: quote!(S),
             construct_field: quote!(scanner),
         };
@@ -79,17 +79,19 @@ impl OneofScannerField<'_> {
                 let encoding_type = single.encoding_type();
                 let repr_type = single.repr_type();
 
+                let write_docs = inner.write_fn_docs();
                 let write_fn = SwapSingleFieldFn {
                     fn_verb: "write",
-                    docs: inner.write_fn_docs(),
-                    generics: vec![quote!('t), quote!(D: From<#repr_type>)],
-                    args: vec![quote!(to: &'t mut D)],
+                    docs: &write_docs.each_ref().map(|s| &**s),
+                    generics: &[quote!('t), quote!(D: From<#repr_type>)],
+                    args: &[quote!(to: &'t mut D)],
                     output_type: quote! {::proto_scan::scan::field::WriteNumeric::<#encoding_type, &'t mut D>},
                     construct_field: quote!(::proto_scan::scan::field::WriteNumeric::<#encoding_type, _>::new(to)),
                 };
+                let save_docs = inner.save_fn_docs();
                 let save_fn = SwapSingleFieldFn {
                     fn_verb: "save",
-                    docs: inner.save_fn_docs(),
+                    docs: &save_docs.each_ref().map(|s| &**s),
                     output_type: quote! {::proto_scan::scan::field::SaveNumeric::<#encoding_type>},
                     construct_field: quote!(::proto_scan::scan::field::SaveNumeric::<#encoding_type>::new()),
                     ..Default::default()
@@ -102,20 +104,22 @@ impl OneofScannerField<'_> {
                 } else {
                     quote! {[::core::primitive::u8]}
                 };
+                let write_docs = inner.write_fn_docs();
                 let write_fn = SwapSingleFieldFn {
                     fn_verb: "write",
-                    docs: inner.write_fn_docs(),
-                    generics: vec![
+                    docs: &write_docs.each_ref().map(|s| &**s),
+                    generics: &[
                         quote!('t),
                         quote!(D: for<'d> ::core::convert::From<&'d #borrow_type>),
                     ],
-                    args: vec![quote!(to: &'t mut D)],
+                    args: &[quote!(to: &'t mut D)],
                     output_type: quote! {::proto_scan::scan::field::WriteBytes::<#borrow_type, &'t mut D>},
                     construct_field: quote!(::proto_scan::scan::field::WriteBytes::<#borrow_type, _>::new(to)),
                 };
+                let save_docs = inner.save_fn_docs();
                 let save_fn = SwapSingleFieldFn {
                     fn_verb: "save",
-                    docs: inner.save_fn_docs(),
+                    docs: &save_docs.each_ref().map(|s| &**s),
                     output_type: quote! {::proto_scan::scan::field::SaveBytes::<#borrow_type>},
                     construct_field: quote!(::proto_scan::scan::field::SaveBytes::<#borrow_type>::new()),
                     ..Default::default()
@@ -127,10 +131,10 @@ impl OneofScannerField<'_> {
                 type_name,
             }) => {
                 let message_name = format_ident!("{type_name}");
-                let docs = vec![
-                    format!("Sets the scanner for the embedded message `{field_name}`."),
-                    "".to_owned(),
-                    format!(
+                let docs = &[
+                    &format!("Sets the scanner for the embedded message `{field_name}`."),
+                    "",
+                    &format!(
                         "Sets the builder to use the provided scanner to
                         read the contents of the message in `{field_name}`.
                         The output of the scanner will be included in the
@@ -138,7 +142,7 @@ impl OneofScannerField<'_> {
                         [`{output_type}::{field_name}`]."
                     ),
                 ];
-                let generics = vec![
+                let generics = [
                     quote!('t),
                     quote! {
                         S:
@@ -155,8 +159,8 @@ impl OneofScannerField<'_> {
                 let scan_fn = SwapSingleFieldFn {
                     fn_verb: "scan",
                     docs,
-                    generics,
-                    args: vec![quote!(scanner: S)],
+                    generics: &generics,
+                    args: &[quote!(scanner: S)],
                     output_type,
                     construct_field: quote!(::proto_scan::scan::field::Message::new(scanner)),
                 };

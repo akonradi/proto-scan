@@ -30,19 +30,19 @@ pub(crate) trait ScannerOutput {
 }
 
 #[derive(Default)]
-pub(crate) struct SwapSingleFieldFn {
+pub(crate) struct SwapSingleFieldFn<'a> {
     pub(crate) fn_verb: &'static str,
-    pub(crate) docs: Vec<String>,
-    pub(crate) generics: Vec<TokenStream>,
-    pub(crate) args: Vec<TokenStream>,
+    pub(crate) docs: &'a [&'a str],
+    pub(crate) generics: &'a [TokenStream],
+    pub(crate) args: &'a [TokenStream],
     pub(crate) output_type: TokenStream,
     pub(crate) construct_field: TokenStream,
 }
 
 impl<'m, P: Parent, F> SwapSingleFieldInherentImpl<'m, P, F> {
-    pub(crate) fn generate_fns(
+    pub(crate) fn generate_fns<'a>(
         &self,
-        impl_fns: impl IntoIterator<Item = SwapSingleFieldFn>,
+        impl_fns: impl IntoIterator<Item = SwapSingleFieldFn<'a>>,
     ) -> TokenStream {
         let Self {
             parent,
@@ -97,10 +97,10 @@ impl<'m, P: Parent, F> SwapSingleFieldInherentImpl<'m, P, F> {
         }
     }
 
-    pub(crate) fn save_fn_docs(&self) -> Vec<String> {
+    pub(crate) fn save_fn_docs(&self) -> [String; 3] {
         let field_name = &self.field.field_name;
         let output_type = self.parent.scanner().output_type().type_name();
-        vec![
+        [
             format!("Sets the scanner to output field `{field_name}`."),
             "".to_owned(),
             format!(
@@ -111,10 +111,10 @@ impl<'m, P: Parent, F> SwapSingleFieldInherentImpl<'m, P, F> {
         ]
     }
 
-    pub(crate) fn write_fn_docs(&self) -> Vec<String> {
+    pub(crate) fn write_fn_docs(&self) -> [String; 3] {
         let field_name = &self.field.field_name;
         let output_type = self.parent.scanner().output_type().type_name();
-        vec![
+        [
             format!("Sets the scanner to write field `{field_name}` to the provided location."),
             "".to_string(),
             format!(

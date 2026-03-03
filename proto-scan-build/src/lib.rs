@@ -45,7 +45,7 @@ impl CompileScan for prost_build::Config {
                     descriptor,
                 )
             })
-            .collect::<Vec<_>>();
+            .collect();
 
         let prost_gen = self.generate(requests)?;
 
@@ -90,8 +90,6 @@ fn visit_mod(mod_items: &[syn::Item]) -> syn::Result<TokenStream> {
     let prost_message: syn::Path = parse_quote!(::prost::Message);
     let prost_oneof: syn::Path = parse_quote!(::prost::Oneof);
 
-    
-
     mod_items
         .iter()
         .map(|item| {
@@ -111,13 +109,13 @@ fn visit_mod(mod_items: &[syn::Item]) -> syn::Result<TokenStream> {
                     }
                     let name = &item_enum.ident;
                     quote! {pub enum #name {
-                        
+
                     } }
-                        .into_iter()
-                        .chain(proto_scan_gen::prost::derive_impl(
-                            parse_quote!(#item_enum),
-                        )?)
-                        .collect()
+                    .into_iter()
+                    .chain(proto_scan_gen::prost::derive_impl(
+                        parse_quote!(#item_enum),
+                    )?)
+                    .collect()
                 }
                 syn::Item::Struct(item_struct) => {
                     let Some(derive) = item_struct

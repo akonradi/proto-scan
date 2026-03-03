@@ -126,32 +126,29 @@ impl<'m> MessageScanner<'m> {
             .generic_types()
             .map(FieldGeneric::ident)
             .collect::<Vec<_>>();
-        let generics_on_scan_bounds = self
-            .generic_types()
-            .map(|g| {
-                let (ident, bound) = (g.ident(), g.scan_callbacks_trait_for_bound());
-                quote!(#ident: #bound)
-            })
-            .collect::<Vec<_>>();
+        let generics_on_scan_bounds = self.generic_types().map(|g| {
+            let (ident, bound) = (g.ident(), g.scan_callbacks_trait_for_bound());
+            quote!(#ident: #bound)
+        });
         let field_names = self.field_names().collect::<Vec<_>>();
         let field_arms = |fn_name: &str| {
             let scan_event_name = &scan_event_name;
             let fn_name = format_ident!("{fn_name}");
             self.0.fields.iter().enumerate().map(move |(index, Field { field_name, generic: _, field_type })| {
-            let event_variant_name = format_ident!("Event{index}");
-            match field_type {
-                MessageFieldType::Single(SingleField { ty: _, number })
-                | MessageFieldType::Repeated { ty: _, number }
-                | MessageFieldType::Message(MessageField { number, type_name: _ })
-                | MessageFieldType::Bytes(BytesField { utf8: _, number }) => quote! {
-                    #number => self.#field_name.#fn_name(value)?.map(#scan_event_name::#event_variant_name),
-                },
-                | MessageFieldType::OneOf { type_name: _, numbers } => quote! {
-                    ((#(#numbers )|*) ) => self.#field_name.#fn_name(field, value)?.map(#scan_event_name::#event_variant_name),
-                },
-                MessageFieldType::Unsupported => TokenStream::new()
-            }
-        })
+                let event_variant_name = format_ident!("Event{index}");
+                match field_type {
+                    MessageFieldType::Single(SingleField { ty: _, number })
+                    | MessageFieldType::Repeated { ty: _, number }
+                    | MessageFieldType::Message(MessageField { number, type_name: _ })
+                    | MessageFieldType::Bytes(BytesField { utf8: _, number }) => quote! {
+                        #number => self.#field_name.#fn_name(value)?.map(#scan_event_name::#event_variant_name),
+                    },
+                    | MessageFieldType::OneOf { type_name: _, numbers } => quote! {
+                        ((#(#numbers )|*) ) => self.#field_name.#fn_name(field, value)?.map(#scan_event_name::#event_variant_name),
+                    },
+                    MessageFieldType::Unsupported => TokenStream::new()
+                }
+            })
         };
 
         let on_numeric_arms = field_arms("on_numeric");
@@ -240,7 +237,7 @@ impl crate::scanner::Scanner for MessageScanner<'_> {
         self.0.fields.iter().map(|f| f.generic())
     }
 
-    fn field_names(&self) -> impl Iterator<Item = std::borrow::Cow<'_, Ident>> {
+    fn field_names(&self) -> impl Iterator<Item = Cow<'_, Ident>> {
         self.0
             .fields
             .iter()
