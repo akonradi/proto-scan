@@ -1,91 +1,41 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::Ident;
 
-use crate::field::{BytesField, Field, FieldGeneric, MessageField, MessageFieldType, SingleField};
+use crate::field::{BytesField, Field, MessageField, MessageFieldType, SingleField};
+use crate::scanner::{ScannerOutput as _, SwapSingleFieldFn, SwapSingleFieldInherentImpl};
 
 /// A field in a generated message scanner type.
 pub(crate) struct MessageScannerField<'m> {
-    pub(crate) parent: crate::message::scanner::MessageScanner<'m>,
-    pub(crate) index: usize,
-    pub(crate) field: &'m Field,
+    inner: SwapSingleFieldInherentImpl<
+        'm,
+        crate::message::scanner::MessageScanner<'m>,
+        MessageFieldType,
+    >,
 }
 
-impl MessageScannerField<'_> {
-    pub fn impl_(&self) -> TokenStream {
-        let Self {
-            parent,
-            index,
-            field: _,
-        } = self;
-        let scanner = parent.scanner();
-        let scanner_name = scanner.type_name();
-        let generic_types = scanner
-            .generic_types()
-            .map(FieldGeneric::ident)
-            .collect::<Vec<_>>();
-        let (before_no_op, tail) = generic_types.split_at(*index);
-        let (_, after_no_op) = tail.split_first().unwrap();
-
-        let impl_fns = self.scanner_impl_fns();
-
-        quote! {
-            impl< #(#before_no_op,)* #(#after_no_op),* > #scanner_name< #(#before_no_op,)* ::proto_scan::scan::field::NoOp, #(#after_no_op),*> {
-                #(#impl_fns)*
-            }
+impl<'m> MessageScannerField<'m> {
+    pub(crate) fn new(
+        parent: crate::message::scanner::MessageScanner<'m>,
+        index: usize,
+        field: &'m Field<MessageFieldType>,
+    ) -> Self {
+        Self {
+            inner: SwapSingleFieldInherentImpl {
+                parent,
+                index,
+                field,
+            },
         }
     }
 
-    fn scanner_impl_fns(&self) -> Vec<TokenStream> {
-        let Self {
-            parent,
-            index,
-            field:
-                Field {
-                    field_name,
-                    field_type,
-                    ..
-                },
-        } = self;
-        let scanner_name = parent.type_name();
-        let scanner_fields = parent.field_names().collect::<Vec<_>>();
-        let (before_no_op, after_no_op) = {
-            let mut generic_types = parent.generic_types().map(FieldGeneric::ident);
-            (
-                (&mut generic_types).take(*index).collect::<Vec<_>>(),
-                generic_types.skip(1).collect::<Vec<_>>(),
-            )
-        };
-        let output_type = self.parent.output_type().type_name();
-
-        let swap_single_field_fn =
-            |fn_name: Ident,
-             docs: Vec<String>,
-             generics: Vec<TokenStream>,
-             args: Vec<TokenStream>,
-             output_type: TokenStream,
-             construct_field: TokenStream| {
-                quote! {
-                    #( #[doc = #docs] )*
-                    pub fn #fn_name <'t, #(#generics),*>(
-                        self,
-                        #(#args),*
-                    ) -> #scanner_name<
-                            #(#before_no_op,)*
-                            #output_type,
-                            #(#after_no_op,)*
-                    > {
-                        let Self { #(#scanner_fields,)* } = self;
-                        let _ = #field_name;
-                        let #field_name = #construct_field;
-                        #scanner_name { #(#scanner_fields,)* }
-                    }
-                }
-            };
-
-        let custom_fn = swap_single_field_fn(
-            format_ident!("{field_name}"),
-            vec![
+    pub fn impl_(&self) -> TokenStream {
+        let Self { inner } = self;
+        let field_name = &inner.field.field_name;
+        let field_type = &inner.field.field_type;
+        let output_type = self.inner.parent.scanner().output_type().type_name();
+        let custom_fn = SwapSingleFieldFn {
+            fn_verb: "",
+            docs: vec![
                 format!("Sets the field scanner for message field `{field_name}`."),
                 "".to_owned(),
                 format!(
@@ -96,34 +46,10 @@ impl MessageScannerField<'_> {
                     [`{output_type}::{field_name}`]."
                 ),
             ],
-            vec![quote!(S: ::proto_scan::scan::IntoScanner + 't)],
-            vec![quote!(scanner: S)],
-            quote!(S),
-            quote!(scanner),
-        );
-
-        let write_fn_docs = || {
-            vec![
-                format!("Sets the scanner to write field `{field_name}` to the provided location."),
-                "".to_string(),
-                format!(
-                    "When the field `{field_name}` is encountered in the input,
-                    the decoded value will be written to the argument `to`. No
-                    output is provided in the overall scan output
-                    ([`{output_type}::{field_name}`] is `()`)."
-                ),
-            ]
-        };
-        let save_fn_docs = || {
-            vec![
-                format!("Sets the scanner to output field `{field_name}`."),
-                "".to_owned(),
-                format!(
-                    "When the field `{field_name}` is encountered in the input
-                    during a scan, the decoded value will be saved and produced
-                    in the output as [`{output_type}::{field_name}`]."
-                ),
-            ]
+            generics: vec![quote!('t), quote!(S: ::proto_scan::scan::IntoScanner + 't)],
+            args: vec![quote!(scanner: S)],
+            output_type: quote!(S),
+            construct_field: quote!(scanner),
         };
 
         match field_type {
@@ -134,45 +60,43 @@ impl MessageScannerField<'_> {
                 let encoding_type = single.encoding_type();
                 let repr_type = single.repr_type();
 
-                let write_fn = swap_single_field_fn(
-                    format_ident!("write_{field_name}"),
-                    write_fn_docs(),
-                    vec![quote!(D: From<#repr_type>)],
-                    vec![quote!(to: &'t mut D)],
-                    quote! {::proto_scan::scan::field::WriteNumeric::<#encoding_type, &'t mut D>},
-                    quote!(::proto_scan::scan::field::WriteNumeric::<#encoding_type, _>::new(to)),
-                );
-                let save_fn = swap_single_field_fn(
-                    format_ident!("save_{field_name}"),
-                    save_fn_docs(),
-                    vec![],
-                    vec![],
-                    quote! {::proto_scan::scan::field::SaveNumeric::<#encoding_type>},
-                    quote!(::proto_scan::scan::field::SaveNumeric::<#encoding_type>::new()),
-                );
-                vec![write_fn, save_fn, custom_fn]
+                let write_fn = SwapSingleFieldFn {
+                    fn_verb: "write",
+                    docs: inner.write_fn_docs(),
+                    generics: vec![quote!('t), quote!(D: From<#repr_type>)],
+                    args: vec![quote!(to: &'t mut D)],
+                    output_type: quote! {::proto_scan::scan::field::WriteNumeric::<#encoding_type, &'t mut D>},
+                    construct_field: quote!(::proto_scan::scan::field::WriteNumeric::<#encoding_type, _>::new(to)),
+                };
+                let save_fn = SwapSingleFieldFn {
+                    fn_verb: "save",
+                    docs: inner.save_fn_docs(),
+                    output_type: quote! {::proto_scan::scan::field::SaveNumeric::<#encoding_type>},
+                    construct_field: quote!(::proto_scan::scan::field::SaveNumeric::<#encoding_type>::new()),
+                    ..Default::default()
+                };
+                inner.generate_fns([write_fn, save_fn, custom_fn])
             }
             MessageFieldType::Repeated { ty, number: _ } => {
                 let encoding_type = ty.encoding_type();
                 let repr_type = ty.repr_type();
 
-                let write_fn = swap_single_field_fn(
-                    format_ident!("write_{field_name}"),
-                    write_fn_docs(),
-                    vec![quote!(D: ::core::iter::Extend<#repr_type>)],
-                    vec![quote!(to: &'t mut D)],
-                    quote! {::proto_scan::scan::field::WriteRepeated::<#encoding_type, &'t mut D>},
-                    quote!(::proto_scan::scan::field::WriteRepeated::<#encoding_type, _>::new(to)),
-                );
-                let save_fn = swap_single_field_fn(
-                    format_ident!("save_{field_name}"),
-                    save_fn_docs(),
-                    vec![],
-                    vec![],
-                    quote! {::proto_scan::scan::field::SaveRepeated::<#encoding_type>},
-                    quote!(::proto_scan::scan::field::SaveRepeated::<#encoding_type>::new()),
-                );
-                vec![write_fn, save_fn, custom_fn]
+                let write_fn = SwapSingleFieldFn {
+                    fn_verb: "write",
+                    docs: inner.write_fn_docs(),
+                    generics: vec![quote!('t), quote!(D: ::core::iter::Extend<#repr_type>)],
+                    args: vec![quote!(to: &'t mut D)],
+                    output_type: quote! {::proto_scan::scan::field::WriteRepeated::<#encoding_type, &'t mut D>},
+                    construct_field: quote!(::proto_scan::scan::field::WriteRepeated::<#encoding_type, _>::new(to)),
+                };
+                let save_fn = SwapSingleFieldFn {
+                    fn_verb: "save",
+                    docs: inner.save_fn_docs(),
+                    output_type: quote! {::proto_scan::scan::field::SaveRepeated::<#encoding_type>},
+                    construct_field: quote!(::proto_scan::scan::field::SaveRepeated::<#encoding_type>::new()),
+                    ..Default::default()
+                };
+                inner.generate_fns([write_fn, save_fn, custom_fn])
             }
             MessageFieldType::Bytes(BytesField { utf8, number: _ }) => {
                 let borrow_type = if *utf8 {
@@ -180,62 +104,75 @@ impl MessageScannerField<'_> {
                 } else {
                     quote! {[::core::primitive::u8]}
                 };
-                let write_fn = swap_single_field_fn(
-                    format_ident!("write_{field_name}"),
-                    write_fn_docs(),
-                    vec![quote!(D: for<'d> ::core::convert::From<&'d #borrow_type>)],
-                    vec![quote!(to: &'t mut D)],
-                    quote! {::proto_scan::scan::field::WriteBytes::<#borrow_type, &'t mut D>},
-                    quote!(::proto_scan::scan::field::WriteBytes::<#borrow_type, _>::new(to)),
-                );
-                let save_fn = swap_single_field_fn(
-                    format_ident!("save_{field_name}"),
-                    save_fn_docs(),
-                    vec![],
-                    vec![],
-                    quote! {::proto_scan::scan::field::SaveBytes::<#borrow_type>},
-                    quote!(::proto_scan::scan::field::SaveBytes::<#borrow_type>::new()),
-                );
-                vec![write_fn, save_fn, custom_fn]
+                let write_fn = {
+                    SwapSingleFieldFn {
+                        fn_verb: "write",
+                        docs: inner.write_fn_docs(),
+                        generics: vec![
+                            quote!('t),
+                            quote!(D: for<'d> ::core::convert::From<&'d #borrow_type>),
+                        ],
+                        args: vec![quote!(to: &'t mut D)],
+                        output_type: quote! {::proto_scan::scan::field::WriteBytes::<#borrow_type, &'t mut D>},
+                        construct_field: quote!(::proto_scan::scan::field::WriteBytes::<#borrow_type, _>::new(to)),
+                    }
+                };
+                let save_fn = SwapSingleFieldFn {
+                    fn_verb: "save",
+                    docs: inner.save_fn_docs(),
+                    output_type: quote! {::proto_scan::scan::field::SaveBytes::<#borrow_type>},
+                    construct_field: quote!(::proto_scan::scan::field::SaveBytes::<#borrow_type>::new()),
+                    ..Default::default()
+                };
+                inner.generate_fns([write_fn, save_fn, custom_fn])
             }
             MessageFieldType::Message(MessageField {
                 number: _,
                 type_name,
             }) => {
                 let message_name = format_ident!("{type_name}");
-                let scan_fn = swap_single_field_fn(
-                    format_ident!("scan_{field_name}"),
-                    vec![
-                        format!("Sets the scanner for the embedded message `{field_name}`."),
-                        "".to_owned(),
-                        format!(
-                            "Sets the builder to use the provided scanner to
-                            read the contents of the message in `{field_name}`.
-                            The output of the scanner will be included in the
-                            overall scan output as
-                            [`{output_type}::{field_name}`]."
-                        ),
-                    ],
-                    vec![quote! {
+                let docs = vec![
+                    format!("Sets the scanner for the embedded message `{field_name}`."),
+                    "".to_owned(),
+                    format!(
+                        "Sets the builder to use the provided scanner to
+                        read the contents of the message in `{field_name}`.
+                        The output of the scanner will be included in the
+                        overall scan output as
+                        [`{output_type}::{field_name}`]."
+                    ),
+                ];
+                let generics = vec![
+                    quote!('t),
+                    quote! {
                         S:
                             ::proto_scan::scan::IntoResettable<Resettable:
                                 ::proto_scan::scan::ScannerBuilder<Message=#message_name>
                             > + 't
-                    }],
-                    vec![quote!(scanner: S)],
-                    quote!(
-                        ::proto_scan::scan::field::Message<
-                            <S as ::proto_scan::scan::IntoResettable>::Resettable,
-                        >
-                    ),
-                    quote!(::proto_scan::scan::field::Message::new(scanner)),
+                    },
+                ];
+                let output_type = quote!(
+                    ::proto_scan::scan::field::Message<
+                        <S as ::proto_scan::scan::IntoResettable>::Resettable,
+                    >
                 );
-                vec![scan_fn, custom_fn]
+                let scan_fn = SwapSingleFieldFn {
+                    fn_verb: "scan",
+                    docs,
+                    generics,
+                    args: vec![quote!(scanner: S)],
+                    output_type,
+                    construct_field: quote!(::proto_scan::scan::field::Message::new(scanner)),
+                };
+                inner.generate_fns([scan_fn, custom_fn])
             }
-            MessageFieldType::OneOf { type_name: _, numbers: _ } => {
-                let custom_fn = swap_single_field_fn(
-                    format_ident!("{field_name}"),
-                    vec![
+            MessageFieldType::OneOf {
+                type_name: _,
+                numbers: _,
+            } => {
+                let f = SwapSingleFieldFn {
+                    fn_verb: "",
+                    docs: vec![
                         format!("Sets the field scanner for the oneof `{field_name}`."),
                         "".to_owned(),
                         format!(
@@ -246,15 +183,14 @@ impl MessageScannerField<'_> {
                     [`{output_type}::{field_name}`]."
                         ),
                     ],
-                    vec![quote!(S: ::proto_scan::scan::IntoScanner + 't)],
-                    vec![quote!(scanner: S)],
-                    quote!(S),
-                    quote!(scanner),
-                );
-
-                vec![custom_fn]
+                    generics: vec![quote!('t), quote!(S: ::proto_scan::scan::IntoScanner + 't)],
+                    args: vec![quote!(scanner: S)],
+                    output_type: quote!(S),
+                    construct_field: quote!(scanner),
+                };
+                inner.generate_fns([f])
             }
-            MessageFieldType::Unsupported => vec![],
+            MessageFieldType::Unsupported => TokenStream::new(),
         }
     }
 }

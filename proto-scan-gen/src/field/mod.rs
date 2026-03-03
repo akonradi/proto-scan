@@ -9,21 +9,29 @@ pub struct Field<F = MessageFieldType> {
     pub field_type: F,
 }
 
-impl Field {
-    pub(crate) fn generic(&self) -> FieldGeneric<'_> {
+impl<F> Field<F> {
+    pub(crate) fn generic(&self) -> FieldGeneric<'_, F> {
         FieldGeneric(self)
     }
 }
 
 /// The generic type for a message field.
-#[derive(Copy, Clone)]
-pub(crate) struct FieldGeneric<'a>(&'a Field);
+pub(crate) struct FieldGeneric<'a, F>(&'a Field<F>);
 
-impl<'a> FieldGeneric<'a> {
+impl<F> Clone for FieldGeneric<'_, F> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<F> Copy for FieldGeneric<'_, F> {}
+
+impl<'a, F> FieldGeneric<'a, F> {
     pub(crate) fn ident(self) -> &'a Ident {
         &self.0.generic
     }
+}
 
+impl<'a> FieldGeneric<'a, MessageFieldType> {
     pub(crate) fn scan_callbacks_trait_for_bound(&self) -> syn::Path {
         let Self(Field {
             generic: _,
@@ -42,8 +50,6 @@ impl<'a> FieldGeneric<'a> {
         }
     }
 }
-
-
 
 #[derive(Debug)]
 pub struct SingleField {

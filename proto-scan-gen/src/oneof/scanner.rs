@@ -1,9 +1,12 @@
+use std::borrow::Cow;
+
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::Ident;
 
 use crate::field::{BytesField, Field, MessageField, OneOfField, SingleField};
 use crate::oneof::{OneofScannerField, ScannableOneof};
+use crate::scanner::Scanner as _;
 
 #[derive(Copy, Clone, Debug)]
 pub struct OneofScanner<'a>(&'a ScannableOneof);
@@ -13,19 +16,17 @@ impl<'a> OneofScanner<'a> {
         Self(arg)
     }
 
-    pub fn type_name(&self) -> Ident {
-        format_ident!("Scan{}", self.0.name)
-    }
-
     pub fn fields(&self) -> impl Iterator<Item = OneofScannerField<'_>> {
         self.0
             .fields
             .iter()
             .enumerate()
             .map(|(i, f)| OneofScannerField {
-                parent: *self,
-                index: i,
-                field: f,
+                inner: crate::scanner::SwapSingleFieldInherentImpl {
+                    parent: *self,
+                    index: i,
+                    field: f,
+                },
             })
     }
 
@@ -36,10 +37,10 @@ impl<'a> OneofScanner<'a> {
 
     pub fn scanner_type_definition(&self) -> TokenStream {
         let type_name = self.type_name();
-        let generics = self.fields().map(|f| &f.field.generic);
+        let generics = self.fields().map(|f| &f.inner.field.generic);
         let fields = self.fields().map(|f| {
-            let name = &f.field.field_name;
-            let generic = &f.field.generic;
+            let name = &f.inner.field.field_name;
+            let generic = &f.inner.field.generic;
             quote! {
                 #name: #generic,
             }
@@ -56,10 +57,10 @@ impl<'a> OneofScanner<'a> {
 
     pub fn output_type_definition(&self) -> TokenStream {
         let type_name = self.scan_output_name();
-        let generics = self.fields().map(|f| &f.field.generic);
+        let generics = self.fields().map(|f| &f.inner.field.generic);
         let fields = self.fields().map(|f| {
-            let name = &f.field.field_name;
-            let generic = &f.field.generic;
+            let name = &f.inner.field.field_name;
+            let generic = &f.inner.field.generic;
             quote! {
                 #name(#generic)
             }
@@ -74,11 +75,14 @@ impl<'a> OneofScanner<'a> {
 
     pub fn impl_scanner_builder(&self) -> TokenStream {
         let type_name = self.type_name();
-        let generics = self.fields().map(|f| &f.field.generic).collect::<Vec<_>>();
+        let generics = self
+            .fields()
+            .map(|f| &f.inner.field.generic)
+            .collect::<Vec<_>>();
         let oneof_type_name = &self.0.name;
         let fields = self
             .fields()
-            .map(|f| &f.field.field_name)
+            .map(|f| &f.inner.field.field_name)
             .collect::<Vec<_>>();
         quote! {
             impl<#(#generics,)*> ::proto_scan::scan::ScannerBuilder for #type_name<#(#generics),*> {
@@ -98,10 +102,10 @@ impl<'a> OneofScanner<'a> {
 
     pub fn event_type_definition(&self) -> TokenStream {
         let type_name = self.scan_event_name();
-        let generics = self.fields().map(|f| &f.field.generic);
+        let generics = self.fields().map(|f| &f.inner.field.generic);
         let fields = self.fields().map(|f| {
-            let name = &f.field.field_name;
-            let generic = &f.field.generic;
+            let name = &f.inner.field.field_name;
+            let generic = &f.inner.field.generic;
             quote! {
                 #name(#generic)
             }
@@ -119,24 +123,22 @@ impl<'a> OneofScanner<'a> {
         let fields = self.fields().collect::<Vec<_>>();
         let field_names = fields
             .iter()
-            .map(|f| &f.field.field_name)
+            .map(|f| &f.inner.field.field_name)
             .collect::<Vec<_>>();
-        let generics = fields.iter().map(|f| &f.field.generic).collect::<Vec<_>>();
+        let generics = fields
+            .iter()
+            .map(|f| &f.inner.field.generic)
+            .collect::<Vec<_>>();
         let generics_with_bounds = fields.iter().map(
             |OneofScannerField {
-                 parent: _,
-                 index: _,
-                 field:
-                     Field {
-                         field_name: _,
-                         generic,
-                         field_type: _,
-                     },
+                inner
              }| {
+                let generic = &inner.field.generic;
                 quote! { #generic: ::proto_scan::scan::field::OnScanField<R> + ::proto_scan::scan::Resettable }
             },
         );
-        let last_set_arms = fields.iter().map(|OneofScannerField {parent: _, index: _, field: Field { field_name, generic: _, field_type: _ } }| {
+        let last_set_arms = fields.iter().map(|OneofScannerField {inner }| {
+            let field_name = &inner.field.field_name;
             quote! {
                 #output_type::#field_name(()) => #output_type::#field_name(#field_name.into_scan_output())
             }
@@ -147,7 +149,8 @@ impl<'a> OneofScanner<'a> {
             let scan_event_name = &scan_event_name;
             let output_type = &output_type;
             let fn_name = format_ident!("{fn_name}");
-            self.fields().map(move |OneofScannerField { parent: _, index: _, field: Field { field_name, generic: _, field_type } } | {
+            self.fields().map(move |OneofScannerField { inner } | {
+                let Field {field_type, field_name, generic: _} = &inner.field;
                 let event_variant_name = field_name;
                 match field_type {
                     OneOfField::Single(SingleField { ty: _, number })
@@ -232,23 +235,40 @@ impl<'a> OneofScanner<'a> {
     pub fn scan_output_name(&self) -> Ident {
         format_ident!("{}Output", self.type_name())
     }
+}
 
-    pub fn scanner_impl_fns(&self) -> TokenStream {
-        let scanner_name = self.type_name();
-        let generic_types = self.0.fields.iter().map(|f| &f.generic).collect::<Vec<_>>();
+impl crate::scanner::Parent for OneofScanner<'_> {
+    type FieldType = OneOfField;
+    fn scanner(&self) -> impl crate::scanner::Scanner<FieldType = Self::FieldType> + '_ {
+        *self
+    }
+}
+impl crate::scanner::Scanner for OneofScanner<'_> {
+    type FieldType = OneOfField;
 
-        self.fields().map(|field|{
-            let index = field.index;
-            let (before_no_op, tail) = generic_types.split_at(index);
-            let (_, after_no_op) = tail.split_first().unwrap();
+    fn type_name(&self) -> Ident {
+        format_ident!("Scan{}", self.0.name)
+    }
 
-            let impl_fns = field.scanner_impl_fns();
+    fn generic_types(&self) -> impl Iterator<Item = crate::field::FieldGeneric<'_, OneOfField>> {
+        self.0.fields.iter().map(|f| f.generic())
+    }
 
-            quote! {
-                impl< #(#before_no_op,)* #(#after_no_op),* > #scanner_name< #(#before_no_op,)* ::proto_scan::scan::field::NoOp, #(#after_no_op),*> {
-                    #(#impl_fns)*
-                }
-            }
-        }).collect()
+    fn field_names(&self) -> impl Iterator<Item = Cow<'_, Ident>> {
+        self.0
+            .fields
+            .iter()
+            .map(|f| Cow::Borrowed(&f.field_name))
+            .chain([Cow::Owned(format_ident!("proto_scan_last_set"))])
+    }
+
+    fn output_type(&self) -> impl crate::scanner::ScannerOutput + '_ {
+        *self
+    }
+}
+
+impl crate::scanner::ScannerOutput for OneofScanner<'_> {
+    fn type_name(&self) -> Ident {
+        self.scan_output_name()
     }
 }

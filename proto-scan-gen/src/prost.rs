@@ -36,12 +36,10 @@ pub fn derive_impl(input: DeriveInput) -> Result<TokenStream> {
             enum_impl(ident, data_enum)
         }
         syn::Data::Enum(_) => Ok(TokenStream::new()),
-        syn::Data::Union(u) => {
-            Err(syn::Error::new(
-                u.union_token.span(),
-                "union types are not supported",
-            ))
-        }
+        syn::Data::Union(u) => Err(syn::Error::new(
+            u.union_token.span(),
+            "union types are not supported",
+        )),
     }
 }
 
@@ -115,9 +113,9 @@ fn enum_impl(name: Ident, data_enum: DataEnum) -> Result<TokenStream> {
         scanner.impl_scanner_builder(),
         scanner.event_type_definition(),
         scanner.impl_scan_callbacks(),
-        scanner.scanner_impl_fns(),
     ]
     .into_iter()
+    .chain(scanner.fields().map(|f| f.impl_()))
     .collect())
 }
 
@@ -285,7 +283,10 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                         format!("unsupported tags value {:?}", value.span().source_text()),
                     )
                 })?;
-                if field_number.replace(FieldNumber::Multiple(values)).is_some() {
+                if field_number
+                    .replace(FieldNumber::Multiple(values))
+                    .is_some()
+                {
                     return Err(syn::Error::new(value.span(), "more than one tag number"));
                 }
             }
@@ -382,7 +383,9 @@ fn extract_message_type_name(ty: syn::Type) -> Result<String> {
         if last.ident == "Vec" || last.ident == "Option" {
             match last.arguments {
                 syn::PathArguments::AngleBracketed(args) if args.args.len() == 1 => {
-                    if let syn::GenericArgument::Type(ty) = args.args.into_iter().next().unwrap() { return inner(ty) }
+                    if let syn::GenericArgument::Type(ty) = args.args.into_iter().next().unwrap() {
+                        return inner(ty);
+                    }
                 }
                 _ => {}
             }

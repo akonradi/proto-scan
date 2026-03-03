@@ -3,6 +3,7 @@ use quote::{format_ident, quote};
 use syn::Ident;
 
 use crate::field::{Field, MessageFieldType};
+use crate::scanner::{Scanner as _, ScannerOutput as _};
 
 pub mod scanner;
 
@@ -41,10 +42,6 @@ impl ScannableMessage {
 pub struct MessageScanOutput<'m>(scanner::MessageScanner<'m>);
 
 impl MessageScanOutput<'_> {
-    pub(crate) fn type_name(&self) -> Ident {
-        format_ident!("{}Output", self.0.type_name())
-    }
-
     pub fn scan_output_definition(&self) -> TokenStream {
         let name = self.type_name();
         let scan_types = self
@@ -52,12 +49,18 @@ impl MessageScanOutput<'_> {
             .generic_types()
             .map(|f| f.ident())
             .collect::<Vec<_>>();
-        let scan_fields = self.0.fields().map(|m| &m.field.field_name);
+        let scan_fields = self.0.field_names();
         quote! {
             #[derive(Copy, Clone, Debug, Default, PartialEq, Hash)]
             pub struct #name <#(#scan_types),*> {
                 #(pub #scan_fields: #scan_types ),*
             }
         }
+    }
+}
+
+impl crate::scanner::ScannerOutput for MessageScanOutput<'_> {
+    fn type_name(&self) -> syn::Ident {
+        format_ident!("{}Output", self.0.type_name())
     }
 }

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::Ident;
@@ -5,6 +7,7 @@ use syn::Ident;
 use crate::field::scanner::MessageScannerField;
 use crate::field::{BytesField, Field, FieldGeneric, MessageField, MessageFieldType, SingleField};
 use crate::message::ScannableMessage;
+use crate::scanner::{Scanner as _, ScannerOutput as _};
 
 /// Generates the scanner for the inner message.
 #[derive(Copy, Clone)]
@@ -15,24 +18,12 @@ impl<'m> MessageScanner<'m> {
         Self(msg)
     }
 
-    pub(crate) fn type_name(&self) -> Ident {
-        Ident::new(&format!("Scan{}", self.0.name), Span::call_site())
-    }
-
-    pub(crate) fn generic_types(&self) -> impl Iterator<Item = FieldGeneric<'_>> + Clone {
-        self.0.fields.iter().map(|f| f.generic())
-    }
-
     pub fn fields(&self) -> impl Iterator<Item = MessageScannerField<'_>> + Clone {
         self.0
             .fields
             .iter()
             .enumerate()
-            .map(|(index, field)| MessageScannerField {
-                parent: *self,
-                index,
-                field,
-            })
+            .map(|(index, field)| MessageScannerField::new(*self, index, field))
     }
 
     pub fn type_definition(&self) -> TokenStream {
@@ -53,17 +44,17 @@ impl<'m> MessageScanner<'m> {
         }
     }
 
-    pub(crate) fn field_names(&self) -> impl Iterator<Item = &Ident> + Clone {
-        self.fields().map(|m| &m.field.field_name)
-    }
-
     pub fn scan_event_defn(&self) -> TokenStream {
         let scan_event_name = self.scan_event_name();
+        let variants = self
+            .generic_types()
+            .map(|f| f.ident())
+            .enumerate()
+            .map(|(i, t)| {
+                let name = format_ident!("Event{i}");
+                quote!(#name(#t))
+            });
         let generics = self.generic_types().map(|f| f.ident());
-        let variants = generics.clone().enumerate().map(|(i, t)| {
-            let name = format_ident!("Event{i}");
-            quote!(#name(#t))
-        });
         quote! {
             pub enum #scan_event_name<#(#generics,)*> {
                 #(#variants),*
@@ -146,7 +137,7 @@ impl<'m> MessageScanner<'m> {
         let field_arms = |fn_name: &str| {
             let scan_event_name = &scan_event_name;
             let fn_name = format_ident!("{fn_name}");
-            self.fields().map(move |MessageScannerField { parent: _, index, field: Field { field_name, generic: _, field_type } }| {
+            self.0.fields.iter().enumerate().map(move |(index, Field { field_name, generic: _, field_type })| {
             let event_variant_name = format_ident!("Event{index}");
             match field_type {
                 MessageFieldType::Single(SingleField { ty: _, number })
@@ -229,5 +220,33 @@ impl<'m> MessageScanner<'m> {
 
     pub(crate) fn output_type(&self) -> super::MessageScanOutput<'_> {
         super::MessageScanOutput(*self)
+    }
+}
+
+impl crate::scanner::Parent for MessageScanner<'_> {
+    type FieldType = MessageFieldType;
+    fn scanner(&self) -> impl crate::scanner::Scanner<FieldType = MessageFieldType> + '_ {
+        *self
+    }
+}
+
+impl crate::scanner::Scanner for MessageScanner<'_> {
+    type FieldType = MessageFieldType;
+    fn type_name(&self) -> Ident {
+        Ident::new(&format!("Scan{}", self.0.name), Span::call_site())
+    }
+
+    fn generic_types(&self) -> impl Iterator<Item = FieldGeneric<'_, MessageFieldType>> {
+        self.0.fields.iter().map(|f| f.generic())
+    }
+
+    fn field_names(&self) -> impl Iterator<Item = std::borrow::Cow<'_, Ident>> {
+        self.0
+            .fields
+            .iter()
+            .map(|field| Cow::Borrowed(&field.field_name))
+    }
+    fn output_type(&self) -> impl crate::scanner::ScannerOutput + '_ {
+        self.output_type()
     }
 }
