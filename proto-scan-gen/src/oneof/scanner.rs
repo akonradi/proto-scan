@@ -143,6 +143,13 @@ impl<'a> OneofScanner<'a> {
             }
         });
 
+        let reset_last_set_arms = self.fields().map(|OneofScannerField {inner }| {
+            let field_name = &inner.field.field_name;
+            quote! {
+                #output_type::#field_name(()) => #field_name.reset(),
+            }
+        });
+
         let scan_event_name = self.scan_event_name();
         let field_arms = |fn_name: &str| {
             let scan_event_name = &scan_event_name;
@@ -223,8 +230,12 @@ impl<'a> OneofScanner<'a> {
             > ::proto_scan::scan::Resettable for #type_name< #(#generics),* > {
                 fn reset(&mut self) {
                     let Self { #(#field_names, )* proto_scan_last_set } = self;
-                    #(#field_names.reset();)*
-                    *proto_scan_last_set = None;
+                    let ::core::option::Option::Some(proto_scan_last_set) = proto_scan_last_set else {
+                        return
+                    };
+                    match proto_scan_last_set {
+                        #(#reset_last_set_arms)*
+                    }
                 }
             }
 
