@@ -19,7 +19,7 @@ pub use save::{SaveBytes, SaveNumeric};
 pub use write::{SaveFrom, WriteBytes, WriteNumeric, WriteRepeated};
 
 /// Implemented by a visitor for a fixed [`FieldNumber`].
-pub trait OnScanField<R: ReadTypes>: IntoScanOutput<ScanOutput: Default> {
+pub trait OnScanField<R: ReadTypes>: IntoScanOutput {
     type ScanEvent;
 
     /// Called when a numeric tag is read.
