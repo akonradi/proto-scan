@@ -45,7 +45,7 @@ impl<'a> OneofScanner<'a> {
                 #name: #generic,
             }
         });
-        let last_set_type = self.scan_output_name();
+        let last_set_type = self.field_number_type_name();
         quote! {
             #[derive(Debug, Default)]
             pub struct #type_name<#(#generics),*> {
@@ -67,7 +67,7 @@ impl<'a> OneofScanner<'a> {
         });
         quote! {
             #[derive(Copy, Clone, Debug, Hash, PartialEq)]
-            pub enum #type_name<#(#generics = ()),*> {
+            pub enum #type_name<#(#generics),*> {
                 #(#fields),*
             }
 
@@ -119,7 +119,7 @@ impl<'a> OneofScanner<'a> {
     }
 
     pub fn field_number_type_definition(&self) -> TokenStream {
-        let type_name = self.field_type_name();
+        let type_name = self.field_number_type_name();
         let fields = self.fields().map(|f| {
             let variant = &f.inner.field.variant_name;
             let repr: isize = f.inner.field.field_type.number().try_into().unwrap();
@@ -136,7 +136,7 @@ impl<'a> OneofScanner<'a> {
     }
 
     pub fn field_number_type_impls(&self) -> TokenStream {
-        let type_name = self.field_type_name();
+        let type_name = self.field_number_type_name();
         let fields = self.fields().map(|f| {
             let Field {
                 variant_name,
@@ -191,12 +191,12 @@ impl<'a> OneofScanner<'a> {
                 quote! { #generic: ::proto_scan::scan::field::OnScanField<R> + ::proto_scan::scan::Resettable }
             },
         );
-        let field_number_type = self.field_type_name();
+        let field_number_type = self.field_number_type_name();
         let last_set_arms = self.fields().map(|OneofScannerField { inner }| {
             let variant = &inner.field.variant_name;
             let field_name = &inner.field.field_name;
             quote! {
-                #output_type::#variant(()) => #output_type::#variant(#field_name.into_scan_output())
+                #field_number_type::#variant => #output_type::#variant(#field_name.into_scan_output())
             }
         });
 
@@ -204,7 +204,7 @@ impl<'a> OneofScanner<'a> {
             let field_name = &inner.field.field_name;
             let variant = &inner.field.variant_name;
             quote! {
-                #output_type::#variant(()) => #field_name.reset(),
+                #field_number_type::#variant => #field_name.reset(),
             }
         });
 
@@ -212,7 +212,6 @@ impl<'a> OneofScanner<'a> {
         let field_arms = |fn_name: &str| {
             let field_number_type = &field_number_type;
             let scan_event_name = &scan_event_name;
-            let output_type = &output_type;
             let fn_name = format_ident!("{fn_name}");
             self.fields().map(move |OneofScannerField { inner } | {
                 let Field {field_type, field_name, generic: _, variant_name } = &inner.field;
@@ -223,7 +222,7 @@ impl<'a> OneofScanner<'a> {
                         #field_number_type::#variant_name => {
                             ::proto_scan::scan::Resettable::reset(self);
                             let event = self.#field_name.#fn_name(value)?;
-                            self.proto_scan_last_set = ::core::option::Option::Some(#output_type::#variant_name(()));
+                            self.proto_scan_last_set = ::core::option::Option::Some(#field_number_type::#variant_name);
                             event.map(#scan_event_name::#variant_name)
                         },
                     },
@@ -301,7 +300,7 @@ impl<'a> OneofScanner<'a> {
         format_ident!("{}Output", self.type_name())
     }
 
-    pub fn field_type_name(&self) -> Ident {
+    pub fn field_number_type_name(&self) -> Ident {
         format_ident!("{}FieldNum", self.type_name())
     }
 }

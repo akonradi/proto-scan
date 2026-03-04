@@ -37,7 +37,7 @@ impl ScannableOneof {
 
     pub fn impl_scannable_oneof(&self) -> TokenStream {
         let type_name = &self.name;
-        let field_number = self.scanner().field_type_name();
+        let field_number = self.scanner().field_number_type_name();
         quote ![
             impl ::proto_scan::scan::ScannableOneOf for #type_name {
                 type FieldNumber = #field_number;
