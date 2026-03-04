@@ -86,7 +86,7 @@ impl<'m> MessageScanner<'m> {
                 type Scanner<R: ::proto_scan::read::ReadTypes> = #type_name < #(<#generics as ::proto_scan::scan::IntoScanner>::Scanner<R> ),* >;
                 fn into_scanner<R: ::proto_scan::read::ReadTypes>(self) -> Self::Scanner<R> {
                     let Self { #(#field_names),* } = self;
-                    Self::Scanner {
+                    Self::Scanner::<R> {
                         #(#field_names: #field_names.into_scanner()),*
                     }
 
@@ -169,13 +169,14 @@ impl<'m> MessageScanner<'m> {
         let on_length_delimited_arms = field_arms("on_length_delimited");
         quote! {
 
-            impl <#(#generics_on_scan_bounds),* , R: ::proto_scan::read::ReadTypes> ::proto_scan::scan::ScanCallbacks<R> for #scanner_name<#(#generics,)*> {
+            impl <#(#generics_on_scan_bounds,)* R: ::proto_scan::read::ReadTypes> ::proto_scan::scan::ScanCallbacks<R> for #scanner_name<#(#generics,)*> {
                 type ScanEvent = Option<#scan_event_name<#(#generics :: ScanEvent),*>>;
                 fn on_numeric(
                     &mut self,
                     field: ::proto_scan::wire::FieldNumber,
                     value: ::proto_scan::wire::NumericField,
                 ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
+                    #[allow(clippy::match_single_binding)]
                     Ok(match u32::from(field) {
                         #(#on_numeric_arms)*
                         _ => None,
@@ -183,6 +184,7 @@ impl<'m> MessageScanner<'m> {
                 }
 
                 fn on_group(&mut self, field: ::proto_scan::wire::FieldNumber, value: ::proto_scan::wire::GroupOp) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
+                    #[allow(clippy::match_single_binding)]
                     Ok(match u32::from(field) {
                         #(#on_group_arms)*
                         _ => None,
@@ -194,6 +196,7 @@ impl<'m> MessageScanner<'m> {
                     field: ::proto_scan::wire::FieldNumber,
                     value: impl ::proto_scan::wire::LengthDelimited<ReadTypes=R>,
                 ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
+                    #[allow(clippy::match_single_binding)]
                     Ok(match u32::from(field) {
                         #(#on_length_delimited_arms)*
                         _ => None,
