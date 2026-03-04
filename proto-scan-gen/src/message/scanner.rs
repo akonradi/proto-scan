@@ -5,7 +5,9 @@ use quote::{format_ident, quote};
 use syn::Ident;
 
 use crate::field::scanner::MessageScannerField;
-use crate::field::{BytesField, Field, FieldGeneric, MessageField, MessageFieldType, SingleField};
+use crate::field::{
+    BytesField, Field, FieldGeneric, MessageField, MessageFieldType, RepeatedField, SingleField,
+};
 use crate::message::ScannableMessage;
 use crate::scanner::{Scanner as _, ScannerOutput as _};
 
@@ -142,7 +144,7 @@ impl<'m> MessageScanner<'m> {
                           }| {
                         match field_type {
                             MessageFieldType::Single(SingleField { ty: _, number })
-                            | MessageFieldType::Repeated { ty: _, number }
+                            | MessageFieldType::Repeated(RepeatedField {ty: _, number})
                             | MessageFieldType::Message(MessageField {
                                 number,
                                 type_name: _,

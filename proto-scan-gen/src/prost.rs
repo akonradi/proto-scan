@@ -8,7 +8,7 @@ use syn::{Attribute, DataEnum, DataStruct, DeriveInput, Expr, Ident, Meta, Resul
 
 use crate::field::{
     BytesField, Field, FixedFieldType, MessageField, MessageFieldType, OneOfField, ParsedFieldType,
-    SingleField, VarintFieldType,
+    RepeatedField, RepeatedFieldType, SingleField, VarintFieldType,
 };
 use crate::message::ScannableMessage;
 use crate::oneof::ScannableOneof;
@@ -302,7 +302,10 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
 
         let field_type = match (field_type, field_number, repeated) {
             (Some(ParsedFieldType::Single(ty)), Some(FieldNumber::Single(number)), true) => {
-                MessageFieldType::Repeated { ty, number }
+                MessageFieldType::Repeated(RepeatedField {
+                    number,
+                    ty: ty.into(),
+                })
             }
             (Some(ParsedFieldType::Single(ty)), Some(FieldNumber::Single(number)), false) => {
                 MessageFieldType::Single(SingleField { ty, number })
@@ -310,6 +313,13 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
             (Some(ParsedFieldType::Message), Some(FieldNumber::Single(number)), false) => {
                 let type_name = extract_message_type_name(rust_field_type)?;
                 MessageFieldType::Message(MessageField { number, type_name })
+            }
+            (Some(ParsedFieldType::Message), Some(FieldNumber::Single(number)), true) => {
+                let type_name = extract_message_type_name(rust_field_type)?;
+                MessageFieldType::Repeated(RepeatedField {
+                    number,
+                    ty: RepeatedFieldType::Message { type_name },
+                })
             }
             (Some(ParsedFieldType::Bytes { utf8 }), Some(FieldNumber::Single(number)), false) => {
                 MessageFieldType::Bytes(BytesField { utf8, number })
@@ -346,11 +356,9 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                     "oneofs can't be repeated",
                 ));
             }
-            (
-                Some(ParsedFieldType::Message | ParsedFieldType::Bytes { utf8: _ }),
-                Some(_number),
-                true,
-            ) => MessageFieldType::Unsupported,
+            (Some(ParsedFieldType::Bytes { utf8: _ }), Some(_number), true) => {
+                MessageFieldType::Unsupported
+            }
             (None, _, _) => MessageFieldType::Unsupported,
             (
                 Some(

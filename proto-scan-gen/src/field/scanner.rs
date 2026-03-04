@@ -2,7 +2,10 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::Ident;
 
-use crate::field::{BytesField, Field, MessageField, MessageFieldType, SingleField};
+use crate::field::{
+    BytesField, Field, MessageField, MessageFieldType, RepeatedField, RepeatedFieldType,
+    SingleField,
+};
 use crate::scanner::{ScannerOutput as _, SwapSingleFieldFn, SwapSingleFieldInherentImpl};
 
 /// A field in a generated message scanner type.
@@ -88,7 +91,10 @@ impl<'m> MessageScannerField<'m> {
                 };
                 inner.generate_fns([write_fn, save_fn, custom_fn])
             }
-            MessageFieldType::Repeated { ty, number: _ } => {
+            MessageFieldType::Repeated(RepeatedField {
+                ty: RepeatedFieldType::Single(ty),
+                number: _,
+            }) => {
                 let encoding_type = ty.encoding_type();
                 let repr_type = ty.repr_type();
 
@@ -161,9 +167,7 @@ impl<'m> MessageScannerField<'m> {
                         S: ::proto_scan::scan::ScannerBuilder<Message=#message_name> + 't
                     },
                 ];
-                let output_type = quote!(
-                    ::proto_scan::scan::field::Message< S >
-                );
+                let output_type = quote!(::proto_scan::scan::field::Message<S>);
                 let scan_fn = SwapSingleFieldFn {
                     fn_verb: "scan",
                     docs,
@@ -199,6 +203,10 @@ impl<'m> MessageScannerField<'m> {
                 };
                 inner.generate_fns([f])
             }
+            MessageFieldType::Repeated(RepeatedField {
+                ty: RepeatedFieldType::Message { type_name: _ },
+                number: _,
+            }) => inner.generate_fns([custom_fn]),
             MessageFieldType::Unsupported => TokenStream::new(),
         }
     }

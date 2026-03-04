@@ -65,6 +65,12 @@ pub struct SingleField {
 }
 
 #[derive(Debug)]
+pub struct RepeatedField {
+    pub ty: RepeatedFieldType,
+    pub number: u32,
+}
+
+#[derive(Debug)]
 pub struct MessageField {
     pub type_name: String,
     pub number: u32,
@@ -95,10 +101,7 @@ impl OneOfField {
 #[derive(Debug)]
 pub enum MessageFieldType {
     Single(SingleField),
-    Repeated {
-        ty: SingleFieldType,
-        number: u32,
-    },
+    Repeated(RepeatedField),
     Bytes(BytesField),
     Message(MessageField),
     OneOf {
@@ -112,6 +115,13 @@ pub enum MessageFieldType {
 pub enum SingleFieldType {
     Varint(VarintFieldType),
     Fixed(FixedFieldType),
+}
+
+#[derive(Clone, Debug, derive_more::From)]
+pub enum RepeatedFieldType {
+    #[from]
+    Single(SingleFieldType),
+    Message { type_name: String },
 }
 
 #[derive(Clone, Debug, derive_more::From)]
