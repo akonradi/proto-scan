@@ -45,9 +45,11 @@ fn scan_message(input: InputKind) {
 fn scan_concatenated() {
     // If the input is the concatenation of two messages, where both have an
     // embedded message but only the first sets a field in that embedded
-    // message, seeing the field set in the first message should not be observable
-    // in terms of the mut ref passed to the write_ builder method.
+    // message, the first's set field should still be saved.
     let mut input = InputKind::Full.into_example_msg();
+    let first_id = input.single_msg.as_ref().unwrap().id;
+    assert_ne!(first_id, 0);
+
     let mut bytes = input.encode_to_vec();
     input.single_msg = Some(Default::default());
     bytes.extend(input.encode_to_vec());
@@ -73,5 +75,5 @@ fn scan_concatenated() {
         oneof_group: (),
     } = scanner.scan(bytes.as_slice()).read_all().unwrap();
 
-    assert_eq!(saved_id, 55555555)
+    assert_eq!(saved_id, first_id);
 }

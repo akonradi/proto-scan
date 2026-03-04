@@ -4,6 +4,7 @@ mod bytes;
 mod custom_field_scanner;
 mod embedded_message;
 mod events;
+mod merge_semantics;
 mod oneof;
 mod read_all;
 mod repeated_numeric;

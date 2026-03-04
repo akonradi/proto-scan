@@ -2,22 +2,18 @@ use core::convert::Infallible;
 
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
-use crate::scan::{
-    IntoResettable, IntoScanOutput, IntoScanner, Resettable, ScanCallbacks, StopScan, next_event,
-};
+use crate::scan::{IntoScanOutput, IntoScanner, Resettable, ScanCallbacks, StopScan, next_event};
 use crate::wire::LengthDelimited;
 
 pub struct Message<F>(F);
 
-impl<F: Resettable> Message<F> {
-    pub fn new(scanner: impl IntoResettable<Resettable = F>) -> Self {
-        Self(scanner.into_resettable())
+impl<F> Message<F> {
+    pub fn new(scanner: F) -> Self {
+        Self(scanner)
     }
 }
 
-impl<F: ScanCallbacks<R, ScanOutput: Default> + Resettable, R: ReadTypes> OnScanField<R>
-    for Message<F>
-{
+impl<F: ScanCallbacks<R, ScanOutput: Default>, R: ReadTypes> OnScanField<R> for Message<F> {
     type ScanEvent = Infallible;
 
     fn on_numeric(
@@ -35,7 +31,6 @@ impl<F: ScanCallbacks<R, ScanOutput: Default> + Resettable, R: ReadTypes> OnScan
         &mut self,
         delimited: impl LengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, StopScan> {
-        self.0.reset();
         let mut parse = delimited.into_events();
         let fields = &mut self.0;
         while let Some(next) = next_event(&mut parse, fields) {
@@ -129,20 +124,6 @@ mod test {
         }
     }
 
-    impl<T: Resettable> Resettable for Scanner<T> {
-        fn reset(&mut self) {
-            self.1.reset();
-        }
-    }
-
-    impl<T: IntoResettable> IntoResettable for Scanner<T> {
-        type Resettable = Scanner<T::Resettable>;
-        fn into_resettable(self) -> Self::Resettable {
-            let Self(f, t) = self;
-            Scanner(f, t.into_resettable())
-        }
-    }
-
     #[test]
     fn scan_embedded_message() {
         /// ```proto
@@ -184,9 +165,10 @@ mod test {
         /// Test1’s a field (i.e., Test3’s c.a field) is set to [150, 151]
         const INPUT: &[u8] = &hex!("1a 06 08 96 01 08 97 01");
 
-        // Duplicating the input should not result in multiple outputs written
-        // to saved_to. That mirrors protobuf's last-one-wins semantics.
-        for input in [Vec::from(INPUT), INPUT.repeat(2)] {
+        // Duplicating the input should result in multiple outputs written
+        // to saved_to. That mirrors protobuf's merge semantics for embedded messages.
+        for repeats in [1, 2] {
+            let input = INPUT.repeat(repeats);
             let mut saved_to = vec![1, 2, 3];
             let scanner = Scanner(
                 3,
@@ -201,7 +183,8 @@ mod test {
             let result = scan.read_all();
 
             assert_matches!(result, Ok(ScanOutput(ScanOutput(()))));
-            assert_eq!(saved_to, &[1, 2, 3, 150, 151]);
+            assert_eq!(saved_to[..3], [1, 2, 3]);
+            assert_eq!(saved_to[3..], [150, 151].repeat(repeats))
         }
     }
 }

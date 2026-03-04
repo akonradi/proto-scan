@@ -158,16 +158,11 @@ impl<'m> MessageScannerField<'m> {
                 let generics = &[
                     quote!('t),
                     quote! {
-                        S:
-                            ::proto_scan::scan::IntoResettable<Resettable:
-                                ::proto_scan::scan::ScannerBuilder<Message=#message_name>
-                            > + 't
+                        S: ::proto_scan::scan::ScannerBuilder<Message=#message_name> + 't
                     },
                 ];
                 let output_type = quote!(
-                    ::proto_scan::scan::field::Message<
-                        <S as ::proto_scan::scan::IntoResettable>::Resettable,
-                    >
+                    ::proto_scan::scan::field::Message< S >
                 );
                 let scan_fn = SwapSingleFieldFn {
                     fn_verb: "scan",

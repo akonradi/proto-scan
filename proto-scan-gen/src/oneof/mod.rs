@@ -152,27 +152,24 @@ impl OneofScannerField<'_> {
                         [`{output_type}::{field_name}`]."
                     ),
                 ];
+                    let args = [quote!(scanner: impl ::proto_scan::scan::IntoResettable<Resettable=S>)];
                 let generics = [
                     quote!('t),
                     quote! {
-                        S:
-                            ::proto_scan::scan::IntoResettable<Resettable:
-                                ::proto_scan::scan::ScannerBuilder<Message=super::#message_name>
-                            > + 't
+                        S: ::proto_scan::scan::ScannerBuilder<Message=super::#message_name>
+                           + ::proto_scan::scan::Resettable +'t
                     },
                 ];
                 let output_type = quote!(
-                    ::proto_scan::scan::field::Message<
-                        <S as ::proto_scan::scan::IntoResettable>::Resettable,
-                    >
+                    ::proto_scan::scan::field::Message< S >
                 );
                 let scan_fn = SwapSingleFieldFn {
                     fn_verb: "scan",
                     docs,
+                    args: &args,
                     generics: &generics,
-                    args: &[quote!(scanner: S)],
                     output_type,
-                    construct_field: quote!(::proto_scan::scan::field::Message::new(scanner)),
+                    construct_field: quote!(::proto_scan::scan::field::Message::new(scanner.into_resettable())),
                 };
                 inner.generate_fns([scan_fn, custom_fn])
             }
