@@ -1,4 +1,3 @@
-
 use crate::read::Read;
 use crate::scan::{IntoScanner, MessageScanner, Scan, ScanCallbacks};
 use crate::wire::ParseEventReader;

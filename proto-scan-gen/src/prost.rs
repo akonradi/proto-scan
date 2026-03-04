@@ -318,9 +318,7 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                 let type_path = strip_outer_path(&rust_field_type)?;
                 MessageFieldType::Repeated(RepeatedField {
                     number,
-                    ty: RepeatedFieldType::Message {
-                        type_path,
-                    },
+                    ty: RepeatedFieldType::Message { type_path },
                 })
             }
             (Some(ParsedFieldType::Bytes { utf8 }), Some(FieldNumber::Single(number)), false) => {
