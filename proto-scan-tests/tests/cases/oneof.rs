@@ -77,6 +77,42 @@ fn save_oneof_message_field() {
     assert_eq!(found, Some("abc123"));
 }
 
+#[test]
+fn merge_embedded_message() {
+    let input = crate::prost_proto::WithOneofRepeat {
+        oneof_group: Some(
+            crate::prost_proto::with_oneof_repeat::OneofGroup::OneofMessage(
+                crate::prost_proto::WithRepeats {
+                    packed_bool: vec![true, false],
+                    ..Default::default()
+                },
+            ),
+        ),
+    };
+    let bytes = input.encode_to_vec().repeat(2);
+
+    let scanner = proto::WithOneofRepeat::scanner().oneof_group(
+        proto::with_oneof_repeat::OneofGroup::scanner()
+            .oneof_message(proto::WithRepeats::scanner().packed_bool(Save)),
+    );
+
+    let output = scanner.scan(bytes.as_slice()).read_all().unwrap();
+
+    assert_eq!(
+        output,
+        proto::ScanWithOneofRepeatOutput {
+            oneof_group: Some(
+                proto::with_oneof_repeat::ScanOneofGroupOutput::OneofMessage(
+                    proto::ScanWithRepeatsOutput {
+                        packed_bool: vec![true, false].repeat(2),
+                        ..Default::default()
+                    }
+                )
+            )
+        }
+    );
+}
+
 #[test_case(Empty)]
 #[test_case(Full)]
 fn custom_scanner(input: InputKind) {

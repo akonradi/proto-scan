@@ -3,7 +3,11 @@ use std::io::Result;
 use proto_scan_build::CompileScan as _;
 
 fn main() -> Result<()> {
-    let protos = ["src/proto/testing.proto", "src/proto/empty_message.proto"];
+    let protos = [
+        "src/proto/oneof.proto",
+        "src/proto/testing.proto",
+        "src/proto/empty_message.proto",
+    ];
     let mut config = prost_build::Config::new();
     config.protoc_arg("--experimental_allow_proto3_optional");
     config.compile_scan(&protos, &["src/"])?;

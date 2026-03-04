@@ -29,7 +29,8 @@ pub trait MessageScanner {
     type Message: ScanMessage;
 }
 
-pub struct Repeated<T>(pub(super) T);
+/// Marker type for protobuf `repeated`.
+pub struct Repeated<T>(pub T);
 
 pub trait IntoScanner<T: ?Sized> {
     type Scanner<R: ReadTypes>: IntoScanOutput;

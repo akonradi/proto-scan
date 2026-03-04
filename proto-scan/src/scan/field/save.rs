@@ -148,6 +148,13 @@ impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveRepeated<E> {
     }
 }
 
+impl<E: Encoding> IntoResettable for SaveRepeated<E> {
+    type Resettable = Self;
+    fn into_resettable(self) -> Self::Resettable {
+        self
+    }
+}
+
 #[cfg(feature = "std")]
 impl<E: Encoding> Resettable for SaveRepeated<E> {
     fn reset(&mut self) {

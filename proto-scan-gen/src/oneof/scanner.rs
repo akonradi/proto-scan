@@ -225,7 +225,6 @@ impl<'a> OneofScanner<'a> {
                     | OneOfField::Message(_)
                     | OneOfField::Bytes(_) => quote! {
                         #field_number_type::#variant_name => {
-                            ::proto_scan::scan::Resettable::reset(self);
                             let event = self.#field_name.#fn_name(value)?;
                             self.proto_scan_last_set = ::core::option::Option::Some(#field_number_type::#variant_name);
                             #scan_event_name::#variant_name(event)
@@ -250,12 +249,18 @@ impl<'a> OneofScanner<'a> {
                     field: #field_number_type,
                     value: ::proto_scan::wire::NumericField,
                 ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
+                    if self.proto_scan_last_set.is_some_and(|e| e != field) {
+                        ::proto_scan::scan::Resettable::reset(self);
+                    }
                     Ok(match field {
                         #(#on_numeric_arms)*
                     })
                 }
 
                 fn on_group(&mut self, field: #field_number_type, value: ::proto_scan::wire::GroupOp) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
+                    if self.proto_scan_last_set.is_some_and(|e| e != field) {
+                        ::proto_scan::scan::Resettable::reset(self);
+                    }
                     Ok(match field {
                         #(#on_group_arms)*
                     })
@@ -266,6 +271,9 @@ impl<'a> OneofScanner<'a> {
                     field: #field_number_type,
                     value: impl ::proto_scan::wire::LengthDelimited<ReadTypes=R>,
                 ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
+                    if self.proto_scan_last_set.is_some_and(|e| e != field) {
+                        ::proto_scan::scan::Resettable::reset(self);
+                    }
                     Ok(match field {
                         #(#on_length_delimited_arms)*
                     })

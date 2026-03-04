@@ -1,0 +1,12 @@
+syntax = "proto3";
+package testing;
+
+import "proto/testing.proto";
+
+message WithOneofRepeat {
+  oneof oneof_group{
+    bool oneof_bool = 5;
+    fixed32 oneof_fixed32 = 6;
+    WithRepeats oneof_message = 7;
+  }
+}
