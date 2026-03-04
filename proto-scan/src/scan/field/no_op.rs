@@ -31,28 +31,24 @@ impl<R: ReadTypes> OnScanField<R> for NoOp {
     }
 }
 
-impl<R: ReadTypes> OnScanOneof<R> for NoOp {
+impl<R: ReadTypes, F> OnScanOneof<R, F> for NoOp {
     type ScanEvent = Infallible;
 
     fn on_numeric(
         &mut self,
-        _field: crate::wire::FieldNumber,
+        _field: F,
         _value: NumericField,
     ) -> Result<Option<Self::ScanEvent>, StopScan> {
         Ok(None)
     }
 
-    fn on_group(
-        &mut self,
-        _field: crate::wire::FieldNumber,
-        _op: GroupOp,
-    ) -> Result<Option<Self::ScanEvent>, StopScan> {
+    fn on_group(&mut self, _field: F, _op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan> {
         Ok(None)
     }
 
     fn on_length_delimited(
         &mut self,
-        _field: crate::wire::FieldNumber,
+        _field: F,
         _delimited: impl LengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, StopScan> {
         Ok(None)

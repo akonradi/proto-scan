@@ -41,7 +41,12 @@ impl<'a> FieldGeneric<'a, MessageFieldType> {
             variant_name: _,
         }) = self;
         match field_type {
-            MessageFieldType::OneOf { .. } => parse_quote!(::proto_scan::scan::OnScanOneof<R>),
+            MessageFieldType::OneOf {
+                numbers: _,
+                type_name,
+            } => {
+                parse_quote!(::proto_scan::scan::OnScanOneof<R, <#type_name as ::proto_scan::scan::ScannableOneOf>::FieldNumber >)
+            }
             MessageFieldType::Single(_)
             | MessageFieldType::Repeated { .. }
             | MessageFieldType::Bytes(_)
@@ -76,6 +81,15 @@ pub enum OneOfField {
     Single(SingleField),
     Bytes(BytesField),
     Message(MessageField),
+}
+impl OneOfField {
+    pub(crate) fn number(&self) -> u32 {
+        match self {
+            OneOfField::Single(single_field) => single_field.number,
+            OneOfField::Bytes(bytes_field) => bytes_field.number,
+            OneOfField::Message(message_field) => message_field.number,
+        }
+    }
 }
 
 #[derive(Debug)]

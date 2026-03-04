@@ -6,7 +6,7 @@ use syn::Ident;
 
 use crate::field::{BytesField, Field, MessageField, OneOfField, SingleField};
 use crate::oneof::{OneofScannerField, ScannableOneof};
-use crate::scanner::Scanner as _;
+use crate::scanner::{Parent, Scanner as _};
 
 #[derive(Copy, Clone, Debug)]
 pub struct OneofScanner<'a>(&'a ScannableOneof);
@@ -56,6 +56,7 @@ impl<'a> OneofScanner<'a> {
     }
 
     pub fn output_type_definition(&self) -> TokenStream {
+        let scanner_name = &self.0.name;
         let type_name = self.scan_output_name();
         let generics = self.fields().map(|f| &f.inner.field.generic);
         let fields = self.fields().map(|f| {
@@ -65,10 +66,35 @@ impl<'a> OneofScanner<'a> {
                 #variant(#generic)
             }
         });
+        let field_number_arms = self.fields().map(|f| {
+            let Field {
+                field_name: _,
+                variant_name,
+                generic: _,
+                field_type,
+            } = f.inner.field;
+            let number = field_type.number();
+            quote! {
+                #number => Self::#variant_name(()),
+            }
+        });
         quote! {
             #[derive(Copy, Clone, Debug, Hash, PartialEq)]
             pub enum #type_name<#(#generics = ()),*> {
                 #(#fields),*
+            }
+
+            impl ::proto_scan::scan::ScannableOneOf for #scanner_name {
+                type FieldNumber = #type_name;
+            }
+
+            impl #type_name {
+                pub(super) const fn for_field_number<const N: u32>() -> Self {
+                    match N {
+                        #(#field_number_arms)*
+                        _ => panic!("unsupported field number"),
+                    }
+                }
             }
         }
     }
@@ -136,7 +162,7 @@ impl<'a> OneofScanner<'a> {
                 quote! { #generic: ::proto_scan::scan::field::OnScanField<R> + ::proto_scan::scan::Resettable }
             },
         );
-        let last_set_arms = self.fields().map(|OneofScannerField {inner }| {
+        let last_set_arms = self.fields().map(|OneofScannerField { inner }| {
             let variant = &inner.field.variant_name;
             let field_name = &inner.field.field_name;
             quote! {
@@ -144,7 +170,7 @@ impl<'a> OneofScanner<'a> {
             }
         });
 
-        let reset_last_set_arms = self.fields().map(|OneofScannerField {inner }| {
+        let reset_last_set_arms = self.fields().map(|OneofScannerField { inner }| {
             let field_name = &inner.field.field_name;
             let variant = &inner.field.variant_name;
             quote! {
@@ -163,7 +189,7 @@ impl<'a> OneofScanner<'a> {
                     OneOfField::Single(SingleField { ty: _, number })
                     | OneOfField::Message(MessageField{ number, type_name: _ })
                     | OneOfField::Bytes(BytesField{ utf8: _, number }) => quote! {
-                        #number => {
+                        #output_type::#variant_name(()) => {
                             ::proto_scan::scan::Resettable::reset(self);
                             let event = self.#field_name.#fn_name(value)?;
                             self.proto_scan_last_set = ::core::option::Option::Some(#output_type::#variant_name(()));
@@ -181,35 +207,32 @@ impl<'a> OneofScanner<'a> {
             impl<
                 #(#generics_with_bounds,)*
                 R: ::proto_scan::read::ReadTypes
-            > ::proto_scan::scan::OnScanOneof<R> for #type_name< #(#generics),* > {
+            > ::proto_scan::scan::OnScanOneof<R, #output_type> for #type_name< #(#generics),* > {
                 type ScanEvent = #scan_event_name < #(<#generics as ::proto_scan::scan::field::OnScanField<R>>::ScanEvent),* >;
 
                 fn on_numeric(
                     &mut self,
-                    field: ::proto_scan::wire::FieldNumber,
+                    field: #output_type,
                     value: ::proto_scan::wire::NumericField,
                 ) -> Result<::core::option::Option<Self::ScanEvent>, ::proto_scan::scan::StopScan> {
-                    Ok(match u32::from(field) {
+                    Ok(match field {
                         #(#on_numeric_arms)*
-                        _ => None,
                     })
                 }
 
-                fn on_group(&mut self, field: ::proto_scan::wire::FieldNumber, value: ::proto_scan::wire::GroupOp) -> Result<::core::option::Option<Self::ScanEvent>, ::proto_scan::scan::StopScan> {
-                    Ok(match u32::from(field) {
+                fn on_group(&mut self, field: #output_type, value: ::proto_scan::wire::GroupOp) -> Result<::core::option::Option<Self::ScanEvent>, ::proto_scan::scan::StopScan> {
+                    Ok(match field {
                         #(#on_group_arms)*
-                        _ => None,
                     })
                 }
 
                 fn on_length_delimited(
                     &mut self,
-                    field: ::proto_scan::wire::FieldNumber,
+                    field: #output_type,
                     value: impl ::proto_scan::wire::LengthDelimited<ReadTypes=R>,
                 ) -> Result<::core::option::Option<Self::ScanEvent>, ::proto_scan::scan::StopScan> {
-                    Ok(match u32::from(field) {
+                    Ok(match field {
                         #(#on_length_delimited_arms)*
-                        _ => None,
                     })
                 }
             }
