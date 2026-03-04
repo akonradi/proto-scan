@@ -103,35 +103,33 @@ fn custom_scanner(input: InputKind) {
         oneof_field,
         input.oneof_group.map(|g| match g {
             crate::prost_proto::scan_example::OneofGroup::OneofBool(_) =>
-                proto::scan_example::ScanOneofGroupOutput::OneofBool(()),
+                proto::scan_example::ScanOneofGroupFieldNum::OneofBool,
             crate::prost_proto::scan_example::OneofGroup::OneofFixed32(_) =>
-                proto::scan_example::ScanOneofGroupOutput::OneofFixed32(()),
+                proto::scan_example::ScanOneofGroupFieldNum::OneofFixed32,
             crate::prost_proto::scan_example::OneofGroup::OneofMessage(_) =>
-                proto::scan_example::ScanOneofGroupOutput::OneofMessage(()),
+                proto::scan_example::ScanOneofGroupFieldNum::OneofMessage,
         })
     );
 }
 
-struct SaveLastFieldNumber<'t>(&'t mut Option<proto::scan_example::ScanOneofGroupOutput>);
-impl IntoScanner for SaveLastFieldNumber<'_> {
+struct SaveLastFieldNumber<'t, F>(&'t mut Option<F>);
+impl<F> IntoScanner for SaveLastFieldNumber<'_, F> {
     type Scanner<R: ReadTypes> = Self;
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         self
     }
 }
 
-impl IntoScanOutput for SaveLastFieldNumber<'_> {
+impl<F> IntoScanOutput for SaveLastFieldNumber<'_, F> {
     type ScanOutput = ();
     fn into_scan_output(self) -> Self::ScanOutput {}
 }
 
-impl<R: ReadTypes> OnScanOneof<R, proto::scan_example::ScanOneofGroupOutput>
-    for SaveLastFieldNumber<'_>
-{
+impl<R: ReadTypes, F> OnScanOneof<R, F> for SaveLastFieldNumber<'_, F> {
     type ScanEvent = Infallible;
     fn on_numeric(
         &mut self,
-        field: proto::scan_example::ScanOneofGroupOutput,
+        field: F,
         _value: proto_scan::wire::NumericField,
     ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::StopScan> {
         *self.0 = Some(field);
@@ -139,7 +137,7 @@ impl<R: ReadTypes> OnScanOneof<R, proto::scan_example::ScanOneofGroupOutput>
     }
     fn on_length_delimited(
         &mut self,
-        field: proto::scan_example::ScanOneofGroupOutput,
+        field: F,
         _delimited: impl proto_scan::wire::LengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::StopScan> {
         *self.0 = Some(field);
@@ -147,7 +145,7 @@ impl<R: ReadTypes> OnScanOneof<R, proto::scan_example::ScanOneofGroupOutput>
     }
     fn on_group(
         &mut self,
-        field: proto::scan_example::ScanOneofGroupOutput,
+        field: F,
         _op: proto_scan::wire::GroupOp,
     ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::StopScan> {
         *self.0 = Some(field);

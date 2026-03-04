@@ -4,9 +4,9 @@ use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::Ident;
 
-use crate::field::{BytesField, Field, MessageField, OneOfField, SingleField};
+use crate::field::{Field, OneOfField};
 use crate::oneof::{OneofScannerField, ScannableOneof};
-use crate::scanner::{Parent, Scanner as _};
+use crate::scanner::Scanner as _;
 
 #[derive(Copy, Clone, Debug)]
 pub struct OneofScanner<'a>(&'a ScannableOneof);
@@ -16,7 +16,7 @@ impl<'a> OneofScanner<'a> {
         Self(arg)
     }
 
-    pub fn fields(&self) -> impl Iterator<Item = OneofScannerField<'_>> {
+    pub fn fields(&self) -> impl Iterator<Item = OneofScannerField<'_>> + Clone {
         self.0
             .fields
             .iter()
@@ -56,7 +56,6 @@ impl<'a> OneofScanner<'a> {
     }
 
     pub fn output_type_definition(&self) -> TokenStream {
-        let scanner_name = &self.0.name;
         let type_name = self.scan_output_name();
         let generics = self.fields().map(|f| &f.inner.field.generic);
         let fields = self.fields().map(|f| {
@@ -66,36 +65,12 @@ impl<'a> OneofScanner<'a> {
                 #variant(#generic)
             }
         });
-        let field_number_arms = self.fields().map(|f| {
-            let Field {
-                field_name: _,
-                variant_name,
-                generic: _,
-                field_type,
-            } = f.inner.field;
-            let number = field_type.number();
-            quote! {
-                #number => Self::#variant_name(()),
-            }
-        });
         quote! {
             #[derive(Copy, Clone, Debug, Hash, PartialEq)]
             pub enum #type_name<#(#generics = ()),*> {
                 #(#fields),*
             }
 
-            impl ::proto_scan::scan::ScannableOneOf for #scanner_name {
-                type FieldNumber = #type_name;
-            }
-
-            impl #type_name {
-                pub(super) const fn for_field_number<const N: u32>() -> Self {
-                    match N {
-                        #(#field_number_arms)*
-                        _ => panic!("unsupported field number"),
-                    }
-                }
-            }
         }
     }
 
@@ -143,6 +118,60 @@ impl<'a> OneofScanner<'a> {
         }
     }
 
+    pub fn field_number_type_definition(&self) -> TokenStream {
+        let type_name = self.field_type_name();
+        let fields = self.fields().map(|f| {
+            let variant = &f.inner.field.variant_name;
+            let repr: isize = f.inner.field.field_type.number().try_into().unwrap();
+            quote! {
+                #variant = #repr
+            }
+        });
+        quote! {
+            #[derive(Copy, Clone, Debug, Hash, PartialEq)]
+            pub enum #type_name {
+                #(#fields),*
+            }
+        }
+    }
+
+    pub fn field_number_type_impls(&self) -> TokenStream {
+        let type_name = self.field_type_name();
+        let fields = self.fields().map(|f| {
+            let Field {
+                variant_name,
+                field_type,
+                ..
+            } = f.inner.field;
+            let number = field_type.number();
+            quote! {
+                #number => Self::#variant_name,
+            }
+        });
+        let fields2 = fields.clone();
+
+        quote! {
+            impl #type_name {
+                pub(super) const fn for_field_number<const N: u32>() -> Self {
+                    match N {
+                        #(#fields)*
+                        _ => panic!("unsupported field number"),
+                    }
+                }
+            }
+
+            impl ::core::convert::TryFrom<::proto_scan::wire::FieldNumber> for #type_name {
+                type Error = ::proto_scan::wire::InvalidFieldNumber;
+                fn try_from(value: ::proto_scan::wire::FieldNumber) -> Result<Self, Self::Error> {
+                    Ok(match u32::from(value) {
+                        #(#fields2)*
+                        n => return Err(::proto_scan::wire::InvalidFieldNumber(n)),
+                    })
+                }
+            }
+        }
+    }
+
     pub fn impl_scan_callbacks(&self) -> TokenStream {
         let type_name = self.type_name();
         let output_type = self.scan_output_name();
@@ -162,6 +191,7 @@ impl<'a> OneofScanner<'a> {
                 quote! { #generic: ::proto_scan::scan::field::OnScanField<R> + ::proto_scan::scan::Resettable }
             },
         );
+        let field_number_type = self.field_type_name();
         let last_set_arms = self.fields().map(|OneofScannerField { inner }| {
             let variant = &inner.field.variant_name;
             let field_name = &inner.field.field_name;
@@ -180,16 +210,17 @@ impl<'a> OneofScanner<'a> {
 
         let scan_event_name = self.scan_event_name();
         let field_arms = |fn_name: &str| {
+            let field_number_type = &field_number_type;
             let scan_event_name = &scan_event_name;
             let output_type = &output_type;
             let fn_name = format_ident!("{fn_name}");
             self.fields().map(move |OneofScannerField { inner } | {
                 let Field {field_type, field_name, generic: _, variant_name } = &inner.field;
                 match field_type {
-                    OneOfField::Single(SingleField { ty: _, number })
-                    | OneOfField::Message(MessageField{ number, type_name: _ })
-                    | OneOfField::Bytes(BytesField{ utf8: _, number }) => quote! {
-                        #output_type::#variant_name(()) => {
+                    OneOfField::Single(_)
+                    | OneOfField::Message(_)
+                    | OneOfField::Bytes(_) => quote! {
+                        #field_number_type::#variant_name => {
                             ::proto_scan::scan::Resettable::reset(self);
                             let event = self.#field_name.#fn_name(value)?;
                             self.proto_scan_last_set = ::core::option::Option::Some(#output_type::#variant_name(()));
@@ -207,12 +238,12 @@ impl<'a> OneofScanner<'a> {
             impl<
                 #(#generics_with_bounds,)*
                 R: ::proto_scan::read::ReadTypes
-            > ::proto_scan::scan::OnScanOneof<R, #output_type> for #type_name< #(#generics),* > {
+            > ::proto_scan::scan::OnScanOneof<R, #field_number_type> for #type_name< #(#generics),* > {
                 type ScanEvent = #scan_event_name < #(<#generics as ::proto_scan::scan::field::OnScanField<R>>::ScanEvent),* >;
 
                 fn on_numeric(
                     &mut self,
-                    field: #output_type,
+                    field: #field_number_type,
                     value: ::proto_scan::wire::NumericField,
                 ) -> Result<::core::option::Option<Self::ScanEvent>, ::proto_scan::scan::StopScan> {
                     Ok(match field {
@@ -220,7 +251,7 @@ impl<'a> OneofScanner<'a> {
                     })
                 }
 
-                fn on_group(&mut self, field: #output_type, value: ::proto_scan::wire::GroupOp) -> Result<::core::option::Option<Self::ScanEvent>, ::proto_scan::scan::StopScan> {
+                fn on_group(&mut self, field: #field_number_type, value: ::proto_scan::wire::GroupOp) -> Result<::core::option::Option<Self::ScanEvent>, ::proto_scan::scan::StopScan> {
                     Ok(match field {
                         #(#on_group_arms)*
                     })
@@ -228,7 +259,7 @@ impl<'a> OneofScanner<'a> {
 
                 fn on_length_delimited(
                     &mut self,
-                    field: #output_type,
+                    field: #field_number_type,
                     value: impl ::proto_scan::wire::LengthDelimited<ReadTypes=R>,
                 ) -> Result<::core::option::Option<Self::ScanEvent>, ::proto_scan::scan::StopScan> {
                     Ok(match field {
@@ -268,6 +299,10 @@ impl<'a> OneofScanner<'a> {
 
     pub fn scan_output_name(&self) -> Ident {
         format_ident!("{}Output", self.type_name())
+    }
+
+    pub fn field_type_name(&self) -> Ident {
+        format_ident!("{}FieldNum", self.type_name())
     }
 }
 

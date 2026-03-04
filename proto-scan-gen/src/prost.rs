@@ -112,9 +112,12 @@ fn enum_impl(name: Ident, data_enum: DataEnum) -> Result<TokenStream> {
     Ok([
         scanner.scanner_type_definition(),
         scanner.output_type_definition(),
-        oneof.impl_scan_message(),
-        scanner.impl_scanner_builder(),
         scanner.event_type_definition(),
+        scanner.field_number_type_definition(),
+        scanner.field_number_type_impls(),
+        oneof.impl_scan_message(),
+        oneof.impl_scannable_oneof(),
+        scanner.impl_scanner_builder(),
         scanner.impl_scan_callbacks(),
     ]
     .into_iter()
