@@ -102,14 +102,14 @@
 //!
 //! Calling the [`scan::ScanMessage::scanner`] method from the impl generated
 //! for `Test1` returns an instance of a generated builder type `ScanTest1`.
-//! `ScanTest1` has a builder method `save_a` that produces a new `ScanTest1`.
-//! When the built scanner processes the input, it records the value of the last
-//! `a` field found in the input. When `ScanTest1`'s
-//! [`read_all()`](scan::Scan::read_all) method is called, it returns (on
-//! success) a `ScanTest1Output`. That generated type has a single field `a`
-//! that contains the decoded output. Any other tag types or fields are ignored.
-//! The input to `read_a` is a `&mut &[u8]` which has an implementation of
-//! [`Read`](read::Read).
+//! `ScanTest1` has a builder method `a` that takes a scanner (here
+//! [`scan::field::Save`]) and produces a new `ScanTest1`.  When the built
+//! scanner processes the input, it records the value of the last `a` field
+//! found in the input. When `ScanTest1`'s [`read_all()`](scan::Scan::read_all)
+//! method is called, it returns (on success) a `ScanTest1Output`. That
+//! generated type has a single field `a` that contains the decoded output. Any
+//! other tag types or fields are ignored.  The input to `read_a` is a `&mut
+//! &[u8]` which has an implementation of [`Read`](read::Read).
 //!
 //! ## Embedded messages
 //!
@@ -152,6 +152,10 @@
 //!     assert_eq!(read_a_from_c(&mut &INPUT[..]), Ok(Some(150)))
 //! }
 //! ```
+//! 
+//! The basic concept is the same, but instead of using the `Save` scanner for field `c`,
+//! a scanner for the inner message type is provided instead. The output of that scanner
+//! is provided as the output of `ScanTest3Output::c`.
 //!
 //! [low-level]: #low-level-parse-event-stream
 //! [high-level]: #high-level-generated-scanner-types

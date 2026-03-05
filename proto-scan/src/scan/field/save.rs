@@ -17,7 +17,15 @@ macro_rules! impl_into_scanner {
             type Scanner<R: ReadTypes> = SaveNumeric<$p>;
 
             fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-                SaveNumeric::new()
+                SaveNumeric(None)
+            }
+        }
+        #[cfg(feature = "std")]
+        impl IntoScanner<Repeated<$p>> for Save {
+            type Scanner<R: ReadTypes> = SaveRepeated<$p>;
+
+            fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+                SaveRepeated(Vec::new())
             }
         }
     };
@@ -51,45 +59,7 @@ impl IntoScanner<[u8]> for Save {
     }
 }
 
-macro_rules! impl_into_scanner {
-    ($p:path) => {
-        impl IntoScanner<Repeated<$p>> for Save {
-            type Scanner<R: ReadTypes> = SaveRepeated<$p>;
-
-            fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-                SaveRepeated::new()
-            }
-        }
-    };
-}
-
-impl_into_scanner!(Varint<bool>);
-impl_into_scanner!(Varint<i32>);
-impl_into_scanner!(Varint<i64>);
-impl_into_scanner!(Varint<u32>);
-impl_into_scanner!(Varint<u64>);
-impl_into_scanner!(Varint<ZigZag<i32>>);
-impl_into_scanner!(Varint<ZigZag<i64>>);
-impl_into_scanner!(Fixed<u64>);
-impl_into_scanner!(Fixed<u32>);
-impl_into_scanner!(Fixed<i64>);
-impl_into_scanner!(Fixed<i32>);
-impl_into_scanner!(Fixed<f64>);
-impl_into_scanner!(Fixed<f32>);
-
 pub struct SaveNumeric<E: Encoding>(Option<E::Repr>);
-
-impl<T: Encoding> Default for SaveNumeric<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<T: Encoding> SaveNumeric<T> {
-    pub fn new() -> Self {
-        Self(None)
-    }
-}
 
 impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveNumeric<E> {
     type ScanEvent = E::Repr;
@@ -138,19 +108,6 @@ impl<E: Encoding> IntoScanOutput for SaveNumeric<E> {
 ///
 /// Deserializes according to the [`Encoding`] type parameter.
 pub struct SaveRepeated<E: Encoding>(Vec<E::Repr>);
-
-#[cfg(feature = "std")]
-impl<T: Encoding> Default for SaveRepeated<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<T: Encoding> SaveRepeated<T> {
-    pub fn new() -> Self {
-        Self(Vec::new())
-    }
-}
 
 #[cfg(feature = "std")]
 impl<E: Encoding> IntoScanOutput for SaveRepeated<E> {

@@ -20,28 +20,10 @@ macro_rules! impl_into_scanner {
             type Scanner<R: ReadTypes> = WriteNumeric<$p, &'t mut T>;
 
             fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-                WriteNumeric::new(self.0)
+                WriteNumeric(self.0, PhantomData)
             }
         }
-    };
-}
 
-impl_into_scanner!(Varint<bool>);
-impl_into_scanner!(Varint<i32>);
-impl_into_scanner!(Varint<i64>);
-impl_into_scanner!(Varint<u32>);
-impl_into_scanner!(Varint<u64>);
-impl_into_scanner!(Varint<ZigZag<i32>>);
-impl_into_scanner!(Varint<ZigZag<i64>>);
-impl_into_scanner!(Fixed<u64>);
-impl_into_scanner!(Fixed<u32>);
-impl_into_scanner!(Fixed<i64>);
-impl_into_scanner!(Fixed<i32>);
-impl_into_scanner!(Fixed<f64>);
-impl_into_scanner!(Fixed<f32>);
-
-macro_rules! impl_into_scanner {
-    ($p:path) => {
         impl<D> IntoScanner<Repeated<$p>> for Write<D>
         where
             WriteRepeated<$p, D>: OnScanField<BoundsOnlyReadTypes>,
@@ -49,7 +31,7 @@ macro_rules! impl_into_scanner {
             type Scanner<R: ReadTypes> = WriteRepeated<$p, D>;
 
             fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-                WriteRepeated::new(self.0)
+                WriteRepeated(self.0, PhantomData)
             }
         }
     };
@@ -99,12 +81,6 @@ impl<S, T: From<S>> SaveFrom<S> for &mut T {
     }
 }
 
-impl<E, D> WriteNumeric<E, D> {
-    pub fn new(to: D) -> Self {
-        Self(to, PhantomData)
-    }
-}
-
 impl<E: Encoding, D: SaveFrom<E::Repr>, R: ReadTypes> OnScanField<R> for WriteNumeric<E, D> {
     type ScanEvent = Infallible;
 
@@ -131,7 +107,7 @@ impl<E: Encoding, D> IntoScanOutput for WriteNumeric<E, D> {
     fn into_scan_output(self) -> Self::ScanOutput {}
 }
 
-/// Implements [`WriteFrom`] and [`Resettable`] to save and restore a previous value.
+/// Implements [`SaveFrom`] and [`Resettable`] to save and restore a previous value.
 pub struct RestoreOnReset<'t, D>(&'t mut D, Option<D>);
 
 impl<'t, D> Resettable for RestoreOnReset<'t, D> {
@@ -164,12 +140,6 @@ impl<'t, E, D> Resettable for WriteNumeric<E, RestoreOnReset<'t, D>> {
 
 /// [`OnScanField`] that writes the decoded values to the provided location.
 pub struct WriteRepeated<E, D>(D, PhantomData<E>);
-
-impl<E, D> WriteRepeated<E, D> {
-    pub fn new(to: D) -> Self {
-        Self(to, PhantomData)
-    }
-}
 
 impl<E: Encoding, R: ReadTypes, D: DerefMut<Target: Extend<E::Repr>>> OnScanField<R>
     for WriteRepeated<E, D>

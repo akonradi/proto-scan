@@ -1,9 +1,11 @@
 use core::convert::Infallible;
 
-use crate::read::{Read, ReadTypes};
+use crate::read::ReadTypes;
 use crate::wire::{FieldNumber, GroupOp, I32, I64, NumericField, Varint};
 use crate::wire::{LengthDelimited, ParseEvent, ParseEventReader};
 
+mod builder;
+pub use builder::ScannerBuilder;
 pub mod encoding;
 pub mod field;
 mod resettable;
@@ -18,40 +20,14 @@ pub trait ScanMessage {
     fn scanner() -> Self::ScannerBuilder;
 }
 
-/// A builder type for a [`Scan`] over a byte stream.
-pub trait ScannerBuilder<M: ?Sized>: Sized {
-    /// Starts a scan over the provided input.
-    ///
-    /// Consumes `self` and produces a [`Scan`] over the input stream.
-    fn scan_events<P: ParseEventReader>(self, read: P) -> Scan<P, Self::Scanner<P::ReadTypes>>
-    where
-        Self: IntoScanner<M>,
-        Self::Scanner<P::ReadTypes>: ScanCallbacks<P::ReadTypes>,
-    {
-        Scan::new(read, self.into_scanner())
-    }
-
-    /// Starts a scan over the provided input.
-    ///
-    /// Consumes `self` and produces a [`Scan`] over the input stream.
-    fn scan<'r, R: Read + 'r>(
-        self,
-        read: R,
-    ) -> Scan<impl ParseEventReader<ReadTypes = R::ReadTypes> + 'r, Self::Scanner<R::ReadTypes>>
-    where
-        Self: IntoScanner<M>,
-        Self::Scanner<R::ReadTypes>: ScanCallbacks<R::ReadTypes>,
-    {
-        self.scan_events(crate::wire::parse(read))
-    }
-}
+/// A scanner for a protobuf message type.
+///
+/// This functions as a marker trait for scanner types that specifically scan
+/// for messages (not fields or oneofs).
 pub trait MessageScanner {
+    /// The message type that this scanner can read.
     type Message: ScanMessage;
 }
-
-impl<S: MessageScanner> ScannerBuilder<S::Message> for S {}
-
-pub trait FieldType {}
 
 pub struct Repeated<T>(pub(super) T);
 
@@ -87,6 +63,7 @@ pub trait ScanCallbacks<R: ReadTypes>: IntoScanOutput {
     ) -> Result<Self::ScanEvent, StopScan>;
 }
 
+/// Callbacks for parse inputs encountered during a scan.
 pub trait OnScanOneof<R: ReadTypes, F>: IntoScanOutput {
     type ScanEvent;
 
@@ -108,7 +85,11 @@ pub trait OnScanOneof<R: ReadTypes, F>: IntoScanOutput {
     ) -> Result<Option<Self::ScanEvent>, StopScan>;
 }
 
+/// A oneof grouping in a message that can be scanned for.
 pub trait ScannableOneOf {
+    /// A discriminant for the oneof variants.
+    /// 
+    /// This should be an enum with one variant for each proto field in the oneof.
     type FieldNumber;
 }
 

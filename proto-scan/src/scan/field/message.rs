@@ -70,9 +70,8 @@ mod test {
     use hex_literal::hex;
 
     use crate::scan::encoding::Varint;
-    use crate::scan::field::NoOp;
-    use crate::scan::field::save::SaveNumeric;
-    use crate::scan::{FieldNumber, NumericField, Scan};
+    use crate::scan::field::{NoOp, Save, Write};
+    use crate::scan::{FieldNumber, NumericField, Repeated, Scan};
 
     use super::*;
     struct Scanner<T = NoOp>(u32, T);
@@ -144,7 +143,10 @@ mod test {
 
         let scanner = Scanner(
             3,
-            Message::new(Scanner(1, SaveNumeric::<Varint<i32>>::new())),
+            Message::new(Scanner(
+                1,
+                <Save as IntoScanner<Varint<i32>>>::into_scanner::<&[u8]>(Save),
+            )),
         );
 
         let mut input = &INPUT[..];
@@ -178,7 +180,9 @@ mod test {
                 3,
                 Message::new(Scanner(
                     1,
-                    crate::scan::field::write::WriteRepeated::<Varint<i32>, _>::new(&mut saved_to),
+                    <Write<_> as IntoScanner<Repeated<Varint<i32>>>>::into_scanner::<&[u8]>(Write(
+                        &mut saved_to,
+                    )),
                 )),
             );
 

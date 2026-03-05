@@ -95,7 +95,6 @@ impl<'m> MessageScanner<'m> {
             let t = f.field_type.as_into_scanner_type();
             quote!(#g: ::proto_scan::scan::IntoScanner<#t>)
         });
-        let _generics_with_bounds2 = generics_with_bounds.clone();
         quote! {
             impl<#(#generics_with_bounds),*> ::proto_scan::scan::IntoScanner<#message_type> for #type_name < #(#generics),* > {
                 type Scanner<R: ::proto_scan::read::ReadTypes> = #type_name < #(#generics ::Scanner<R> ),* >;
@@ -106,15 +105,6 @@ impl<'m> MessageScanner<'m> {
                     }
                 }
             }
-            // impl<#(#generics_with_bounds2),*> ::proto_scan::scan::IntoScanner<::proto_scan::scan::field::Message<#message_type>> for #type_name < #(#generics),* > {
-            //     type Scanner<R: ::proto_scan::read::ReadTypes> = ::proto_scan::scan::field::Message<#type_name < #(#generics ::Scanner<R> ),* >>;
-            //     fn into_scanner<R: ::proto_scan::read::ReadTypes>(self) -> Self::Scanner<R> {
-            //         let Self { #(#field_names),* } = self;
-            //         ::proto_scan::scan::field::Message::new(#type_name {
-            //             #(#field_names: #field_names.into_scanner()),*
-            //         })
-            //     }
-            // }
         }
     }
 
