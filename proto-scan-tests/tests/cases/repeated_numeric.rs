@@ -1,4 +1,5 @@
 use prost::Message;
+use proto_scan::scan::field::Write;
 use proto_scan::scan::{ScanMessage as _, ScannerBuilder as _};
 use test_case::test_case;
 
@@ -11,7 +12,7 @@ fn save_repeated_bool(input: InputKind) {
     let input = input.into_example_msg();
     let mut save_to = vec![true, true];
 
-    let scanner = proto::ScanExample::scanner().write_repeated_bool(&mut save_to);
+    let scanner = proto::ScanExample::scanner().repeated_bool(Write(&mut save_to));
     {
         let bytes = input.encode_to_vec();
         for event in scanner.scan(bytes.as_slice()) {

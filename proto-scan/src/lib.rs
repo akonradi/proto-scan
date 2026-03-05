@@ -86,7 +86,7 @@
 //! }
 //!
 //! fn read_a<R: read::Read>(r: R) -> Result<Option<i64>, scan::StopScan> {
-//!     let scanner = Test1::scanner().save_a();
+//!     let scanner = Test1::scanner().a(scan::field::Save);
 //!     let ScanTest1Output { a } = scanner.scan(r).read_all()?;
 //!     Ok(a)
 //! }
@@ -137,7 +137,7 @@
 //! }
 //!
 //! fn read_a_from_c<R: read::Read>(r: R) -> Result<Option<i64>, scan::StopScan> {
-//!     let scanner = Test3::scanner().scan_c(Test1::scanner().save_a());
+//!     let scanner = Test3::scanner().c(Test1::scanner().a(scan::field::Save));
 //!     let ScanTest3Output {
 //!         c: ScanTest1Output { a },
 //!     } = scanner.scan(r).read_all()?;

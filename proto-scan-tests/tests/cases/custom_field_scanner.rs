@@ -1,5 +1,6 @@
 use prost::Message as _;
 use proto_scan::read::ReadTypes;
+use proto_scan::scan::encoding::Varint;
 use proto_scan::scan::field::OnScanField;
 use proto_scan::scan::{IntoScanOutput, IntoScanner, ScanMessage as _, ScannerBuilder as _};
 use proto_scan::wire::NumericField;
@@ -40,7 +41,7 @@ impl<R: ReadTypes> OnScanField<R> for CustomScanner<'_> {
     }
 }
 
-impl IntoScanner for CustomScanner<'_> {
+impl IntoScanner<Varint<bool>> for CustomScanner<'_> {
     type Scanner<R: ReadTypes> = Self;
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         self

@@ -68,9 +68,15 @@ impl<'m> MessageScanner<'m> {
             .generic_types()
             .map(FieldGeneric::ident)
             .collect::<Vec<_>>();
+        let generics_with_bounds = self.0.fields.iter().map(|f| {
+            let g = &f.generic;
+            let t = f.field_type.as_into_scanner_type();
+            quote!(#g: ::proto_scan::scan::IntoScanner<#t>)
+        });
+
         let message_name = &self.0.name;
         quote! {
-            impl<#(#generics: ::proto_scan::scan::IntoScanner ),*> ::proto_scan::scan::ScannerBuilder for #type_name < #(#generics),* > {
+            impl<#(#generics_with_bounds ),*> ::proto_scan::scan::MessageScanner for #type_name < #(#generics),* > {
                 type Message = #message_name;
             }
         }
@@ -82,18 +88,33 @@ impl<'m> MessageScanner<'m> {
             .generic_types()
             .map(FieldGeneric::ident)
             .collect::<Vec<_>>();
+        let message_type = &self.0.name;
         let field_names = self.field_names().collect::<Vec<_>>();
+        let generics_with_bounds = self.0.fields.iter().map(|f| {
+            let g = &f.generic;
+            let t = f.field_type.as_into_scanner_type();
+            quote!(#g: ::proto_scan::scan::IntoScanner<#t>)
+        });
+        let _generics_with_bounds2 = generics_with_bounds.clone();
         quote! {
-            impl<#(#generics: ::proto_scan::scan::IntoScanner),*> ::proto_scan::scan::IntoScanner for #type_name < #(#generics),* > {
-                type Scanner<R: ::proto_scan::read::ReadTypes> = #type_name < #(<#generics as ::proto_scan::scan::IntoScanner>::Scanner<R> ),* >;
+            impl<#(#generics_with_bounds),*> ::proto_scan::scan::IntoScanner<#message_type> for #type_name < #(#generics),* > {
+                type Scanner<R: ::proto_scan::read::ReadTypes> = #type_name < #(#generics ::Scanner<R> ),* >;
                 fn into_scanner<R: ::proto_scan::read::ReadTypes>(self) -> Self::Scanner<R> {
                     let Self { #(#field_names),* } = self;
-                    Self::Scanner::<R> {
+                    #type_name {
                         #(#field_names: #field_names.into_scanner()),*
                     }
-
                 }
             }
+            // impl<#(#generics_with_bounds2),*> ::proto_scan::scan::IntoScanner<::proto_scan::scan::field::Message<#message_type>> for #type_name < #(#generics),* > {
+            //     type Scanner<R: ::proto_scan::read::ReadTypes> = ::proto_scan::scan::field::Message<#type_name < #(#generics ::Scanner<R> ),* >>;
+            //     fn into_scanner<R: ::proto_scan::read::ReadTypes>(self) -> Self::Scanner<R> {
+            //         let Self { #(#field_names),* } = self;
+            //         ::proto_scan::scan::field::Message::new(#type_name {
+            //             #(#field_names: #field_names.into_scanner()),*
+            //         })
+            //     }
+            // }
         }
     }
 
@@ -147,7 +168,7 @@ impl<'m> MessageScanner<'m> {
                             | MessageFieldType::Repeated(RepeatedField {ty: _, number})
                             | MessageFieldType::Message(MessageField {
                                 number,
-                                type_name: _,
+                                type_path: _,
                             })
                             | MessageFieldType::Bytes(BytesField { utf8: _, number }) => quote! {
                                 #number => self.#field_name.#fn_name(value)?.map(#scan_event_name::#variant_name),
@@ -260,8 +281,5 @@ impl crate::scanner::Scanner for MessageScanner<'_> {
             .fields
             .iter()
             .map(|field| Cow::Borrowed(&field.field_name))
-    }
-    fn output_type(&self) -> impl crate::scanner::ScannerOutput + '_ {
-        self.output_type()
     }
 }

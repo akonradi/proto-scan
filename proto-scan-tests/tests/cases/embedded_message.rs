@@ -1,5 +1,5 @@
 use prost::Message as _;
-use proto_scan::scan::field::Message;
+use proto_scan::scan::field::{Save, Write};
 use proto_scan::scan::{ScanMessage as _, ScannerBuilder as _};
 use test_case::test_case;
 
@@ -13,10 +13,10 @@ fn scan_message(input: InputKind) {
     let bytes = input.encode_to_vec();
     let mut saved_id = None;
 
-    let scanner = proto::ScanExample::scanner().scan_single_msg(
+    let scanner = proto::ScanExample::scanner().single_msg(
         proto::MultiFieldMessage::scanner()
-            .save_flag()
-            .write_id(&mut saved_id),
+            .flag(Save)
+            .id(Write(&mut saved_id)),
     );
     let scan = scanner.scan(bytes.as_slice());
 
@@ -56,11 +56,11 @@ fn scan_concatenated() {
 
     let mut saved_id = 55555555;
     let mut saved_name = "a name".to_owned();
-    let scanner = proto::ScanExample::scanner().single_msg(Message::new(
+    let scanner = proto::ScanExample::scanner().single_msg(
         proto::MultiFieldMessage::scanner()
-            .write_id(&mut saved_id)
-            .write_name(&mut saved_name),
-    ));
+            .id(Write(&mut saved_id))
+            .name(Write(&mut saved_name)),
+    );
     let proto::ScanScanExampleOutput {
         repeated_msg: (),
         single_msg:

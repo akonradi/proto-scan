@@ -311,14 +311,16 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                 MessageFieldType::Single(SingleField { ty, number })
             }
             (Some(ParsedFieldType::Message), Some(FieldNumber::Single(number)), false) => {
-                let type_name = extract_message_type_name(rust_field_type)?;
-                MessageFieldType::Message(MessageField { number, type_name })
+                let type_path = strip_outer_path(&rust_field_type)?;
+                MessageFieldType::Message(MessageField { number, type_path })
             }
             (Some(ParsedFieldType::Message), Some(FieldNumber::Single(number)), true) => {
-                let type_name = extract_message_type_name(rust_field_type)?;
+                let type_path = strip_outer_path(&rust_field_type)?;
                 MessageFieldType::Repeated(RepeatedField {
                     number,
-                    ty: RepeatedFieldType::Message { type_name },
+                    ty: RepeatedFieldType::Message {
+                        type_path,
+                    },
                 })
             }
             (Some(ParsedFieldType::Bytes { utf8 }), Some(FieldNumber::Single(number)), false) => {
@@ -381,25 +383,20 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
     }
 }
 
-fn extract_message_type_name(ty: syn::Type) -> Result<String> {
+fn strip_outer_path(ty: &syn::Type) -> Result<syn::TypePath> {
     let span = ty.span();
-    fn inner(ty: syn::Type) -> std::result::Result<String, Cow<'static, str>> {
+    fn inner(ty: &syn::Type) -> std::result::Result<syn::TypePath, Cow<'static, str>> {
         let path = match ty {
             syn::Type::Path(path) => path,
             _ => Err("unsupported message field type")?,
         };
 
-        let last = path
-            .path
-            .segments
-            .into_iter()
-            .last()
-            .ok_or("path is empty")?;
+        let last = path.path.segments.iter().last().ok_or("path is empty")?;
 
         if last.ident == "Vec" || last.ident == "Option" {
-            match last.arguments {
+            match &last.arguments {
                 syn::PathArguments::AngleBracketed(args) if args.args.len() == 1 => {
-                    if let syn::GenericArgument::Type(ty) = args.args.into_iter().next().unwrap() {
+                    if let syn::GenericArgument::Type(ty) = args.args.iter().next().unwrap() {
                         return inner(ty);
                     }
                 }
@@ -408,7 +405,7 @@ fn extract_message_type_name(ty: syn::Type) -> Result<String> {
             Err(format!("unrecognized {} type param", last.ident).into())
         } else {
             if last.arguments.is_empty() {
-                Ok(last.ident.to_string())
+                Ok(path.clone())
             } else {
                 Err("unrecognized type is templated")?
             }

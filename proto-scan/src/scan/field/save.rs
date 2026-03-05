@@ -1,15 +1,82 @@
 use core::convert::Infallible;
-use core::marker::PhantomData;
 
 use crate::read::{ReadBuffer, ReadTypes};
-use crate::scan::encoding::Encoding;
+use crate::scan::encoding::{Encoding, Fixed, Varint, ZigZag};
 use crate::scan::field::OnScanField;
-use crate::scan::{IntoResettable, IntoScanOutput, IntoScanner, Resettable, StopScan};
+use crate::scan::{IntoResettable, IntoScanOutput, IntoScanner, Repeated, Resettable, StopScan};
 use crate::wire::{GroupOp, LengthDelimited, NumericField, NumericWireType};
 
 /// [`OnScanField`] implementation that produces the read value as the event output.
 ///
 /// Deserializes according to the [`Encoding`] type parameter.
+pub struct Save;
+
+macro_rules! impl_into_scanner {
+    ($p:path) => {
+        impl IntoScanner<$p> for Save {
+            type Scanner<R: ReadTypes> = SaveNumeric<$p>;
+
+            fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+                SaveNumeric::new()
+            }
+        }
+    };
+}
+
+impl_into_scanner!(Varint<bool>);
+impl_into_scanner!(Varint<i32>);
+impl_into_scanner!(Varint<i64>);
+impl_into_scanner!(Varint<u32>);
+impl_into_scanner!(Varint<u64>);
+impl_into_scanner!(Varint<ZigZag<i32>>);
+impl_into_scanner!(Varint<ZigZag<i64>>);
+impl_into_scanner!(Fixed<u64>);
+impl_into_scanner!(Fixed<u32>);
+impl_into_scanner!(Fixed<i64>);
+impl_into_scanner!(Fixed<i32>);
+impl_into_scanner!(Fixed<f64>);
+impl_into_scanner!(Fixed<f32>);
+
+impl IntoScanner<str> for Save {
+    type Scanner<R: ReadTypes> = SaveBytesScanner<str, R>;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+        SaveBytesScanner(None)
+    }
+}
+
+impl IntoScanner<[u8]> for Save {
+    type Scanner<R: ReadTypes> = SaveBytesScanner<[u8], R>;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+        SaveBytesScanner(None)
+    }
+}
+
+macro_rules! impl_into_scanner {
+    ($p:path) => {
+        impl IntoScanner<Repeated<$p>> for Save {
+            type Scanner<R: ReadTypes> = SaveRepeated<$p>;
+
+            fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+                SaveRepeated::new()
+            }
+        }
+    };
+}
+
+impl_into_scanner!(Varint<bool>);
+impl_into_scanner!(Varint<i32>);
+impl_into_scanner!(Varint<i64>);
+impl_into_scanner!(Varint<u32>);
+impl_into_scanner!(Varint<u64>);
+impl_into_scanner!(Varint<ZigZag<i32>>);
+impl_into_scanner!(Varint<ZigZag<i64>>);
+impl_into_scanner!(Fixed<u64>);
+impl_into_scanner!(Fixed<u32>);
+impl_into_scanner!(Fixed<i64>);
+impl_into_scanner!(Fixed<i32>);
+impl_into_scanner!(Fixed<f64>);
+impl_into_scanner!(Fixed<f32>);
+
 pub struct SaveNumeric<E: Encoding>(Option<E::Repr>);
 
 impl<T: Encoding> Default for SaveNumeric<T> {
@@ -55,13 +122,6 @@ impl<E: Encoding> Resettable for SaveNumeric<E> {
 impl<E: Encoding> IntoResettable for SaveNumeric<E> {
     type Resettable = Self;
     fn into_resettable(self) -> Self::Resettable {
-        self
-    }
-}
-
-impl<E: Encoding> IntoScanner for SaveNumeric<E> {
-    type Scanner<R: ReadTypes> = Self;
-    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         self
     }
 }
@@ -138,30 +198,8 @@ impl<E: Encoding> Resettable for SaveRepeated<E> {
     }
 }
 
-#[cfg(feature = "std")]
-impl<E: Encoding> IntoScanner for SaveRepeated<E> {
-    type Scanner<R: ReadTypes> = Self;
-    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-        self
-    }
-}
-
-/// [`IntoScanner`] implementation whose `Scanner` type produces the read value as the event output.
-pub struct SaveBytes<E: ?Sized>(PhantomData<E>);
-
 /// [`OnScanField`] impl that produces the read value as the event output.
 pub struct SaveBytesScanner<E: DecodeFromBytes + ?Sized, R: ReadTypes>(Option<E::Decoded<R>>);
-
-impl<E: ?Sized> IntoResettable for SaveBytes<E> {
-    type Resettable = Self;
-    fn into_resettable(self) -> Self::Resettable {
-        self
-    }
-}
-
-impl<E: ?Sized> Resettable for SaveBytes<E> {
-    fn reset(&mut self) {}
-}
 
 pub trait DecodeFromBytes {
     type Error;
@@ -182,25 +220,6 @@ impl DecodeFromBytes for [u8] {
     type Decoded<R: ReadTypes> = R::Buffer;
     fn decode<R: ReadTypes>(bytes: R::Buffer) -> Result<Self::Decoded<R>, Self::Error> {
         Ok(bytes)
-    }
-}
-
-impl<T: DecodeFromBytes + ?Sized> Default for SaveBytes<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<T: DecodeFromBytes + ?Sized> SaveBytes<T> {
-    pub fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<T: DecodeFromBytes + ?Sized> IntoScanner for SaveBytes<T> {
-    type Scanner<R: ReadTypes> = SaveBytesScanner<T, R>;
-    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-        SaveBytesScanner(None)
     }
 }
 

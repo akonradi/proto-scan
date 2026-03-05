@@ -1,8 +1,8 @@
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::quote;
 use syn::Ident;
 
-use crate::field::{BytesField, Field, MessageField, OneOfField, SingleField};
+use crate::field::{Field, OneOfField};
 use crate::oneof::scanner::OneofScanner;
 use crate::scanner::{Scanner as _, SwapSingleFieldFn};
 
@@ -59,6 +59,7 @@ impl OneofScannerField<'_> {
         let field_type = &inner.field.field_type;
         let output_type = parent.scan_output_name();
 
+        let into_scanner_type = field_type.as_into_scanner_type();
         let custom_fn = SwapSingleFieldFn {
             fn_verb: "",
             docs: &[
@@ -74,105 +75,13 @@ impl OneofScannerField<'_> {
             ],
             generics: &[
                 quote!('t),
-                quote!(S: ::proto_scan::scan::IntoScanner<Scanner<::proto_scan::read::BoundsOnlyReadTypes>: ::proto_scan::scan::Resettable> + 't),
+                quote!(S: ::proto_scan::scan::IntoScanner<#into_scanner_type, Scanner<::proto_scan::read::BoundsOnlyReadTypes>: ::proto_scan::scan::Resettable> + 't),
             ],
             args: &[quote!(scanner: S)],
             output_type: quote!(S),
             construct_field: quote!(scanner),
         };
 
-        match field_type {
-            OneOfField::Single(SingleField {
-                ty: single,
-                number: _,
-            }) => {
-                let encoding_type = single.encoding_type();
-                let repr_type = single.repr_type();
-
-                let write_docs = inner.write_fn_docs();
-                let write_fn = SwapSingleFieldFn {
-                    fn_verb: "write",
-                    docs: &write_docs.each_ref().map(|s| &**s),
-                    generics: &[quote!('t), quote!(D: From<#repr_type>)],
-                    args: &[quote!(to: &'t mut D)],
-                    output_type: quote! {::proto_scan::scan::field::WriteNumeric::<#encoding_type, &'t mut D>},
-                    construct_field: quote!(::proto_scan::scan::field::WriteNumeric::<#encoding_type, _>::new(to)),
-                };
-                let save_docs = inner.save_fn_docs();
-                let save_fn = SwapSingleFieldFn {
-                    fn_verb: "save",
-                    docs: &save_docs.each_ref().map(|s| &**s),
-                    output_type: quote! {::proto_scan::scan::field::SaveNumeric::<#encoding_type>},
-                    construct_field: quote!(::proto_scan::scan::field::SaveNumeric::<#encoding_type>::new()),
-                    ..Default::default()
-                };
-                inner.generate_fns([write_fn, save_fn, custom_fn])
-            }
-            OneOfField::Bytes(BytesField { utf8, number: _ }) => {
-                let borrow_type = if *utf8 {
-                    quote! {::core::primitive::str}
-                } else {
-                    quote! {[::core::primitive::u8]}
-                };
-                let write_docs = inner.write_fn_docs();
-                let write_fn = SwapSingleFieldFn {
-                    fn_verb: "write",
-                    docs: &write_docs.each_ref().map(|s| &**s),
-                    generics: &[
-                        quote!('t),
-                        quote!(D: for<'d> ::core::convert::From<&'d #borrow_type>),
-                    ],
-                    args: &[quote!(to: &'t mut D)],
-                    output_type: quote! {::proto_scan::scan::field::WriteBytes::<#borrow_type, &'t mut D>},
-                    construct_field: quote!(::proto_scan::scan::field::WriteBytes::<#borrow_type, _>::new(to)),
-                };
-                let save_docs = inner.save_fn_docs();
-                let save_fn = SwapSingleFieldFn {
-                    fn_verb: "save",
-                    docs: &save_docs.each_ref().map(|s| &**s),
-                    output_type: quote! {::proto_scan::scan::field::SaveBytes::<#borrow_type>},
-                    construct_field: quote!(::proto_scan::scan::field::SaveBytes::<#borrow_type>::new()),
-                    ..Default::default()
-                };
-                inner.generate_fns([write_fn, save_fn, custom_fn])
-            }
-            OneOfField::Message(MessageField {
-                number: _,
-                type_name,
-            }) => {
-                let message_name = format_ident!("{type_name}");
-                let docs = &[
-                    &format!("Sets the scanner for the embedded message `{field_name}`."),
-                    "",
-                    &format!(
-                        "Sets the builder to use the provided scanner to
-                        read the contents of the message in `{field_name}`.
-                        The output of the scanner will be included in the
-                        overall scan output as
-                        [`{output_type}::{field_name}`]."
-                    ),
-                ];
-                    let args = [quote!(scanner: impl ::proto_scan::scan::IntoResettable<Resettable=S>)];
-                let generics = [
-                    quote!('t),
-                    quote! {
-                        S: ::proto_scan::scan::ScannerBuilder<Message=super::#message_name>
-                           + ::proto_scan::scan::Resettable +'t
-                    },
-                ];
-                let output_type = quote!(
-                    ::proto_scan::scan::field::Message< S >
-                );
-                let scan_fn = SwapSingleFieldFn {
-                    fn_verb: "scan",
-                    docs,
-                    args: &args,
-                    generics: &generics,
-                    output_type,
-                    construct_field: quote!(::proto_scan::scan::field::Message::new(scanner.into_resettable())),
-                };
-                inner.generate_fns([scan_fn, custom_fn])
-            }
-        }
+        inner.generate_fns([custom_fn])
     }
 }

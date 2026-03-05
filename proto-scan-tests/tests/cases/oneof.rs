@@ -2,6 +2,7 @@ use std::convert::Infallible;
 
 use prost::Message as _;
 use proto_scan::read::ReadTypes;
+use proto_scan::scan::field::Save;
 use proto_scan::scan::{
     IntoScanOutput, IntoScanner, OnScanOneof, ScanMessage as _, ScannerBuilder as _,
 };
@@ -18,9 +19,9 @@ fn save_field(input: InputKind) {
 
     let scanner = proto::ScanExample::scanner().oneof_group(
         proto::scan_example::OneofGroup::scanner()
-            .save_oneof_bool()
-            .save_oneof_fixed_32()
-            .scan_oneof_message(proto::MultiFieldMessage::scanner().save_id()),
+            .oneof_bool(Save)
+            .oneof_fixed_32(Save)
+            .oneof_message(proto::MultiFieldMessage::scanner().id(Save)),
     );
     let scan = scanner.scan(bytes.as_slice());
 
@@ -66,7 +67,7 @@ fn save_oneof_message_field() {
     .encode_to_vec();
     let scanner = proto::ScanExample::scanner().oneof_group(
         proto::scan_example::OneofGroup::scanner()
-            .scan_oneof_message(proto::MultiFieldMessage::scanner().save_name()),
+            .oneof_message(proto::MultiFieldMessage::scanner().name(Save)),
     );
     let scan = scanner.scan(bytes.as_slice());
 
@@ -113,7 +114,7 @@ fn custom_scanner(input: InputKind) {
 }
 
 struct SaveLastFieldNumber<'t, F>(&'t mut Option<F>);
-impl<F> IntoScanner for SaveLastFieldNumber<'_, F> {
+impl<M, F> IntoScanner<M> for SaveLastFieldNumber<'_, F> {
     type Scanner<R: ReadTypes> = Self;
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         self

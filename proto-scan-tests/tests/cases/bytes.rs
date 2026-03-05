@@ -1,4 +1,5 @@
 use prost::Message;
+use proto_scan::scan::field::{Save, Write};
 use proto_scan::scan::{ScanMessage as _, ScannerBuilder as _};
 use test_case::test_case;
 
@@ -17,8 +18,8 @@ fn write_bytes(input: InputKind) {
     };
 
     let scanner = proto::BytesFieldTypes::scanner()
-        .write_bytes_field(&mut save_to.bytes_field)
-        .write_string_field(&mut save_to.string_field);
+        .bytes_field(Write(&mut save_to.bytes_field))
+        .string_field(Write(&mut save_to.string_field));
     {
         let bytes = input.encode_to_vec();
         for event in scanner.scan(bytes.as_slice()) {
@@ -43,8 +44,8 @@ fn save_bytes(input: InputKind) {
     let input = input.into_bytes_field_types();
 
     let scanner = proto::BytesFieldTypes::scanner()
-        .save_bytes_field()
-        .save_string_field();
+        .bytes_field(Save)
+        .string_field(Save);
     let bytes = input.encode_to_vec();
     let output = { scanner.scan(bytes.as_slice()).read_all().unwrap() };
 

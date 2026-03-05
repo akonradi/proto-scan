@@ -2,7 +2,9 @@ use core::convert::Infallible;
 
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
-use crate::scan::{IntoScanOutput, IntoScanner, Resettable, ScanCallbacks, StopScan, next_event};
+use crate::scan::{
+    IntoScanOutput, IntoScanner, MessageScanner, Resettable, ScanCallbacks, StopScan, next_event,
+};
 use crate::wire::LengthDelimited;
 
 pub struct Message<F>(F);
@@ -13,7 +15,15 @@ impl<F> Message<F> {
     }
 }
 
-impl<F: ScanCallbacks<R, ScanOutput: Default>, R: ReadTypes> OnScanField<R> for Message<F> {
+impl<M, S: MessageScanner<Message = M> + IntoScanner<M>> IntoScanner<Message<M>> for S {
+    type Scanner<R: ReadTypes> = Message<S::Scanner<R>>;
+
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+        Message::new(S::into_scanner(self))
+    }
+}
+
+impl<F: ScanCallbacks<R>, R: ReadTypes> OnScanField<R> for Message<F> {
     type ScanEvent = Infallible;
 
     fn on_numeric(
@@ -40,7 +50,7 @@ impl<F: ScanCallbacks<R, ScanOutput: Default>, R: ReadTypes> OnScanField<R> for 
     }
 }
 
-impl<F: IntoScanOutput<ScanOutput: Default>> IntoScanOutput for Message<F> {
+impl<F: IntoScanOutput> IntoScanOutput for Message<F> {
     type ScanOutput = F::ScanOutput;
 
     fn into_scan_output(self) -> Self::ScanOutput {
@@ -54,20 +64,14 @@ impl<F: Resettable> Resettable for Message<F> {
     }
 }
 
-impl<F: IntoScanner> IntoScanner for Message<F> {
-    type Scanner<R: ReadTypes> = Message<F::Scanner<R>>;
-    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-        Message(self.0.into_scanner())
-    }
-}
-
 #[cfg(test)]
 mod test {
     use assert_matches::assert_matches;
     use hex_literal::hex;
 
     use crate::scan::encoding::Varint;
-    use crate::scan::field::{NoOp, SaveNumeric};
+    use crate::scan::field::NoOp;
+    use crate::scan::field::save::SaveNumeric;
     use crate::scan::{FieldNumber, NumericField, Scan};
 
     use super::*;
@@ -174,7 +178,7 @@ mod test {
                 3,
                 Message::new(Scanner(
                     1,
-                    crate::scan::field::WriteRepeated::<Varint<i32>, _>::new(&mut saved_to),
+                    crate::scan::field::write::WriteRepeated::<Varint<i32>, _>::new(&mut saved_to),
                 )),
             );
 

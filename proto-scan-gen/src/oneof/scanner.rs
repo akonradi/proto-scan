@@ -80,17 +80,21 @@ impl<'a> OneofScanner<'a> {
             .fields()
             .map(|f| &f.inner.field.generic)
             .collect::<Vec<_>>();
+        let generics_with_bounds = self.0.fields.iter().map(|f| {
+            let g = &f.generic;
+            let t = f.field_type.as_into_scanner_type();
+            quote!(#g: ::proto_scan::scan::IntoScanner<#t>)
+        });
         let oneof_type_name = &self.0.name;
         let fields = self
             .fields()
             .map(|f| &f.inner.field.field_name)
             .collect::<Vec<_>>();
         quote! {
-            impl<#(#generics,)*> ::proto_scan::scan::ScannerBuilder for #type_name<#(#generics),*> {
-                type Message = #oneof_type_name;
+            impl<#(#generics,)*> ::proto_scan::scan::ScannerBuilder <#oneof_type_name> for #type_name<#(#generics),*> {
             }
 
-            impl<#(#generics: ::proto_scan::scan::IntoScanner,)*> ::proto_scan::scan::IntoScanner for #type_name<#(#generics),*> {
+            impl<#(#generics_with_bounds, )*> ::proto_scan::scan::IntoScanner<#oneof_type_name> for #type_name<#(#generics),*> {
                 type Scanner<R: ::proto_scan::read::ReadTypes> = #type_name<#(#generics::Scanner<R>),*>;
 
                 fn into_scanner<R: ::proto_scan::read::ReadTypes>(self) -> Self::Scanner<R> {
@@ -328,10 +332,6 @@ impl crate::scanner::Scanner for OneofScanner<'_> {
             .iter()
             .map(|f| Cow::Borrowed(&f.field_name))
             .chain([Cow::Owned(format_ident!("proto_scan_last_set"))])
-    }
-
-    fn output_type(&self) -> impl crate::scanner::ScannerOutput + '_ {
-        *self
     }
 }
 

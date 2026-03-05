@@ -1,3 +1,5 @@
+use proc_macro2::TokenStream;
+use quote::{ToTokens as _, quote};
 use syn::{Ident, parse_quote};
 
 pub mod scanner;
@@ -72,14 +74,28 @@ pub struct RepeatedField {
 
 #[derive(Debug)]
 pub struct MessageField {
-    pub type_name: String,
     pub number: u32,
+    pub(crate) type_path: syn::TypePath,
+}
+
+impl MessageField {
+    pub fn type_name(&self) -> &syn::Ident {
+        &self.type_path.path.segments.last().unwrap().ident
+    }
 }
 
 #[derive(Debug)]
 pub struct BytesField {
     pub utf8: bool,
     pub number: u32,
+}
+impl BytesField {
+    fn as_into_scanner_type(&self) -> TokenStream {
+        match self.utf8 {
+            false => quote!([u8]),
+            true => quote!(str),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -94,6 +110,17 @@ impl OneOfField {
             OneOfField::Single(single_field) => single_field.number,
             OneOfField::Bytes(bytes_field) => bytes_field.number,
             OneOfField::Message(message_field) => message_field.number,
+        }
+    }
+
+    pub fn as_into_scanner_type(&self) -> TokenStream {
+        match self {
+            OneOfField::Single(single_field) => single_field.ty.encoding_type().to_token_stream(),
+            OneOfField::Bytes(bytes_field) => bytes_field.as_into_scanner_type(),
+            OneOfField::Message(message_field) => {
+                let m = &message_field.type_path;
+                quote! {::proto_scan::scan::field::Message < #m >}
+            }
         }
     }
 }
@@ -111,6 +138,33 @@ pub enum MessageFieldType {
     Unsupported,
 }
 
+impl MessageFieldType {
+    pub fn as_into_scanner_type(&self) -> TokenStream {
+        match self {
+            MessageFieldType::Single(single_field) => {
+                single_field.ty.encoding_type().to_token_stream()
+            }
+            MessageFieldType::Repeated(repeated_field) => {
+                let inner = match &repeated_field.ty {
+                    RepeatedFieldType::Single(single) => single.encoding_type().to_token_stream(),
+                    RepeatedFieldType::Message { type_path } => type_path.to_token_stream(),
+                };
+                parse_quote!(::proto_scan::scan::Repeated<#inner>)
+            }
+            MessageFieldType::Bytes(bytes_field) => bytes_field.as_into_scanner_type(),
+            MessageFieldType::Message(message_field) => {
+                let m = &message_field.type_path;
+                parse_quote!(::proto_scan::scan::field::Message<#m>)
+            }
+            MessageFieldType::OneOf {
+                type_name,
+                numbers: _,
+            } => type_name.into_token_stream(),
+            MessageFieldType::Unsupported => quote! { () },
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, derive_more::From)]
 pub enum SingleFieldType {
     Varint(VarintFieldType),
@@ -121,7 +175,9 @@ pub enum SingleFieldType {
 pub enum RepeatedFieldType {
     #[from]
     Single(SingleFieldType),
-    Message { type_name: String },
+    Message {
+        type_path: syn::TypePath,
+    },
 }
 
 #[derive(Clone, Debug, derive_more::From)]

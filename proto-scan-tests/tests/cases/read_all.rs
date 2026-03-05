@@ -1,4 +1,5 @@
 use prost::Message as _;
+use proto_scan::scan::field::Save;
 use proto_scan::scan::{ScanMessage as _, ScannerBuilder as _};
 use test_case::test_case;
 
@@ -11,9 +12,9 @@ fn read_all(input: InputKind) {
     let input = input.into_example_msg();
     let bytes = input.encode_to_vec();
     let scanner = proto::ScanExample::scanner()
-        .save_single_bool()
-        .save_single_fixed64()
-        .save_repeated_bool();
+        .single_bool(Save)
+        .single_fixed64(Save)
+        .repeated_bool(Save);
     let scan = scanner.scan(bytes.as_slice());
 
     let read_all = scan.read_all();

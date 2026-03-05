@@ -12,7 +12,7 @@ use InputKind::*;
 #[derive(Copy, Clone, Debug)]
 struct EmitEvent<T>(T);
 
-impl<T> IntoScanner for EmitEvent<T> {
+impl<M, T> IntoScanner<M> for EmitEvent<T> {
     type Scanner<R: ReadTypes> = Self;
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         self

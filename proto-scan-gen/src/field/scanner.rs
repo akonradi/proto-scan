@@ -1,11 +1,8 @@
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::quote;
 use syn::Ident;
 
-use crate::field::{
-    BytesField, Field, MessageField, MessageFieldType, RepeatedField, RepeatedFieldType,
-    SingleField,
-};
+use crate::field::{Field, MessageFieldType};
 use crate::scanner::{ScannerOutput as _, SwapSingleFieldFn, SwapSingleFieldInherentImpl};
 
 /// A field in a generated message scanner type.
@@ -45,6 +42,8 @@ impl<'m> MessageScannerField<'m> {
         let field_name = &inner.field.field_name;
         let field_type = &inner.field.field_type;
         let output_type = self.inner.parent.scanner().output_type().type_name();
+
+        let into_scanner_type = field_type.as_into_scanner_type();
         let custom_fn = SwapSingleFieldFn {
             fn_verb: "",
             docs: &[
@@ -58,156 +57,15 @@ impl<'m> MessageScannerField<'m> {
                     [`{output_type}::{field_name}`]."
                 ),
             ],
-            generics: &[quote!('t), quote!(S: ::proto_scan::scan::IntoScanner + 't)],
+            generics: &[
+                quote!('t),
+                quote!(S: ::proto_scan::scan::IntoScanner<#into_scanner_type> + 't),
+            ],
             args: &[quote!(scanner: S)],
             output_type: quote!(S),
             construct_field: quote!(scanner),
         };
 
-        match field_type {
-            MessageFieldType::Single(SingleField {
-                ty: single,
-                number: _,
-            }) => {
-                let encoding_type = single.encoding_type();
-                let repr_type = single.repr_type();
-
-                let write_docs = inner.write_fn_docs();
-                let write_fn = SwapSingleFieldFn {
-                    fn_verb: "write",
-                    docs: &write_docs.each_ref().map(|s| &**s),
-                    generics: &[quote!('t), quote!(D: From<#repr_type>)],
-                    args: &[quote!(to: &'t mut D)],
-                    output_type: quote! {::proto_scan::scan::field::WriteNumeric::<#encoding_type, &'t mut D>},
-                    construct_field: quote!(::proto_scan::scan::field::WriteNumeric::<#encoding_type, _>::new(to)),
-                };
-                let save_docs = inner.save_fn_docs();
-                let save_fn = SwapSingleFieldFn {
-                    fn_verb: "save",
-                    docs: &save_docs.each_ref().map(|s| &**s),
-                    output_type: quote! {::proto_scan::scan::field::SaveNumeric::<#encoding_type>},
-                    construct_field: quote!(::proto_scan::scan::field::SaveNumeric::<#encoding_type>::new()),
-                    ..Default::default()
-                };
-                inner.generate_fns([write_fn, save_fn, custom_fn])
-            }
-            MessageFieldType::Repeated(RepeatedField {
-                ty: RepeatedFieldType::Single(ty),
-                number: _,
-            }) => {
-                let encoding_type = ty.encoding_type();
-                let repr_type = ty.repr_type();
-
-                let write_docs = inner.write_fn_docs();
-                let write_fn = SwapSingleFieldFn {
-                    fn_verb: "write",
-                    docs: &write_docs.each_ref().map(|s| &**s),
-                    generics: &[quote!('t), quote!(D: ::core::iter::Extend<#repr_type>)],
-                    args: &[quote!(to: &'t mut D)],
-                    output_type: quote! {::proto_scan::scan::field::WriteRepeated::<#encoding_type, &'t mut D>},
-                    construct_field: quote!(::proto_scan::scan::field::WriteRepeated::<#encoding_type, _>::new(to)),
-                };
-                let save_docs = inner.save_fn_docs();
-                let save_fn = SwapSingleFieldFn {
-                    fn_verb: "save",
-                    docs: &save_docs.each_ref().map(|s| &**s),
-                    output_type: quote! {::proto_scan::scan::field::SaveRepeated::<#encoding_type>},
-                    construct_field: quote!(::proto_scan::scan::field::SaveRepeated::<#encoding_type>::new()),
-                    ..Default::default()
-                };
-                inner.generate_fns([write_fn, save_fn, custom_fn])
-            }
-            MessageFieldType::Bytes(BytesField { utf8, number: _ }) => {
-                let borrow_type = if *utf8 {
-                    quote! {::core::primitive::str}
-                } else {
-                    quote! {[::core::primitive::u8]}
-                };
-                let write_docs = inner.write_fn_docs();
-                let write_fn = SwapSingleFieldFn {
-                    fn_verb: "write",
-                    docs: &write_docs.each_ref().map(|s| &**s),
-                    generics: &[
-                        quote!('t),
-                        quote!(D: for<'d> ::core::convert::From<&'d #borrow_type>),
-                    ],
-                    args: &[quote!(to: &'t mut D)],
-                    output_type: quote! {::proto_scan::scan::field::WriteBytes::<#borrow_type, &'t mut D>},
-                    construct_field: quote!(::proto_scan::scan::field::WriteBytes::<#borrow_type, _>::new(to)),
-                };
-                let save_docs = inner.save_fn_docs();
-                let save_fn = SwapSingleFieldFn {
-                    fn_verb: "save",
-                    docs: &save_docs.each_ref().map(|s| &**s),
-                    output_type: quote! {::proto_scan::scan::field::SaveBytes::<#borrow_type>},
-                    construct_field: quote!(::proto_scan::scan::field::SaveBytes::<#borrow_type>::new()),
-                    ..Default::default()
-                };
-                inner.generate_fns([write_fn, save_fn, custom_fn])
-            }
-            MessageFieldType::Message(MessageField {
-                number: _,
-                type_name,
-            }) => {
-                let message_name = format_ident!("{type_name}");
-                let docs = &[
-                    &format!("Sets the scanner for the embedded message `{field_name}`."),
-                    "",
-                    &format!(
-                        "Sets the builder to use the provided scanner to
-                        read the contents of the message in `{field_name}`.
-                        The output of the scanner will be included in the
-                        overall scan output as
-                        [`{output_type}::{field_name}`]."
-                    ),
-                ];
-                let generics = &[
-                    quote!('t),
-                    quote! {
-                        S: ::proto_scan::scan::ScannerBuilder<Message=#message_name> + 't
-                    },
-                ];
-                let output_type = quote!(::proto_scan::scan::field::Message<S>);
-                let scan_fn = SwapSingleFieldFn {
-                    fn_verb: "scan",
-                    docs,
-                    generics,
-                    args: &[quote!(scanner: S)],
-                    output_type,
-                    construct_field: quote!(::proto_scan::scan::field::Message::new(scanner)),
-                };
-                inner.generate_fns([scan_fn, custom_fn])
-            }
-            MessageFieldType::OneOf {
-                type_name: _,
-                numbers: _,
-            } => {
-                let docs = &[
-                    &format!("Sets the field scanner for the oneof `{field_name}`."),
-                    "",
-                    &format!(
-                        "This allows the caller to specify the behavior on
-                    encountering any of the fields in the oneof `{field_name}`
-                    defined in the source message. The output of the provided
-                    field scanner will be included in the overall scan output as
-                    [`{output_type}::{field_name}`]."
-                    ),
-                ];
-                let f = SwapSingleFieldFn {
-                    fn_verb: "",
-                    docs,
-                    generics: &[quote!('t), quote!(S: ::proto_scan::scan::IntoScanner + 't)],
-                    args: &[quote!(scanner: S)],
-                    output_type: quote!(S),
-                    construct_field: quote!(scanner),
-                };
-                inner.generate_fns([f])
-            }
-            MessageFieldType::Repeated(RepeatedField {
-                ty: RepeatedFieldType::Message { type_name: _ },
-                number: _,
-            }) => inner.generate_fns([custom_fn]),
-            MessageFieldType::Unsupported => TokenStream::new(),
-        }
+        inner.generate_fns([custom_fn])
     }
 }

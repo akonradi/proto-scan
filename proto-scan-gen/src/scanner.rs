@@ -22,7 +22,6 @@ pub(crate) trait Scanner {
     fn type_name(&self) -> Ident;
     fn generic_types(&self) -> impl Iterator<Item = FieldGeneric<'_, Self::FieldType>>;
     fn field_names(&self) -> impl Iterator<Item = Cow<'_, Ident>>;
-    fn output_type(&self) -> impl ScannerOutput + '_;
 }
 
 pub(crate) trait ScannerOutput {
@@ -96,34 +95,5 @@ impl<'m, P: Parent, F> SwapSingleFieldInherentImpl<'m, P, F> {
                 #(#impl_fns)*
             }
         }
-    }
-
-    pub(crate) fn save_fn_docs(&self) -> [String; 3] {
-        let field_name = &self.field.field_name;
-        let output_type = self.parent.scanner().output_type().type_name();
-        [
-            format!("Sets the scanner to output field `{field_name}`."),
-            "".to_owned(),
-            format!(
-                "When the field `{field_name}` is encountered in the input
-                    during a scan, the decoded value will be saved and produced
-                    in the output as [`{output_type}::{field_name}`]."
-            ),
-        ]
-    }
-
-    pub(crate) fn write_fn_docs(&self) -> [String; 3] {
-        let field_name = &self.field.field_name;
-        let output_type = self.parent.scanner().output_type().type_name();
-        [
-            format!("Sets the scanner to write field `{field_name}` to the provided location."),
-            "".to_string(),
-            format!(
-                "When the field `{field_name}` is encountered in the input,
-                    the decoded value will be written to the argument `to`. No
-                    output is provided in the overall scan output
-                    ([`{output_type}::{field_name}`] is `()`)."
-            ),
-        ]
     }
 }

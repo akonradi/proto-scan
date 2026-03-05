@@ -66,7 +66,7 @@ impl IntoResettable for NoOp {
     }
 }
 
-impl IntoScanner for NoOp {
+impl<T: ?Sized> IntoScanner<T> for NoOp {
     type Scanner<R: ReadTypes> = Self;
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         self

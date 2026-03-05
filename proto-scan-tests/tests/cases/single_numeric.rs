@@ -1,4 +1,5 @@
 use prost::Message;
+use proto_scan::scan::field::{Save, Write};
 use proto_scan::scan::{ScanMessage as _, ScannerBuilder as _};
 use test_case::test_case;
 
@@ -27,19 +28,19 @@ fn write_field(input: InputKind) {
     };
 
     let scanner = proto::SingleFieldTypes::scanner()
-        .write_int32_field(&mut save_to.int32_field)
-        .write_int64_field(&mut save_to.int64_field)
-        .write_uint32_field(&mut save_to.uint32_field)
-        .write_uint64_field(&mut save_to.uint64_field)
-        .write_sint32_field(&mut save_to.sint32_field)
-        .write_sint64_field(&mut save_to.sint64_field)
-        .write_bool_field(&mut save_to.bool_field)
-        .write_fixed64_field(&mut save_to.fixed64_field)
-        .write_sfixed64_field(&mut save_to.sfixed64_field)
-        .write_double_field(&mut save_to.double_field)
-        .write_fixed32_field(&mut save_to.fixed32_field)
-        .write_sfixed32_field(&mut save_to.sfixed32_field)
-        .write_float_field(&mut save_to.float_field);
+        .int32_field(Write(&mut save_to.int32_field))
+        .int64_field(Write(&mut save_to.int64_field))
+        .uint32_field(Write(&mut save_to.uint32_field))
+        .uint64_field(Write(&mut save_to.uint64_field))
+        .sint32_field(Write(&mut save_to.sint32_field))
+        .sint64_field(Write(&mut save_to.sint64_field))
+        .bool_field(Write(&mut save_to.bool_field))
+        .fixed64_field(Write(&mut save_to.fixed64_field))
+        .sfixed64_field(Write(&mut save_to.sfixed64_field))
+        .double_field(Write(&mut save_to.double_field))
+        .fixed32_field(Write(&mut save_to.fixed32_field))
+        .sfixed32_field(Write(&mut save_to.sfixed32_field))
+        .float_field(Write(&mut save_to.float_field));
     {
         let bytes = input.encode_to_vec();
         for event in scanner.scan(bytes.as_slice()) {
@@ -74,19 +75,19 @@ fn save_field(input: InputKind) {
     let input = input.into_single_field_types();
 
     let scanner = proto::SingleFieldTypes::scanner()
-        .save_int32_field()
-        .save_int64_field()
-        .save_uint32_field()
-        .save_uint64_field()
-        .save_sint32_field()
-        .save_sint64_field()
-        .save_bool_field()
-        .save_fixed64_field()
-        .save_sfixed64_field()
-        .save_double_field()
-        .save_fixed32_field()
-        .save_sfixed32_field()
-        .save_float_field();
+        .int32_field(Save)
+        .int64_field(Save)
+        .uint32_field(Save)
+        .uint64_field(Save)
+        .sint32_field(Save)
+        .sint64_field(Save)
+        .bool_field(Save)
+        .fixed64_field(Save)
+        .sfixed64_field(Save)
+        .double_field(Save)
+        .fixed32_field(Save)
+        .sfixed32_field(Save)
+        .float_field(Save);
 
     let output = {
         let bytes = input.encode_to_vec();

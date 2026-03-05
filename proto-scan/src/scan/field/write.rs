@@ -2,12 +2,85 @@ use core::convert::Infallible;
 use core::marker::PhantomData;
 use core::ops::DerefMut;
 
-use crate::read::ReadTypes;
-use crate::scan::encoding::Encoding;
+use crate::read::{BoundsOnlyReadTypes, ReadTypes};
+use crate::scan::encoding::{Encoding, Fixed, Varint, ZigZag};
 use crate::scan::field::OnScanField;
-use crate::scan::{GroupOp, IntoScanOutput, IntoScanner, NumericField, StopScan};
+use crate::scan::{GroupOp, IntoScanOutput, IntoScanner, NumericField, Repeated, StopScan};
 use crate::scan::{IntoResettable, Resettable};
 use crate::wire::{LengthDelimited, NumericWireType};
+
+pub struct Write<T>(pub T);
+
+macro_rules! impl_into_scanner {
+    ($p:path) => {
+        impl<'t, T> IntoScanner<$p> for Write<&'t mut T>
+        where
+            <$p as Encoding>::Repr: Into<T>,
+        {
+            type Scanner<R: ReadTypes> = WriteNumeric<$p, &'t mut T>;
+
+            fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+                WriteNumeric::new(self.0)
+            }
+        }
+    };
+}
+
+impl_into_scanner!(Varint<bool>);
+impl_into_scanner!(Varint<i32>);
+impl_into_scanner!(Varint<i64>);
+impl_into_scanner!(Varint<u32>);
+impl_into_scanner!(Varint<u64>);
+impl_into_scanner!(Varint<ZigZag<i32>>);
+impl_into_scanner!(Varint<ZigZag<i64>>);
+impl_into_scanner!(Fixed<u64>);
+impl_into_scanner!(Fixed<u32>);
+impl_into_scanner!(Fixed<i64>);
+impl_into_scanner!(Fixed<i32>);
+impl_into_scanner!(Fixed<f64>);
+impl_into_scanner!(Fixed<f32>);
+
+macro_rules! impl_into_scanner {
+    ($p:path) => {
+        impl<D> IntoScanner<Repeated<$p>> for Write<D>
+        where
+            WriteRepeated<$p, D>: OnScanField<BoundsOnlyReadTypes>,
+        {
+            type Scanner<R: ReadTypes> = WriteRepeated<$p, D>;
+
+            fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+                WriteRepeated::new(self.0)
+            }
+        }
+    };
+}
+
+impl_into_scanner!(Varint<bool>);
+impl_into_scanner!(Varint<i32>);
+impl_into_scanner!(Varint<i64>);
+impl_into_scanner!(Varint<u32>);
+impl_into_scanner!(Varint<u64>);
+impl_into_scanner!(Varint<ZigZag<i32>>);
+impl_into_scanner!(Varint<ZigZag<i64>>);
+impl_into_scanner!(Fixed<u64>);
+impl_into_scanner!(Fixed<u32>);
+impl_into_scanner!(Fixed<i64>);
+impl_into_scanner!(Fixed<i32>);
+impl_into_scanner!(Fixed<f64>);
+impl_into_scanner!(Fixed<f32>);
+
+impl<T> IntoScanner<[u8]> for Write<T> {
+    type Scanner<R: ReadTypes> = WriteBytes<[u8], T>;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+        WriteBytes::new(self.0)
+    }
+}
+impl<T> IntoScanner<str> for Write<T> {
+    type Scanner<R: ReadTypes> = WriteBytes<str, T>;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+        WriteBytes::new(self.0)
+    }
+}
 
 /// [`OnScanField`] that writes the decoded value to the provided location.
 pub struct WriteNumeric<E, D>(D, PhantomData<E>);
@@ -86,13 +159,6 @@ impl<'t, E, D> IntoResettable for WriteNumeric<E, &'t mut D> {
 impl<'t, E, D> Resettable for WriteNumeric<E, RestoreOnReset<'t, D>> {
     fn reset(&mut self) {
         self.0.reset();
-    }
-}
-
-impl<E, D> IntoScanner for WriteNumeric<E, D> {
-    type Scanner<R: ReadTypes> = Self;
-    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-        self
     }
 }
 
@@ -190,13 +256,6 @@ impl<D: Resettable, E> Resettable for WriteRepeated<E, D> {
     }
 }
 
-impl<E, D> IntoScanner for WriteRepeated<E, D> {
-    type Scanner<R: ReadTypes> = Self;
-    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-        self
-    }
-}
-
 /// [`OnScanField`] that writes the decoded values to the provided location.
 pub struct WriteBytes<E: ?Sized, D>(D, PhantomData<E>);
 
@@ -264,12 +323,5 @@ impl<'t, E: ?Sized, D> IntoResettable for WriteBytes<E, &'t mut D> {
 
     fn into_resettable(self) -> Self::Resettable {
         WriteBytes(RestoreOnReset(self.0, None), PhantomData)
-    }
-}
-
-impl<E: ?Sized, D> IntoScanner for WriteBytes<E, D> {
-    type Scanner<R: ReadTypes> = Self;
-    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-        self
     }
 }

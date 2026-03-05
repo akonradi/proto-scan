@@ -1,6 +1,7 @@
 use std::sync::LazyLock;
 
 use prost::Message;
+use proto_scan::scan::field::Save;
 use proto_scan::scan::{ScanMessage, ScannerBuilder};
 
 use super::*;
@@ -70,11 +71,11 @@ fn scan_merged_parsing() {
     };
     let contents = [joined, MERGED_MESSAGE.encode_to_vec()];
     let [separate, merged] = contents.each_ref().map(|bytes| {
-        let scanner = proto::ScanExample::scanner().scan_single_msg(
+        let scanner = proto::ScanExample::scanner().single_msg(
             proto::MultiFieldMessage::scanner()
-                .save_flag()
-                .save_id()
-                .save_name(),
+                .flag(Save)
+                .id(Save)
+                .name(Save),
         );
         scanner.scan(bytes.as_slice()).read_all().unwrap()
     });

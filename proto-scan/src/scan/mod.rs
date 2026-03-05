@@ -12,22 +12,21 @@ pub use resettable::{IntoResettable, Resettable};
 /// A message that can be scanned.
 pub trait ScanMessage {
     /// The scanner for the message.
-    type ScannerBuilder: ScannerBuilder<Message = Self>;
+    type ScannerBuilder: ScannerBuilder<Self>;
 
     /// Creates a new scanner builder
     fn scanner() -> Self::ScannerBuilder;
 }
 
 /// A builder type for a [`Scan`] over a byte stream.
-pub trait ScannerBuilder: Sized {
-    type Message;
-
+pub trait ScannerBuilder<M: ?Sized>: Sized {
     /// Starts a scan over the provided input.
     ///
     /// Consumes `self` and produces a [`Scan`] over the input stream.
     fn scan_events<P: ParseEventReader>(self, read: P) -> Scan<P, Self::Scanner<P::ReadTypes>>
     where
-        Self: IntoScanner,
+        Self: IntoScanner<M>,
+        Self::Scanner<P::ReadTypes>: ScanCallbacks<P::ReadTypes>,
     {
         Scan::new(read, self.into_scanner())
     }
@@ -40,13 +39,23 @@ pub trait ScannerBuilder: Sized {
         read: R,
     ) -> Scan<impl ParseEventReader<ReadTypes = R::ReadTypes> + 'r, Self::Scanner<R::ReadTypes>>
     where
-        Self: IntoScanner,
+        Self: IntoScanner<M>,
+        Self::Scanner<R::ReadTypes>: ScanCallbacks<R::ReadTypes>,
     {
         self.scan_events(crate::wire::parse(read))
     }
 }
+pub trait MessageScanner {
+    type Message: ScanMessage;
+}
 
-pub trait IntoScanner {
+impl<S: MessageScanner> ScannerBuilder<S::Message> for S {}
+
+pub trait FieldType {}
+
+pub struct Repeated<T>(pub(super) T);
+
+pub trait IntoScanner<T: ?Sized> {
     type Scanner<R: ReadTypes>;
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R>;
 }
@@ -89,11 +98,7 @@ pub trait OnScanOneof<R: ReadTypes, F>: IntoScanOutput {
     ) -> Result<Option<Self::ScanEvent>, StopScan>;
 
     /// Called when a SGROUP or EGROUP tag is read.
-    fn on_group(
-        &mut self,
-        field: F,
-        op: GroupOp,
-    ) -> Result<Option<Self::ScanEvent>, StopScan>;
+    fn on_group(&mut self, field: F, op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan>;
 
     /// Called when a length-delimited field tag is encountered.
     fn on_length_delimited(
