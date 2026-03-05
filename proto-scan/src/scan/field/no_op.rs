@@ -3,7 +3,7 @@ use core::convert::Infallible;
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
 use crate::scan::{
-    GroupOp, IntoResettable, IntoScanOutput, IntoScanner, NumericField, OnScanOneof, Resettable,
+    GroupOp, IntoResettable, IntoScanOutput, IntoScanner, NumericField, Resettable, ScanCallbacks,
     StopScan,
 };
 use crate::wire::LengthDelimited;
@@ -31,7 +31,7 @@ impl<R: ReadTypes> OnScanField<R> for NoOp {
     }
 }
 
-impl<R: ReadTypes, F> OnScanOneof<R, F> for NoOp {
+impl<R: ReadTypes, F> ScanCallbacks<R, F> for NoOp {
     type ScanEvent = ();
 
     fn on_numeric(&mut self, _field: F, _value: NumericField) -> Result<Self::ScanEvent, StopScan> {

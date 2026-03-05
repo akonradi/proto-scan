@@ -42,29 +42,7 @@ pub trait IntoScanOutput {
 }
 
 /// Callbacks for parse inputs encountered during a scan.
-pub trait ScanCallbacks<R: ReadTypes>: IntoScanOutput {
-    type ScanEvent;
-
-    /// Called when a numeric field is parsed.
-    fn on_numeric(
-        &mut self,
-        field: FieldNumber,
-        value: NumericField,
-    ) -> Result<Self::ScanEvent, StopScan>;
-
-    /// Called when a SGROUP or EGROUP tag is read.
-    fn on_group(&mut self, field: FieldNumber, op: GroupOp) -> Result<Self::ScanEvent, StopScan>;
-
-    /// Called when a length-delimited field tag is encountered.
-    fn on_length_delimited(
-        &mut self,
-        field: FieldNumber,
-        delimited: impl LengthDelimited<ReadTypes = R>,
-    ) -> Result<Self::ScanEvent, StopScan>;
-}
-
-/// Callbacks for parse inputs encountered during a scan.
-pub trait OnScanOneof<R: ReadTypes, F>: IntoScanOutput {
+pub trait ScanCallbacks<R: ReadTypes, F = FieldNumber>: IntoScanOutput {
     type ScanEvent;
 
     /// Called when a numeric field is parsed.

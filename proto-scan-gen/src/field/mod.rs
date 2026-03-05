@@ -47,7 +47,7 @@ impl<'a> FieldGeneric<'a, MessageFieldType> {
                 numbers: _,
                 type_name,
             } => {
-                parse_quote!(::proto_scan::scan::OnScanOneof<R, <#type_name as ::proto_scan::scan::ScannableOneOf>::FieldNumber >)
+                parse_quote!(::proto_scan::scan::ScanCallbacks<R, <#type_name as ::proto_scan::scan::ScannableOneOf>::FieldNumber >)
             }
             MessageFieldType::Single(_)
             | MessageFieldType::Repeated { .. }

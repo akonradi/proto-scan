@@ -242,7 +242,7 @@ impl<'a> OneofScanner<'a> {
             impl<
                 #(#generics_with_bounds,)*
                 R: ::proto_scan::read::ReadTypes
-            > ::proto_scan::scan::OnScanOneof<R, #field_number_type> for #type_name< #(#generics),* > {
+            > ::proto_scan::scan::ScanCallbacks<R, #field_number_type> for #type_name< #(#generics),* > {
                 type ScanEvent = #scan_event_name < #(::core::option::Option<<#generics as ::proto_scan::scan::field::OnScanField<R>>::ScanEvent>),* >;
 
                 fn on_numeric(

@@ -2,7 +2,7 @@ use prost::Message as _;
 use proto_scan::read::ReadTypes;
 use proto_scan::scan::field::Save;
 use proto_scan::scan::{
-    IntoScanOutput, IntoScanner, OnScanOneof, ScanMessage as _, ScannerBuilder as _,
+    IntoScanOutput, IntoScanner, ScanCallbacks, ScanMessage as _, ScannerBuilder as _,
 };
 use test_case::test_case;
 
@@ -124,7 +124,7 @@ impl<F> IntoScanOutput for SaveLastFieldNumber<'_, F> {
     fn into_scan_output(self) -> Self::ScanOutput {}
 }
 
-impl<R: ReadTypes, F> OnScanOneof<R, F> for SaveLastFieldNumber<'_, F> {
+impl<R: ReadTypes, F> ScanCallbacks<R, F> for SaveLastFieldNumber<'_, F> {
     type ScanEvent = ();
     fn on_numeric(
         &mut self,
