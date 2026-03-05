@@ -68,6 +68,9 @@ fn scan_message(input: InputKind) {
     if !bytes.is_empty() {
         expected_events.insert(None);
     }
+    if input.oneof_group.is_some() {
+        expected_events.insert(Some(proto::ScanScanExampleEvent::OneofGroup(())));
+    }
 
     let events = scanner
         .scan(bytes.as_slice())

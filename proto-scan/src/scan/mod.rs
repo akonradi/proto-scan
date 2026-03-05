@@ -68,27 +68,23 @@ pub trait OnScanOneof<R: ReadTypes, F>: IntoScanOutput {
     type ScanEvent;
 
     /// Called when a numeric field is parsed.
-    fn on_numeric(
-        &mut self,
-        field: F,
-        value: NumericField,
-    ) -> Result<Option<Self::ScanEvent>, StopScan>;
+    fn on_numeric(&mut self, field: F, value: NumericField) -> Result<Self::ScanEvent, StopScan>;
 
     /// Called when a SGROUP or EGROUP tag is read.
-    fn on_group(&mut self, field: F, op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan>;
+    fn on_group(&mut self, field: F, op: GroupOp) -> Result<Self::ScanEvent, StopScan>;
 
     /// Called when a length-delimited field tag is encountered.
     fn on_length_delimited(
         &mut self,
         field: F,
         delimited: impl LengthDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, StopScan>;
+    ) -> Result<Self::ScanEvent, StopScan>;
 }
 
 /// A oneof grouping in a message that can be scanned for.
 pub trait ScannableOneOf {
     /// A discriminant for the oneof variants.
-    /// 
+    ///
     /// This should be an enum with one variant for each proto field in the oneof.
     type FieldNumber;
 }

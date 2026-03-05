@@ -1,5 +1,3 @@
-use std::convert::Infallible;
-
 use prost::Message as _;
 use proto_scan::read::ReadTypes;
 use proto_scan::scan::field::Save;
@@ -127,29 +125,29 @@ impl<F> IntoScanOutput for SaveLastFieldNumber<'_, F> {
 }
 
 impl<R: ReadTypes, F> OnScanOneof<R, F> for SaveLastFieldNumber<'_, F> {
-    type ScanEvent = Infallible;
+    type ScanEvent = ();
     fn on_numeric(
         &mut self,
         field: F,
         _value: proto_scan::wire::NumericField,
-    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::StopScan> {
+    ) -> Result<Self::ScanEvent, proto_scan::scan::StopScan> {
         *self.0 = Some(field);
-        Ok(None)
+        Ok(())
     }
     fn on_length_delimited(
         &mut self,
         field: F,
         _delimited: impl proto_scan::wire::LengthDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::StopScan> {
+    ) -> Result<Self::ScanEvent, proto_scan::scan::StopScan> {
         *self.0 = Some(field);
-        Ok(None)
+        Ok(())
     }
     fn on_group(
         &mut self,
         field: F,
         _op: proto_scan::wire::GroupOp,
-    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::StopScan> {
+    ) -> Result<Self::ScanEvent, proto_scan::scan::StopScan> {
         *self.0 = Some(field);
-        Ok(None)
+        Ok(())
     }
 }

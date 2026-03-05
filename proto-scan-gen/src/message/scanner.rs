@@ -168,7 +168,11 @@ impl<'m> MessageScanner<'m> {
                                 numbers,
                             } => numbers.iter().map(|number| {
                                 quote! {
-                                    #number => self.#field_name.#fn_name(<#type_name as ::proto_scan::scan::ScannableOneOf>::FieldNumber::for_field_number::<#number>(), value)?.map(#scan_event_name::#variant_name),
+                                    #number => {
+                                        let field_number = <#type_name as ::proto_scan::scan::ScannableOneOf>::FieldNumber::for_field_number::<#number>();
+                                        let event = self.#field_name.#fn_name(field_number, value)?;
+                                        ::core::option::Option::Some(#scan_event_name::#variant_name(event))
+                                    },
                                 }
                             }).collect(),
                             MessageFieldType::Unsupported => TokenStream::new(),

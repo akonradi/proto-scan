@@ -116,6 +116,7 @@ impl<'a> OneofScanner<'a> {
             }
         });
         quote! {
+            #[derive(Copy, Clone, Debug, Hash, PartialEq)]
             pub enum #type_name<#(#generics = ()),*> {
                 #(#fields),*
             }
@@ -227,7 +228,7 @@ impl<'a> OneofScanner<'a> {
                             ::proto_scan::scan::Resettable::reset(self);
                             let event = self.#field_name.#fn_name(value)?;
                             self.proto_scan_last_set = ::core::option::Option::Some(#field_number_type::#variant_name);
-                            event.map(#scan_event_name::#variant_name)
+                            #scan_event_name::#variant_name(event)
                         },
                     },
                 }
@@ -242,19 +243,19 @@ impl<'a> OneofScanner<'a> {
                 #(#generics_with_bounds,)*
                 R: ::proto_scan::read::ReadTypes
             > ::proto_scan::scan::OnScanOneof<R, #field_number_type> for #type_name< #(#generics),* > {
-                type ScanEvent = #scan_event_name < #(<#generics as ::proto_scan::scan::field::OnScanField<R>>::ScanEvent),* >;
+                type ScanEvent = #scan_event_name < #(::core::option::Option<<#generics as ::proto_scan::scan::field::OnScanField<R>>::ScanEvent>),* >;
 
                 fn on_numeric(
                     &mut self,
                     field: #field_number_type,
                     value: ::proto_scan::wire::NumericField,
-                ) -> Result<::core::option::Option<Self::ScanEvent>, ::proto_scan::scan::StopScan> {
+                ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
                     Ok(match field {
                         #(#on_numeric_arms)*
                     })
                 }
 
-                fn on_group(&mut self, field: #field_number_type, value: ::proto_scan::wire::GroupOp) -> Result<::core::option::Option<Self::ScanEvent>, ::proto_scan::scan::StopScan> {
+                fn on_group(&mut self, field: #field_number_type, value: ::proto_scan::wire::GroupOp) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
                     Ok(match field {
                         #(#on_group_arms)*
                     })
@@ -264,7 +265,7 @@ impl<'a> OneofScanner<'a> {
                     &mut self,
                     field: #field_number_type,
                     value: impl ::proto_scan::wire::LengthDelimited<ReadTypes=R>,
-                ) -> Result<::core::option::Option<Self::ScanEvent>, ::proto_scan::scan::StopScan> {
+                ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
                     Ok(match field {
                         #(#on_length_delimited_arms)*
                     })
