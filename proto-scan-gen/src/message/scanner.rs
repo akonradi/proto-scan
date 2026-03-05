@@ -39,7 +39,7 @@ impl<'m> MessageScanner<'m> {
              }| quote!(#field_name: #generic),
         );
         quote! {
-            #[derive(Default)]
+            #[derive(Clone, Default)]
             pub struct #scanner_name <#(#scan_types),*> {
                 #(#scan_fields, )*
             }

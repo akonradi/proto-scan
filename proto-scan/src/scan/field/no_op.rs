@@ -9,7 +9,7 @@ use crate::scan::{
 use crate::wire::LengthDelimited;
 
 /// [`OnScanField`] impl that does nothing and always succeeds.
-#[derive(Default)]
+#[derive(Copy, Clone, Default)]
 pub struct NoOp;
 
 impl<R: ReadTypes> OnScanField<R> for NoOp {

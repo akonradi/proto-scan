@@ -7,7 +7,7 @@ mod events;
 mod merge_semantics;
 mod oneof;
 mod read_all;
-mod repeated_numeric;
+mod repeated;
 mod single_numeric;
 
 pub(super) fn example_msg() -> crate::prost_proto::ScanExample {

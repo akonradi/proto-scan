@@ -158,6 +158,15 @@ impl<E: Encoding> Resettable for SaveRepeated<E> {
 /// [`OnScanField`] impl that produces the read value as the event output.
 pub struct SaveBytesScanner<E: DecodeFromBytes + ?Sized, R: ReadTypes>(Option<E::Decoded<R>>);
 
+impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> Clone for SaveBytesScanner<E, R>
+where
+    E::Decoded<R>: Clone,
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
 pub trait DecodeFromBytes {
     type Error;
     type Decoded<R: ReadTypes>;

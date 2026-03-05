@@ -32,7 +32,7 @@ pub trait MessageScanner {
 pub struct Repeated<T>(pub(super) T);
 
 pub trait IntoScanner<T: ?Sized> {
-    type Scanner<R: ReadTypes>;
+    type Scanner<R: ReadTypes>: IntoScanOutput;
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R>;
 }
 

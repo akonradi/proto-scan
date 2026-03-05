@@ -144,13 +144,16 @@ impl MessageFieldType {
             MessageFieldType::Single(single_field) => {
                 single_field.ty.encoding_type().to_token_stream()
             }
-            MessageFieldType::Repeated(repeated_field) => {
-                let inner = match &repeated_field.ty {
-                    RepeatedFieldType::Single(single) => single.encoding_type().to_token_stream(),
-                    RepeatedFieldType::Message { type_path } => type_path.to_token_stream(),
-                };
-                parse_quote!(::proto_scan::scan::Repeated<#inner>)
-            }
+            MessageFieldType::Repeated(repeated_field) => match &repeated_field.ty {
+                RepeatedFieldType::Single(single) => {
+                    let inner = single.encoding_type();
+                    parse_quote!(::proto_scan::scan::Repeated<#inner>)
+                }
+                RepeatedFieldType::Message { type_path } => {
+                    let m = type_path;
+                    parse_quote!(::proto_scan::scan::Repeated<::proto_scan::scan::field::Message<#m>>)
+                }
+            },
             MessageFieldType::Bytes(bytes_field) => bytes_field.as_into_scanner_type(),
             MessageFieldType::Message(message_field) => {
                 let m = &message_field.type_path;
