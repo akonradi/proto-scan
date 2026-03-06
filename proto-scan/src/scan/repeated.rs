@@ -1,4 +1,5 @@
 use std::convert::Infallible;
+use std::ops::DerefMut;
 
 use crate::read::ReadTypes;
 use crate::scan::field::{Message, OnScanField};
@@ -22,6 +23,9 @@ impl<F> Fold<F> {
         Self(f)
     }
 }
+
+/// [`RepeatStrategy`] that clones a message scanner and writes its output somewhere else.
+pub struct WriteCloned<D>(pub D);
 
 /// A strategy for handling repeated messages.
 pub trait RepeatStrategy<M: MessageScanner> {
@@ -134,7 +138,7 @@ impl<S: IntoScanOutput> IntoScanOutput for RepeatedSave<S> {
 }
 
 /// Implementation of [`RepeatStrategyScanner`] for [`Fold`].
-/// 
+///
 /// On encountering a new embedded message, this clones the scanner provided to
 /// [`RepeatStrategyScanner::on_message`] and uses it to scan the message input.
 /// Then, if that was the first instance of the message, it saves the scanner
@@ -172,6 +176,37 @@ impl<R: ReadTypes, S: ScanCallbacks<R> + Clone, F: Fn(&mut S::ScanOutput, S::Sca
         } else {
             self.0 = Some(scanner.into_scan_output())
         }
+        Ok(())
+    }
+}
+
+pub struct RepeatedWriteCloned<D>(D);
+
+impl<M: MessageScanner, D> RepeatStrategy<M> for WriteCloned<D> {
+    type Impl<R: ReadTypes> = RepeatedWriteCloned<D>;
+
+    fn into_impl<R: ReadTypes>(self) -> Self::Impl<R> {
+        RepeatedWriteCloned(self.0)
+    }
+}
+
+impl<D> IntoScanOutput for RepeatedWriteCloned<D> {
+    type ScanOutput = ();
+    fn into_scan_output(self) -> Self::ScanOutput {}
+}
+
+impl<R: ReadTypes, S: ScanCallbacks<R> + Clone, D: DerefMut<Target: Extend<S::ScanOutput>>>
+    RepeatStrategyScanner<R, S> for RepeatedWriteCloned<D>
+{
+    fn on_message(
+        &mut self,
+        scanner: &S,
+        input: impl LengthDelimited<ReadTypes = R>,
+    ) -> Result<(), StopScan> {
+        let mut scanner = Message::new(scanner.clone());
+        let _event = scanner.on_length_delimited(input);
+        let output = scanner.into_scan_output();
+        self.0.extend([output]);
         Ok(())
     }
 }

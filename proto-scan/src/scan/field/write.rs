@@ -5,6 +5,7 @@ use core::ops::DerefMut;
 use crate::read::{BoundsOnlyReadTypes, ReadTypes};
 use crate::scan::encoding::{Encoding, Fixed, Varint, ZigZag};
 use crate::scan::field::OnScanField;
+use crate::scan::save_from::SaveFrom;
 use crate::scan::{GroupOp, IntoScanOutput, IntoScanner, NumericField, Repeated, StopScan};
 use crate::scan::{IntoResettable, Resettable};
 use crate::wire::{LengthDelimited, NumericWireType};
@@ -66,20 +67,6 @@ impl<T> IntoScanner<str> for Write<T> {
 
 /// [`OnScanField`] that writes the decoded value to the provided location.
 pub struct WriteNumeric<E, D>(D, PhantomData<E>);
-
-/// Generalization of assignment for wrapping types.
-///
-/// A type `Wrap<T>(T, bool)` could implement `SaveFrom<T>` to save the value
-/// and note that a modification was made.
-pub trait SaveFrom<T> {
-    fn save_from(&mut self, value: T);
-}
-
-impl<S, T: From<S>> SaveFrom<S> for &mut T {
-    fn save_from(&mut self, value: S) {
-        **self = value.into();
-    }
-}
 
 impl<E: Encoding, D: SaveFrom<E::Repr>, R: ReadTypes> OnScanField<R> for WriteNumeric<E, D> {
     type ScanEvent = Infallible;

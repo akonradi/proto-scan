@@ -1,7 +1,7 @@
 use prost::Message;
 use proto_scan::scan::field::{Save, Write};
 use proto_scan::scan::{
-    Fold, SaveCloned, ScanMessage as _, ScanRepeated as _, ScannerBuilder as _,
+    Fold, SaveCloned, ScanMessage as _, ScanRepeated as _, ScannerBuilder as _, WriteCloned,
 };
 use test_case::test_case;
 
@@ -97,4 +97,38 @@ fn fold_repeated_message() {
     } = scanner.scan(input.as_slice()).read_all().unwrap();
 
     assert_eq!(repeated_msg.unwrap().id.unwrap(), expected);
+}
+
+#[test]
+fn write_repeated_message() {
+    let input = Full.into_example_msg();
+    let mut saved = Vec::new();
+    let scanner = proto::ScanExample::scanner().repeated_msg(
+        proto::MultiFieldMessage::scanner()
+            .id(Save)
+            .name(Save)
+            .repeat_by(WriteCloned(&mut saved)),
+    );
+
+    let expected = input
+        .repeated_msg
+        .iter()
+        .map(|m| proto::ScanMultiFieldMessageOutput {
+            id: Some(m.id),
+            name: Some(m.name.as_str()),
+            flag: (),
+        })
+        .collect::<Vec<_>>();
+
+    let input = input.encode_to_vec();
+    let proto::ScanScanExampleOutput {
+        repeated_msg: (),
+        single_msg: (),
+        repeated_bool: (),
+        single_bool: (),
+        single_fixed64: (),
+        oneof_group: (),
+    } = scanner.scan(input.as_slice()).read_all().unwrap();
+
+    assert_eq!(saved, expected);
 }

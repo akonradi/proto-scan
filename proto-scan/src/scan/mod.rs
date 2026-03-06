@@ -12,6 +12,8 @@ mod resettable;
 pub use resettable::{IntoResettable, Resettable};
 mod repeated;
 pub use repeated::*;
+mod save_from;
+pub use save_from::SaveFrom;
 
 /// A message that can be scanned.
 pub trait ScanMessage {
