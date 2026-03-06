@@ -4,13 +4,11 @@ use crate::scan::{IntoScanOutput, StopScan};
 use crate::wire::FieldNumber;
 use crate::wire::{GroupOp, LengthDelimited, NumericField};
 
-mod invoke_on;
 mod message;
 mod no_op;
 mod save;
 mod write;
 
-pub use invoke_on::InvokeOn;
 pub use message::Message;
 pub use no_op::NoOp;
 pub use save::Save;
