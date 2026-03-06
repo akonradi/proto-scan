@@ -61,6 +61,12 @@ impl IntoScanner<[u8]> for Save {
 
 pub struct SaveNumeric<E: Encoding>(Option<E::Repr>);
 
+impl<E: Encoding> Clone for SaveNumeric<E> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
 impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveNumeric<E> {
     type ScanEvent = E::Repr;
 

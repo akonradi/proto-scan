@@ -10,6 +10,8 @@ pub mod encoding;
 pub mod field;
 mod resettable;
 pub use resettable::{IntoResettable, Resettable};
+mod repeated;
+pub use repeated::*;
 
 /// A message that can be scanned.
 pub trait ScanMessage {
@@ -28,9 +30,6 @@ pub trait MessageScanner {
     /// The message type that this scanner can read.
     type Message: ScanMessage;
 }
-
-/// Marker type for protobuf `repeated`.
-pub struct Repeated<T>(pub T);
 
 pub trait IntoScanner<T: ?Sized> {
     type Scanner<R: ReadTypes>: IntoScanOutput;

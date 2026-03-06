@@ -7,6 +7,7 @@ use crate::scan::{
 };
 use crate::wire::LengthDelimited;
 
+#[derive(Clone)]
 pub struct Message<F>(F);
 
 impl<F> Message<F> {

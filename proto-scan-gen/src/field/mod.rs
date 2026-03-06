@@ -151,7 +151,7 @@ impl MessageFieldType {
                 }
                 RepeatedFieldType::Message { type_path } => {
                     let m = type_path;
-                    parse_quote!(::proto_scan::scan::Repeated<::proto_scan::scan::field::Message<#m>>)
+                    parse_quote!(::proto_scan::scan::Repeated<#m>)
                 }
             },
             MessageFieldType::Bytes(bytes_field) => bytes_field.as_into_scanner_type(),
