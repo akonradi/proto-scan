@@ -11,7 +11,9 @@ pub mod field;
 mod resettable;
 pub use resettable::{IntoResettable, Resettable};
 mod repeated;
-pub use repeated::*;
+pub use repeated::{
+    Fold, RepeatStrategy, RepeatStrategyScanner, Repeated, SaveCloned, ScanRepeated, WriteCloned,
+};
 mod save_from;
 pub use save_from::SaveFrom;
 
