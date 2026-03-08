@@ -5,6 +5,7 @@ use core::ops::DerefMut;
 use crate::read::{BoundsOnlyReadTypes, ReadTypes};
 use crate::scan::encoding::{Encoding, Fixed, Varint, ZigZag};
 use crate::scan::field::OnScanField;
+use crate::scan::field::save::DecodeFromBytes;
 use crate::scan::save_from::SaveFrom;
 use crate::scan::{GroupOp, IntoScanOutput, IntoScanner, NumericField, Repeated, StopScan};
 use crate::scan::{IntoResettable, Resettable};
@@ -222,7 +223,9 @@ impl<E: ?Sized, D> WriteBytes<E, D> {
     }
 }
 
-impl<D: for<'a> SaveFrom<&'a [u8]>, R: ReadTypes> OnScanField<R> for WriteBytes<[u8], D> {
+impl<B: DecodeFromBytes + ?Sized, D: SaveFrom<B::Decoded<R>>, R: ReadTypes> OnScanField<R>
+    for WriteBytes<B, D>
+{
     type ScanEvent = Infallible;
 
     fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Infallible>, StopScan> {
@@ -235,31 +238,11 @@ impl<D: for<'a> SaveFrom<&'a [u8]>, R: ReadTypes> OnScanField<R> for WriteBytes<
 
     fn on_length_delimited(
         &mut self,
-        delimited: impl LengthDelimited,
+        delimited: impl LengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Infallible>, StopScan> {
         let bytes = delimited.into_bytes().ok().ok_or(StopScan)?;
-        self.0.save_from(bytes.as_ref());
-        Ok(None)
-    }
-}
-
-impl<D: for<'a> SaveFrom<&'a str>, R: ReadTypes> OnScanField<R> for WriteBytes<str, D> {
-    type ScanEvent = Infallible;
-    fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Infallible>, StopScan> {
-        Err(StopScan)
-    }
-
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Infallible>, StopScan> {
-        Err(StopScan)
-    }
-
-    fn on_length_delimited(
-        &mut self,
-        delimited: impl LengthDelimited,
-    ) -> Result<Option<Infallible>, StopScan> {
-        let bytes = delimited.into_bytes().ok().ok_or(StopScan)?;
-        let bytes = core::str::from_utf8(bytes.as_ref()).map_err(|_| StopScan)?;
-        self.0.save_from(bytes);
+        let decoded = B::decode(bytes).ok().ok_or(StopScan)?;
+        self.0.save_from(decoded);
         Ok(None)
     }
 }
