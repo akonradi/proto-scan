@@ -3,6 +3,7 @@ use crate::proto;
 mod bytes;
 mod custom_field_scanner;
 mod embedded_message;
+mod enums;
 mod events;
 mod merge_semantics;
 mod oneof;

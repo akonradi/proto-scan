@@ -214,6 +214,7 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
             ("double", FixedFieldType::F64.into()),
             ("bytes", ParsedFieldType::Bytes { utf8: false }),
             ("string", ParsedFieldType::Bytes { utf8: true }),
+            ("enumeration", VarintFieldType::I32.into()),
         ];
 
         for attr in attrs {
