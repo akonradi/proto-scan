@@ -8,6 +8,8 @@ pub mod encoding;
 pub mod error;
 pub use error::ScanError;
 pub mod field;
+mod map;
+pub use map::Map;
 mod resettable;
 pub use resettable::{IntoResettable, Resettable};
 mod repeated;

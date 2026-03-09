@@ -53,6 +53,7 @@ impl<'a> FieldGeneric<'a, MessageFieldType> {
             | MessageFieldType::Repeated { .. }
             | MessageFieldType::Bytes(_)
             | MessageFieldType::Message(_)
+            | MessageFieldType::Map(_)
             | MessageFieldType::Unsupported => {
                 parse_quote!(::proto_scan::scan::field::OnScanField<R>)
             }
@@ -124,6 +125,12 @@ impl OneOfField {
         }
     }
 }
+#[derive(Debug)]
+pub struct MapField {
+    pub number: u32,
+    pub key: MapKeyType,
+    pub value: MapValueType<syn::TypePath>,
+}
 
 #[derive(Debug)]
 pub enum MessageFieldType {
@@ -135,6 +142,7 @@ pub enum MessageFieldType {
         type_name: syn::Path,
         numbers: Vec<u32>,
     },
+    Map(MapField),
     Unsupported,
 }
 
@@ -163,6 +171,15 @@ impl MessageFieldType {
                 type_name,
                 numbers: _,
             } => type_name.into_token_stream(),
+            MessageFieldType::Map(MapField {
+                key,
+                value,
+                number: _,
+            }) => {
+                let key_type = key.encoding_type();
+                let value_type = value.encoding_type();
+                parse_quote!(::proto_scan::scan::Map<#key_type, #value_type>)
+            }
             MessageFieldType::Unsupported => quote! { () },
         }
     }
@@ -183,6 +200,50 @@ pub enum RepeatedFieldType {
     },
 }
 
+#[derive(Copy, Clone, Debug)]
+pub struct MapFieldType {
+    pub key: MapKeyType,
+    pub value: MapValueType,
+}
+
+#[derive(Copy, Clone, Debug, derive_more::From)]
+pub enum MapKeyType {
+    String,
+    #[from(SingleFieldType, VarintFieldType, FixedFieldType)]
+    Numeric(SingleFieldType),
+}
+impl MapKeyType {
+    fn encoding_type(&self) -> syn::Path {
+        match self {
+            MapKeyType::String => parse_quote!(::core::primitive::str),
+            MapKeyType::Numeric(single_field_type) => single_field_type.encoding_type(),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, derive_more::From)]
+pub enum MapValueType<M = ()> {
+    #[from(SingleFieldType, VarintFieldType, FixedFieldType)]
+    Single(SingleFieldType),
+    Message(M),
+    Bytes {
+        utf8: bool,
+    },
+}
+impl MapValueType<syn::TypePath> {
+    fn encoding_type(&self) -> syn::TypePath {
+        match self {
+            MapValueType::Single(single_field_type) => syn::TypePath {
+                path: single_field_type.encoding_type(),
+                qself: None,
+            },
+            MapValueType::Message(m) => parse_quote!(::proto_scan::scan::field::Message<#m>),
+            MapValueType::Bytes { utf8: true } => parse_quote!(::core::primitive::str),
+            MapValueType::Bytes { utf8: false } => parse_quote!([::core::primitive::u8]),
+        }
+    }
+}
+
 #[derive(Clone, Debug, derive_more::From)]
 pub enum ParsedFieldType {
     #[from(SingleFieldType, VarintFieldType, FixedFieldType)]
@@ -194,6 +255,7 @@ pub enum ParsedFieldType {
     OneOf {
         ty: syn::Path,
     },
+    Map(MapFieldType),
 }
 
 #[derive(Copy, Clone, Debug)]

@@ -4,11 +4,12 @@ use convert_case::ccase;
 use proc_macro2::{Span, TokenStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned as _;
-use syn::{Attribute, DataEnum, DataStruct, DeriveInput, Expr, Ident, Meta, Result, Token};
+use syn::{Attribute, DataEnum, DataStruct, DeriveInput, Expr, Ident, LitStr, Meta, Result, Token};
 
 use crate::field::{
-    BytesField, Field, FixedFieldType, MessageField, MessageFieldType, OneOfField, ParsedFieldType,
-    RepeatedField, RepeatedFieldType, SingleField, VarintFieldType,
+    BytesField, Field, FixedFieldType, MapField, MapFieldType, MapKeyType, MapValueType,
+    MessageField, MessageFieldType, OneOfField, ParsedFieldType, RepeatedField, RepeatedFieldType,
+    SingleField, VarintFieldType,
 };
 use crate::message::ScannableMessage;
 use crate::oneof::ScannableOneof;
@@ -87,6 +88,7 @@ fn enum_impl(name: Ident, data_enum: DataEnum) -> Result<TokenStream> {
                 MessageFieldType::Bytes(bytes_field) => OneOfField::Bytes(bytes_field),
                 MessageFieldType::Message(message_field) => OneOfField::Message(message_field),
                 MessageFieldType::Repeated { .. }
+                | MessageFieldType::Map(_)
                 | MessageFieldType::OneOf { .. }
                 | MessageFieldType::Unsupported => {
                     return Err(syn::Error::new(
@@ -218,15 +220,19 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
         ];
 
         for attr in attrs {
+            let mut set_field_type = |new_type| {
+                if let Some(t) = field_type.replace(new_type) {
+                    return Err(syn::Error::new(
+                        attr.span(),
+                        format!("already found type {t:?}"),
+                    ));
+                }
+                Ok(())
+            };
             for (name, found_type) in &field_type_names {
                 if attr.path().is_ident(name) {
                     let _ = attr.require_path_only();
-                    if let Some(t) = field_type.replace(found_type.clone()) {
-                        return Err(syn::Error::new(
-                            attr.span(),
-                            format!("already found type {t:?}"),
-                        ));
-                    }
+                    set_field_type(found_type.clone())?;
                 }
             }
             if attr.path().is_ident("oneof") {
@@ -238,14 +244,20 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                 else {
                     return Err(syn::Error::new(attr.span(), "oneof has a non-path value"));
                 };
-                if let Some(t) = field_type.replace(ParsedFieldType::OneOf {
+                set_field_type(ParsedFieldType::OneOf {
                     ty: syn::parse_str(&value.value())?,
-                }) {
-                    return Err(syn::Error::new(
-                        attr.span(),
-                        format!("already found type {t:?}"),
-                    ));
-                }
+                })?
+            }
+            if attr.path().is_ident("map") {
+                let value = &attr.require_name_value()?.value;
+                let Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(value),
+                    ..
+                }) = value
+                else {
+                    return Err(syn::Error::new(attr.span(), "oneof has a non-path value"));
+                };
+                set_field_type(ParsedFieldType::Map(parse_map_type(value)?))?;
             }
             if attr.path().is_ident("repeated") {
                 let _ = attr.require_path_only();
@@ -325,11 +337,26 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
             (Some(ParsedFieldType::Bytes { utf8 }), Some(FieldNumber::Single(number)), false) => {
                 MessageFieldType::Bytes(BytesField { utf8, number })
             }
+            (Some(ParsedFieldType::Map(map)), Some(FieldNumber::Single(number)), false) => {
+                let MapFieldType { key, value } = map;
+                let value = match value {
+                    MapValueType::Single(single_field_type) => {
+                        MapValueType::Single(single_field_type)
+                    }
+                    MapValueType::Message(()) => {
+                        let type_path = strip_outer_path(&rust_field_type)?;
+                        MapValueType::Message(type_path)
+                    }
+                    MapValueType::Bytes { utf8 } => MapValueType::Bytes { utf8 },
+                };
+                MessageFieldType::Map(MapField { key, value, number })
+            }
             (
                 Some(
                     ParsedFieldType::Single(_)
                     | ParsedFieldType::Message
-                    | ParsedFieldType::Bytes { .. },
+                    | ParsedFieldType::Bytes { .. }
+                    | ParsedFieldType::Map(_),
                 ),
                 Some(FieldNumber::Multiple(_)),
                 _,
@@ -357,6 +384,9 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                     "oneofs can't be repeated",
                 ));
             }
+            (Some(ParsedFieldType::Map(_)), _, true) => {
+                return Err(syn::Error::new(Span::call_site(), "maps can't be repeated"));
+            }
             (Some(ParsedFieldType::Bytes { utf8: _ }), Some(_number), true) => {
                 MessageFieldType::Unsupported
             }
@@ -366,7 +396,8 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                     ft @ (ParsedFieldType::Single(_)
                     | ParsedFieldType::Message
                     | ParsedFieldType::Bytes { .. }
-                    | ParsedFieldType::OneOf { .. }),
+                    | ParsedFieldType::OneOf { .. }
+                    | ParsedFieldType::Map(_)),
                 ),
                 None,
                 _repeated,
@@ -402,6 +433,16 @@ fn strip_outer_path(ty: &syn::Type) -> Result<syn::TypePath> {
                 _ => {}
             }
             Err(format!("unrecognized {} type param", last.ident).into())
+        } else if last.ident == "HashMap" {
+            match &last.arguments {
+                syn::PathArguments::AngleBracketed(args) if args.args.len() == 2 => {
+                    if let syn::GenericArgument::Type(ty) = args.args.iter().last().unwrap() {
+                        return inner(ty);
+                    }
+                }
+                _ => {}
+            }
+            Err(format!("unrecognized {} type param", last.ident).into())
         } else {
             if last.arguments.is_empty() {
                 Ok(path.clone())
@@ -412,6 +453,60 @@ fn strip_outer_path(ty: &syn::Type) -> Result<syn::TypePath> {
     }
 
     inner(ty).map_err(|e| syn::Error::new(span, e))
+}
+
+fn parse_map_type(t: &LitStr) -> Result<MapFieldType> {
+    let span = t.span();
+    let t = t.value();
+    let (key, value) = t
+        .split_once(",")
+        .ok_or_else(|| syn::Error::new(span, "unrecognized map type"))?;
+
+    let key_type_names = [
+        ("bool", VarintFieldType::Bool.into()),
+        ("int32", VarintFieldType::I32.into()),
+        ("int64", VarintFieldType::I64.into()),
+        ("uint32", VarintFieldType::U32.into()),
+        ("uint64", VarintFieldType::U64.into()),
+        ("sint32", VarintFieldType::I32Z.into()),
+        ("sint64", VarintFieldType::I64Z.into()),
+        ("fixed32", FixedFieldType::U32.into()),
+        ("fixed64", FixedFieldType::U64.into()),
+        ("sfixed32", FixedFieldType::I32.into()),
+        ("sfixed64", FixedFieldType::I64.into()),
+        ("string", MapKeyType::String),
+    ];
+
+    let value_type_names = [
+        ("bool", VarintFieldType::Bool.into()),
+        ("int32", VarintFieldType::I32.into()),
+        ("int64", VarintFieldType::I64.into()),
+        ("uint32", VarintFieldType::U32.into()),
+        ("uint64", VarintFieldType::U64.into()),
+        ("sint32", VarintFieldType::I32Z.into()),
+        ("sint64", VarintFieldType::I64Z.into()),
+        ("fixed32", FixedFieldType::U32.into()),
+        ("fixed64", FixedFieldType::U64.into()),
+        ("sfixed32", FixedFieldType::I32.into()),
+        ("sfixed64", FixedFieldType::I64.into()),
+        ("bytes", MapValueType::Bytes { utf8: false }),
+        ("string", MapValueType::Bytes { utf8: true }),
+        ("message", MapValueType::Message(())),
+    ];
+
+    let key = key_type_names
+        .iter()
+        .find(|k| key.trim() == k.0)
+        .ok_or_else(|| syn::Error::new(span, "unknown key type"))?
+        .1;
+
+    let value = value_type_names
+        .iter()
+        .find(|v| value.trim() == v.0)
+        .ok_or_else(|| syn::Error::new(span, "unknown value type"))?
+        .1;
+
+    Ok(MapFieldType { key, value })
 }
 
 /// Get the items belonging to the 'prost' list attribute, e.g. `#[prost(foo, bar="baz")]`.
