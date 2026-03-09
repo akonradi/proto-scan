@@ -35,8 +35,12 @@ associated data in the protobuf binary format.
 # TODO items remaining
 This is still a work in progress. A non-exhaustive list of things remaining:
 
+- Handle protobuf maps in some way in the generated scanner code.
+- Generate enum handling code for type-safe scanning.
 - Handle proto2 groups in some way.
 - Document `proto-scan-build` and derive processes better (for now see the build script of the -tests crate).
 - Enable higher-performance varint deserialization with a `Read::peek` method.
+- Make `ScanError::Utf8` variant infallible if none of the scanners check for UTF-8.
+- Make the repeated scanners resettable for use in oneof scanners.
 
 [`prost`]: https://docs.rs/prost/latest/prost/
