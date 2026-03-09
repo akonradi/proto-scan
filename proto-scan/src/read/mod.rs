@@ -4,7 +4,9 @@ use core::str::Utf8Error;
 
 use either::Either;
 
+mod bounds_only;
 pub(crate) mod count_reader;
+pub use bounds_only::BoundsOnlyReadTypes;
 
 pub trait ReadError {
     type Error: core::error::Error + 'static;
@@ -36,15 +38,6 @@ pub trait Read {
     /// Implementations must only skip fewer than the number of bytes requested
     /// if the end of the stream is reached.
     fn skip(&mut self, bytes: u32) -> Result<u32, <Self::ReadTypes as ReadError>::Error>;
-}
-
-pub struct BoundsOnlyReadTypes(Never);
-
-impl ReadError for BoundsOnlyReadTypes {
-    type Error = Never;
-}
-impl ReadTypes for BoundsOnlyReadTypes {
-    type Buffer = NeverBuffer;
 }
 
 impl ReadError for &[u8] {
@@ -135,26 +128,44 @@ impl<R: Read, L: Read<ReadTypes = R::ReadTypes>> Read for Either<L, R> {
     }
 }
 
-pub struct NeverBuffer(Never);
+/// Implementation of [`Read`] that wraps a [`std::io::Read`] impl.
+#[cfg(feature = "std")]
+pub struct IoRead<R>(R);
 
-impl AsRef<[u8]> for NeverBuffer {
-    fn as_ref(&self) -> &[u8] {
-        match self.0 {}
+#[cfg(feature = "std")]
+impl<R: std::io::Read> ReadError for IoRead<R> {
+    type Error = std::io::Error;
+}
+
+#[cfg(feature = "std")]
+impl<R: std::io::Read> ReadTypes for IoRead<R> {
+    type Buffer = Vec<u8>;
+}
+
+#[cfg(feature = "std")]
+impl<R: std::io::Read + std::io::Seek> Read for IoRead<R> {
+    type ReadTypes = Self;
+
+    fn read(&mut self, bytes: u32) -> Result<Vec<u8>, std::io::Error> {
+        let mut buffer = Vec::with_capacity(bytes.try_into().unwrap_or(usize::MAX));
+        self.0.read_exact(&mut buffer)?;
+        Ok(buffer)
+    }
+
+    fn skip(&mut self, bytes: u32) -> Result<u32, std::io::Error> {
+        let skipped = self.0.seek(std::io::SeekFrom::Current(bytes.into()))?;
+        if skipped != bytes.into() {
+            return Err(std::io::Error::other("seek skipped too few bytes"));
+        }
+        Ok(bytes)
     }
 }
 
-impl core::ops::Deref for NeverBuffer {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        match self.0 {}
-    }
-}
-
-impl ReadBuffer for NeverBuffer {
-    type String = NeverBuffer;
+#[cfg(feature = "std")]
+impl ReadBuffer for Vec<u8> {
+    type String = String;
 
     fn into_string(self) -> Result<Self::String, core::str::Utf8Error> {
-        todo!()
+        String::from_utf8(self).map_err(|e| e.utf8_error())
     }
 }

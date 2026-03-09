@@ -36,7 +36,6 @@ associated data in the protobuf binary format.
 This is still a work in progress. A non-exhaustive list of things remaining:
 
 - Handle proto2 groups in some way.
-- Implement `Read` for `std::io::Read`.
 - Document `proto-scan-build` and derive processes better (for now see the build script of the -tests crate).
 - Enable higher-performance varint deserialization with a `Read::peek` method.
 
