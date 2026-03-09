@@ -1,0 +1,13 @@
+syntax = "proto3";
+package map;
+
+message MapValue {
+    int64 id = 1;
+}
+
+message WithMap {
+    map<string, int32> string_to_i32 = 1;
+    map<string, MapValue> string_to_message = 2;
+    map<fixed64, int32> fixed64_to_i32 = 3;
+    map<fixed64, MapValue> fixed64_to_message = 4;
+}

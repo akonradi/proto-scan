@@ -17,7 +17,7 @@ pub trait ReadTypes: ReadError {
 }
 
 pub trait ReadBuffer: AsRef<[u8]> {
-    type String: Deref<Target = str>;
+    type String: Deref<Target = str> + Default;
     fn into_string(self) -> Result<Self::String, core::str::Utf8Error>;
 }
 

@@ -9,7 +9,7 @@ pub mod error;
 pub use error::ScanError;
 pub mod field;
 mod map;
-pub use map::Map;
+pub use map::{Map, SaveMap};
 mod resettable;
 pub use resettable::{IntoResettable, Resettable};
 mod repeated;

@@ -28,7 +28,7 @@ impl core::ops::Deref for NeverBuffer {
 }
 
 impl ReadBuffer for NeverBuffer {
-    type String = NeverBuffer;
+    type String = &'static str;
 
     fn into_string(self) -> Result<Self::String, core::str::Utf8Error> {
         match self.0 {}

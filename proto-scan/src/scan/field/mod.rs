@@ -14,6 +14,9 @@ pub use no_op::NoOp;
 pub use save::Save;
 pub use write::Write;
 
+// Not exported, only available for use in maps.
+pub(super) use save::{SaveBytesScanner, SaveNumeric};
+
 /// Implemented by a visitor for a fixed [`FieldNumber`].
 pub trait OnScanField<R: ReadTypes>: IntoScanOutput {
     type ScanEvent;

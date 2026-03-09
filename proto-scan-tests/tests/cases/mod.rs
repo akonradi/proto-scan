@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::proto;
 
 mod bytes;
@@ -5,6 +7,7 @@ mod custom_field_scanner;
 mod embedded_message;
 mod enums;
 mod events;
+mod map;
 mod merge_semantics;
 mod oneof;
 mod read_all;
@@ -82,6 +85,25 @@ impl InputKind {
                 repeated_string_field: vec!["abc".into(), "123".into()],
             },
             InputKind::Empty => Default::default(),
+        }
+    }
+
+    fn into_map_message(self) -> crate::prost_proto::WithMap {
+        use crate::prost_proto::MapValue;
+        match self {
+            InputKind::Empty => Default::default(),
+            InputKind::Full => crate::prost_proto::WithMap {
+                fixed64_to_i32: HashMap::from([(1, 1), (2, 2), (3, 3)]),
+                fixed64_to_message: HashMap::from([(5, MapValue { id: 5 })]),
+                string_to_i32: HashMap::from([
+                    ("a".to_owned(), 'a' as i32),
+                    ("key".to_owned(), 'v' as i32),
+                ]),
+                string_to_message: HashMap::from([
+                    ("message".to_owned(), MapValue { id: 33 }),
+                    ("empty".to_owned(), MapValue::default()),
+                ]),
+            },
         }
     }
 }

@@ -4,6 +4,7 @@ use proto_scan_build::CompileScan as _;
 
 fn main() -> Result<()> {
     let protos = [
+        "src/proto/map.proto",
         "src/proto/oneof.proto",
         "src/proto/testing.proto",
         "src/proto/empty_message.proto",

@@ -69,6 +69,12 @@ impl<E: Encoding> Clone for SaveNumeric<E> {
     }
 }
 
+impl<E: Encoding> Default for SaveNumeric<E> {
+    fn default() -> Self {
+        Self(None)
+    }
+}
+
 impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveNumeric<E> {
     type ScanEvent = E::Repr;
 
@@ -193,6 +199,12 @@ where
 {
     fn clone(&self) -> Self {
         Self(self.0.clone())
+    }
+}
+
+impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> Default for SaveBytesScanner<E, R> {
+    fn default() -> Self {
+        Self(None)
     }
 }
 
