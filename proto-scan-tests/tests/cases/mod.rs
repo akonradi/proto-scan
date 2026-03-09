@@ -52,30 +52,36 @@ impl InputKind {
     }
 
     fn into_single_field_types(self) -> crate::prost_proto::SingleFieldTypes {
-        crate::prost_proto::SingleFieldTypes {
-            int32_field: -111111,
-            int64_field: -11823844323454654,
-            uint32_field: 874839458,
-            uint64_field: 23478204893922,
-            sint32_field: -371840583,
-            sint64_field: -173748299301934928,
-            bool_field: true,
-            enum_field: crate::prost_proto::EnumType::One.into(),
-            fixed64_field: 73294810928097023,
-            sfixed64_field: -13649537238187435,
-            double_field: 0.123456,
-            fixed32_field: 372943813,
-            sfixed32_field: -17348172,
-            float_field: -0.08776,
+        match self {
+            InputKind::Full => crate::prost_proto::SingleFieldTypes {
+                int32_field: -111111,
+                int64_field: -11823844323454654,
+                uint32_field: 874839458,
+                uint64_field: 23478204893922,
+                sint32_field: -371840583,
+                sint64_field: -173748299301934928,
+                bool_field: true,
+                enum_field: crate::prost_proto::EnumType::One.into(),
+                fixed64_field: 73294810928097023,
+                sfixed64_field: -13649537238187435,
+                double_field: 0.123456,
+                fixed32_field: 372943813,
+                sfixed32_field: -17348172,
+                float_field: -0.08776,
+            },
+            InputKind::Empty => Default::default(),
         }
     }
 
     fn into_bytes_field_types(self) -> crate::prost_proto::BytesFieldTypes {
-        crate::prost_proto::BytesFieldTypes {
-            bytes_field: b"abc".into(),
-            string_field: "abc".into(),
-            repeated_bytes_field: vec![b"abc".into(), b"123".into()],
-            repeated_string_field: vec!["abc".into(), "123".into()],
+        match self {
+            InputKind::Full => crate::prost_proto::BytesFieldTypes {
+                bytes_field: b"abc".into(),
+                string_field: "abc".into(),
+                repeated_bytes_field: vec![b"abc".into(), b"123".into()],
+                repeated_string_field: vec!["abc".into(), "123".into()],
+            },
+            InputKind::Empty => Default::default(),
         }
     }
 }

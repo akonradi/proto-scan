@@ -51,20 +51,20 @@ fn write_field(input: InputKind) {
     }
 
     let expected = proto::ScanSingleFieldTypesOutput {
-        int32_field: Some(input.int32_field),
-        int64_field: Some(input.int64_field),
-        uint32_field: Some(input.uint32_field),
-        uint64_field: Some(input.uint64_field),
-        sint32_field: Some(input.sint32_field),
-        sint64_field: Some(input.sint64_field),
-        bool_field: Some(input.bool_field),
+        int32_field: none_if_default(input.int32_field),
+        int64_field: none_if_default(input.int64_field),
+        uint32_field: none_if_default(input.uint32_field),
+        uint64_field: none_if_default(input.uint64_field),
+        sint32_field: none_if_default(input.sint32_field),
+        sint64_field: none_if_default(input.sint64_field),
+        bool_field: none_if_default(input.bool_field),
         enum_field: (),
-        fixed64_field: Some(input.fixed64_field),
-        sfixed64_field: Some(input.sfixed64_field),
-        double_field: Some(input.double_field),
-        fixed32_field: Some(input.fixed32_field),
-        sfixed32_field: Some(input.sfixed32_field),
-        float_field: Some(input.float_field),
+        fixed64_field: none_if_default(input.fixed64_field),
+        sfixed64_field: none_if_default(input.sfixed64_field),
+        double_field: none_if_default(input.double_field),
+        fixed32_field: none_if_default(input.fixed32_field),
+        sfixed32_field: none_if_default(input.sfixed32_field),
+        float_field: none_if_default(input.float_field),
     };
     assert_eq!(save_to, expected);
 }
@@ -95,20 +95,24 @@ fn save_field(input: InputKind) {
     };
 
     let expected = proto::ScanSingleFieldTypesOutput {
-        int32_field: Some(input.int32_field),
-        int64_field: Some(input.int64_field),
-        uint32_field: Some(input.uint32_field),
-        uint64_field: Some(input.uint64_field),
-        sint32_field: Some(input.sint32_field),
-        sint64_field: Some(input.sint64_field),
-        bool_field: Some(input.bool_field),
+        int32_field: none_if_default(input.int32_field),
+        int64_field: none_if_default(input.int64_field),
+        uint32_field: none_if_default(input.uint32_field),
+        uint64_field: none_if_default(input.uint64_field),
+        sint32_field: none_if_default(input.sint32_field),
+        sint64_field: none_if_default(input.sint64_field),
+        bool_field: none_if_default(input.bool_field),
         enum_field: (),
-        fixed64_field: Some(input.fixed64_field),
-        sfixed64_field: Some(input.sfixed64_field),
-        double_field: Some(input.double_field),
-        fixed32_field: Some(input.fixed32_field),
-        sfixed32_field: Some(input.sfixed32_field),
-        float_field: Some(input.float_field),
+        fixed64_field: none_if_default(input.fixed64_field),
+        sfixed64_field: none_if_default(input.sfixed64_field),
+        double_field: none_if_default(input.double_field),
+        fixed32_field: none_if_default(input.fixed32_field),
+        sfixed32_field: none_if_default(input.sfixed32_field),
+        float_field: none_if_default(input.float_field),
     };
     assert_eq!(output, expected);
+}
+
+fn none_if_default<T: Default + PartialEq>(val: T) -> Option<T> {
+    (val != T::default()).then_some(val)
 }
