@@ -37,7 +37,6 @@ This is still a work in progress. A non-exhaustive list of things remaining:
 
 - Handle proto2 groups in some way.
 - Implement `Read` for `std::io::Read`.
-- Avoid a copy when saving a string or repeated bytes field from a `Read` impl whose buffer is a `Vec` or `Box<u8>`.
 - Document `proto-scan-build` and derive processes better (for now see the build script of the -tests crate).
 - Enable higher-performance varint deserialization with a `Read::peek` method.
 
