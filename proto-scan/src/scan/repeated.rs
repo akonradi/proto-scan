@@ -3,8 +3,8 @@ use std::ops::DerefMut;
 
 use crate::read::ReadTypes;
 use crate::scan::field::{Message, OnScanField};
-use crate::scan::{IntoScanOutput, IntoScanner, MessageScanner, ScanCallbacks, StopScan};
-use crate::wire::{GroupOp, LengthDelimited, NumericField};
+use crate::scan::{IntoScanOutput, IntoScanner, MessageScanner, ScanCallbacks, ScanError};
+use crate::wire::{GroupOp, LengthDelimited, NumericField, WrongWireType};
 
 /// Marker type for protobuf `repeated`.
 pub struct Repeated<T>(pub T);
@@ -34,12 +34,12 @@ pub trait RepeatStrategy<M: MessageScanner> {
 }
 
 /// The instantiation of a [`RepeatStrategy`] policy.
-pub trait RepeatStrategyScanner<R: ReadTypes, S>: IntoScanOutput {
+pub trait RepeatStrategyScanner<R: ReadTypes, S: ScanCallbacks<R>>: IntoScanOutput {
     fn on_message(
         &mut self,
         scanner: &S,
         input: impl LengthDelimited<ReadTypes = R>,
-    ) -> Result<(), StopScan>;
+    ) -> Result<(), ScanError<R::Error>>;
 }
 
 /// Extension trait for message scanners.
@@ -86,18 +86,21 @@ impl<R: ReadTypes, S: ScanCallbacks<R>, F: RepeatStrategyScanner<R, S>> OnScanFi
 {
     type ScanEvent = Infallible;
 
-    fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
-        Err(StopScan)
+    fn on_numeric(
+        &mut self,
+        _value: NumericField,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        Err(WrongWireType.into())
     }
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan> {
-        Err(StopScan)
+    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        Err(WrongWireType.into())
     }
 
     fn on_length_delimited(
         &mut self,
         delimited: impl LengthDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, StopScan> {
+    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
         self.1.on_message(&self.0, delimited).map(|()| None)
     }
 }
@@ -122,7 +125,7 @@ impl<R: ReadTypes, S: ScanCallbacks<R> + Clone> RepeatStrategyScanner<R, S> for 
         &mut self,
         scanner: &S,
         input: impl LengthDelimited<ReadTypes = R>,
-    ) -> Result<(), StopScan> {
+    ) -> Result<(), ScanError<R::Error>> {
         let mut scanner = Message::new(scanner.clone());
         let _event = scanner.on_length_delimited(input)?;
         self.0.push(scanner.into_scan_output());
@@ -168,7 +171,7 @@ impl<R: ReadTypes, S: ScanCallbacks<R> + Clone, F: Fn(&mut S::ScanOutput, S::Sca
         &mut self,
         scanner: &S,
         input: impl LengthDelimited<ReadTypes = R>,
-    ) -> Result<(), StopScan> {
+    ) -> Result<(), ScanError<R::Error>> {
         let mut scanner = Message::new(scanner.clone());
         let _event = scanner.on_length_delimited(input)?;
         if let Some(prev) = self.0.as_mut() {
@@ -202,7 +205,7 @@ impl<R: ReadTypes, S: ScanCallbacks<R> + Clone, D: DerefMut<Target: Extend<S::Sc
         &mut self,
         scanner: &S,
         input: impl LengthDelimited<ReadTypes = R>,
-    ) -> Result<(), StopScan> {
+    ) -> Result<(), ScanError<R::Error>> {
         let mut scanner = Message::new(scanner.clone());
         let _event = scanner.on_length_delimited(input);
         let output = scanner.into_scan_output();

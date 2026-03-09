@@ -3,9 +3,9 @@ use core::convert::Infallible;
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
 use crate::scan::{
-    IntoScanOutput, IntoScanner, MessageScanner, Resettable, ScanCallbacks, StopScan, next_event,
+    IntoScanOutput, IntoScanner, MessageScanner, Resettable, ScanCallbacks, ScanError, next_event,
 };
-use crate::wire::LengthDelimited;
+use crate::wire::{LengthDelimited, WrongWireType};
 
 #[derive(Clone)]
 pub struct Message<F>(F);
@@ -30,18 +30,21 @@ impl<F: ScanCallbacks<R>, R: ReadTypes> OnScanField<R> for Message<F> {
     fn on_numeric(
         &mut self,
         _value: crate::scan::NumericField,
-    ) -> Result<Option<Self::ScanEvent>, StopScan> {
-        Err(StopScan)
+    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        Err(WrongWireType.into())
     }
 
-    fn on_group(&mut self, _op: crate::scan::GroupOp) -> Result<Option<Self::ScanEvent>, StopScan> {
-        Err(StopScan)
+    fn on_group(
+        &mut self,
+        _op: crate::scan::GroupOp,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        Err(WrongWireType.into())
     }
 
     fn on_length_delimited(
         &mut self,
         delimited: impl LengthDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, StopScan> {
+    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
         let mut parse = delimited.into_events();
         let fields = &mut self.0;
         while let Some(next) = next_event(&mut parse, fields) {
@@ -86,7 +89,7 @@ mod test {
             &mut self,
             field: FieldNumber,
             value: NumericField,
-        ) -> Result<Self::ScanEvent, StopScan> {
+        ) -> Result<Self::ScanEvent, ScanError<R::Error>> {
             if field == self.0 {
                 self.1.on_numeric(value).map(|e| e.map(|e| (e,)))
             } else {
@@ -98,7 +101,7 @@ mod test {
             &mut self,
             field: FieldNumber,
             op: crate::scan::GroupOp,
-        ) -> Result<Self::ScanEvent, StopScan> {
+        ) -> Result<Self::ScanEvent, ScanError<R::Error>> {
             if field == self.0 {
                 self.1.on_group(op).map(|e| e.map(|e| (e,)))
             } else {
@@ -110,7 +113,7 @@ mod test {
             &mut self,
             field: FieldNumber,
             delimited: impl LengthDelimited<ReadTypes = R>,
-        ) -> Result<Self::ScanEvent, StopScan> {
+        ) -> Result<Self::ScanEvent, ScanError<R::Error>> {
             if field == self.0 {
                 self.1
                     .on_length_delimited(delimited)

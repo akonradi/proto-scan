@@ -192,7 +192,7 @@ impl<'m> MessageScanner<'m> {
                     &mut self,
                     field: ::proto_scan::wire::FieldNumber,
                     value: ::proto_scan::wire::NumericField,
-                ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
+                ) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
                     #[allow(clippy::match_single_binding)]
                     Ok(match u32::from(field) {
                         #(#on_numeric_arms)*
@@ -200,7 +200,7 @@ impl<'m> MessageScanner<'m> {
                     })
                 }
 
-                fn on_group(&mut self, field: ::proto_scan::wire::FieldNumber, value: ::proto_scan::wire::GroupOp) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
+                fn on_group(&mut self, field: ::proto_scan::wire::FieldNumber, value: ::proto_scan::wire::GroupOp) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
                     #[allow(clippy::match_single_binding)]
                     Ok(match u32::from(field) {
                         #(#on_group_arms)*
@@ -212,7 +212,7 @@ impl<'m> MessageScanner<'m> {
                     &mut self,
                     field: ::proto_scan::wire::FieldNumber,
                     value: impl ::proto_scan::wire::LengthDelimited<ReadTypes=R>,
-                ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
+                ) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
                     #[allow(clippy::match_single_binding)]
                     Ok(match u32::from(field) {
                         #(#on_length_delimited_arms)*

@@ -8,7 +8,7 @@ pub use group_op::GroupOp;
 pub use numeric_field::NumericField;
 pub use parse::{LengthDelimited, ParseEvent, ParseEventReader, parse};
 pub(crate) use tag::{Tag, WireType};
-pub use wire_type::{I32, I64, NumericWireType, Varint};
+pub use wire_type::{I32, I64, NumericWireType, Varint, WrongWireType};
 
 mod field_number;
 mod group_op;

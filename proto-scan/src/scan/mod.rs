@@ -1,12 +1,12 @@
-use core::convert::Infallible;
-
-use crate::read::ReadTypes;
+use crate::read::{ReadError, ReadTypes};
 use crate::wire::{FieldNumber, GroupOp, I32, I64, NumericField, Varint};
 use crate::wire::{LengthDelimited, ParseEvent, ParseEventReader};
 
 mod builder;
 pub use builder::ScannerBuilder;
 pub mod encoding;
+pub mod error;
+pub use error::ScanError;
 pub mod field;
 mod resettable;
 pub use resettable::{IntoResettable, Resettable};
@@ -50,17 +50,21 @@ pub trait ScanCallbacks<R: ReadTypes, F = FieldNumber>: IntoScanOutput {
     type ScanEvent;
 
     /// Called when a numeric field is parsed.
-    fn on_numeric(&mut self, field: F, value: NumericField) -> Result<Self::ScanEvent, StopScan>;
+    fn on_numeric(
+        &mut self,
+        field: F,
+        value: NumericField,
+    ) -> Result<Self::ScanEvent, ScanError<R::Error>>;
 
     /// Called when a SGROUP or EGROUP tag is read.
-    fn on_group(&mut self, field: F, op: GroupOp) -> Result<Self::ScanEvent, StopScan>;
+    fn on_group(&mut self, field: F, op: GroupOp) -> Result<Self::ScanEvent, ScanError<R::Error>>;
 
     /// Called when a length-delimited field tag is encountered.
     fn on_length_delimited(
         &mut self,
         field: F,
         delimited: impl LengthDelimited<ReadTypes = R>,
-    ) -> Result<Self::ScanEvent, StopScan>;
+    ) -> Result<Self::ScanEvent, ScanError<R::Error>>;
 }
 
 /// A oneof grouping in a message that can be scanned for.
@@ -87,8 +91,11 @@ impl<P, S> Scan<P, S> {
 /// an error.
 pub struct IntoIter<P, S>(P, S);
 
+type ParseEventReaderScanError<P> =
+    ScanError<<<P as ParseEventReader>::ReadTypes as ReadError>::Error>;
+
 impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>> IntoIterator for Scan<P, S> {
-    type Item = Result<S::ScanEvent, StopScan>;
+    type Item = Result<S::ScanEvent, ParseEventReaderScanError<P>>;
     type IntoIter = IntoIter<P, S>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -97,8 +104,10 @@ impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>> IntoIterator for Scan<
 }
 
 impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>> Iterator for IntoIter<P, S> {
-    type Item = Result<S::ScanEvent, StopScan>;
-    fn next(&mut self) -> Option<Result<S::ScanEvent, StopScan>> {
+    type Item = Result<S::ScanEvent, ParseEventReaderScanError<P>>;
+    fn next(
+        &mut self,
+    ) -> Option<Result<S::ScanEvent, ScanError<<P::ReadTypes as ReadError>::Error>>> {
         next_event(&mut self.0, &mut self.1)
     }
 }
@@ -106,9 +115,9 @@ impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>> Iterator for IntoIter<
 pub(crate) fn next_event<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>>(
     parse: &mut P,
     fields: &mut S,
-) -> Option<Result<S::ScanEvent, StopScan>> {
+) -> Option<Result<S::ScanEvent, ParseEventReaderScanError<P>>> {
     let (field_number, event) = match parse.next() {
-        Some(Err(_)) => return Some(Err(StopScan)),
+        Some(Err(e)) => return Some(Err(e.into())),
         None => return None,
         Some(Ok(event)) => event,
     };
@@ -122,24 +131,11 @@ pub(crate) fn next_event<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>>(
 }
 
 impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>> Scan<P, S> {
-    pub fn read_all(self) -> Result<S::ScanOutput, StopScan> {
+    pub fn read_all(self) -> Result<S::ScanOutput, ParseEventReaderScanError<P>> {
         let mut it = self.into_iter();
         for r in it.by_ref() {
             let _ = r?;
         }
         Ok(it.1.into_scan_output())
-    }
-}
-
-/// Sentinel type indicating that a scan completed unsuccessfully.
-///
-/// TODO: make this an enum that provides some detail about why the scan was
-/// unsuccessful.
-#[derive(Debug, PartialEq)]
-pub struct StopScan;
-
-impl From<Infallible> for StopScan {
-    fn from(value: Infallible) -> Self {
-        match value {}
     }
 }

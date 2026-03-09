@@ -36,7 +36,6 @@ associated data in the protobuf binary format.
 This is still a work in progress. A non-exhaustive list of things remaining:
 
 - Handle proto2 groups in some way.
-- Make `scan::StopScan` a meaningful enum.
 - Implement `Read` for `std::io::Read`.
 - Avoid a copy when saving a string or repeated bytes field from a `Read` impl whose buffer is a `Vec` or `Box<u8>`.
 - Make the library and generated code `no_std` with a feature flag

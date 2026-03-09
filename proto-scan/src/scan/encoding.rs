@@ -1,7 +1,7 @@
 use core::convert::Infallible;
 use core::marker::PhantomData;
+use std::num::TryFromIntError;
 
-use crate::scan::StopScan;
 use crate::wire::NumericWireType;
 
 pub struct Varint<T>(PhantomData<T>);
@@ -11,9 +11,23 @@ pub struct ZigZag<T>(PhantomData<T>);
 pub trait Encoding {
     type Wire: NumericWireType;
     type Repr: Copy;
-    type Error: Into<super::StopScan>;
+    type Error: Into<VarintOutOfBounds>;
 
     fn decode(wire: <Self::Wire as NumericWireType>::Repr) -> Result<Self::Repr, Self::Error>;
+}
+
+pub struct VarintOutOfBounds;
+
+impl From<Infallible> for VarintOutOfBounds {
+    fn from(value: Infallible) -> Self {
+        match value {}
+    }
+}
+
+impl From<TryFromIntError> for VarintOutOfBounds {
+    fn from(_: TryFromIntError) -> Self {
+        VarintOutOfBounds
+    }
 }
 
 fn zigzag_decode<U>(u: U) -> U
@@ -34,13 +48,13 @@ impl Encoding for Varint<bool> {
     type Wire = super::Varint;
 
     type Repr = bool;
-    type Error = super::StopScan;
+    type Error = VarintOutOfBounds;
 
-    fn decode(wire: <Self::Wire as NumericWireType>::Repr) -> Result<bool, super::StopScan> {
+    fn decode(wire: <Self::Wire as NumericWireType>::Repr) -> Result<bool, Self::Error> {
         match wire {
             0 => Ok(false),
             1 => Ok(true),
-            _ => Err(super::StopScan),
+            _ => Err(VarintOutOfBounds),
         }
     }
 }
@@ -51,10 +65,10 @@ macro_rules! impl_encoding {
             type Wire = super::Varint;
 
             type Repr = $t;
-            type Error = super::StopScan;
+            type Error = VarintOutOfBounds;
 
-            fn decode(wire: <Self::Wire as NumericWireType>::Repr) -> Result<$t, super::StopScan> {
-                let unzigged = zigzag_decode(<$repr>::try_from(wire).ok().ok_or(super::StopScan)?);
+            fn decode(wire: <Self::Wire as NumericWireType>::Repr) -> Result<$t, Self::Error> {
+                let unzigged = zigzag_decode(<$repr>::try_from(wire)?);
                 let bytes = unzigged.to_ne_bytes();
                 Ok(<$t>::from_ne_bytes(bytes))
             }
@@ -65,11 +79,11 @@ macro_rules! impl_encoding {
             type Wire = super::Varint;
 
             type Repr = $t;
-            type Error = super::StopScan;
+            type Error = VarintOutOfBounds;
 
-            fn decode(wire: <Self::Wire as NumericWireType>::Repr) -> Result<$t, super::StopScan> {
+            fn decode(wire: <Self::Wire as NumericWireType>::Repr) -> Result<$t, Self::Error> {
                 let repr = <$repr>::from_ne_bytes(wire.to_ne_bytes());
-                repr.try_into().ok().ok_or(StopScan)
+                Ok(repr.try_into()?)
             }
         }
     };

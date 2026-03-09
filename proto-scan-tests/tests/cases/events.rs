@@ -31,19 +31,19 @@ impl<R: ReadTypes, T: Clone> OnScanField<R> for EmitEvent<T> {
     fn on_numeric(
         &mut self,
         _value: proto_scan::wire::NumericField,
-    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::StopScan> {
+    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::ScanError<R::Error>> {
         Ok(Some(self.0.clone()))
     }
     fn on_group(
         &mut self,
         _op: proto_scan::wire::GroupOp,
-    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::StopScan> {
+    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::ScanError<R::Error>> {
         Ok(Some(self.0.clone()))
     }
     fn on_length_delimited(
         &mut self,
         _delimited: impl proto_scan::wire::LengthDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::StopScan> {
+    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::ScanError<R::Error>> {
         Ok(Some(self.0.clone()))
     }
 }

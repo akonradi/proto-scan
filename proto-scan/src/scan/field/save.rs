@@ -3,8 +3,8 @@ use core::convert::Infallible;
 use crate::read::{ReadBuffer, ReadTypes};
 use crate::scan::encoding::{Encoding, Fixed, Varint, ZigZag};
 use crate::scan::field::OnScanField;
-use crate::scan::{IntoResettable, IntoScanOutput, IntoScanner, Repeated, Resettable, StopScan};
-use crate::wire::{GroupOp, LengthDelimited, NumericField, NumericWireType};
+use crate::scan::{IntoResettable, IntoScanOutput, IntoScanner, Repeated, Resettable, ScanError};
+use crate::wire::{GroupOp, LengthDelimited, NumericField, NumericWireType, WrongWireType};
 
 /// [`OnScanField`] implementation that produces the read value as the event output.
 ///
@@ -63,29 +63,33 @@ pub struct SaveNumeric<E: Encoding>(Option<E::Repr>);
 
 impl<E: Encoding> Clone for SaveNumeric<E> {
     fn clone(&self) -> Self {
-        Self(self.0.clone())
+        Self(self.0)
     }
 }
 
 impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveNumeric<E> {
     type ScanEvent = E::Repr;
+    
 
-    fn on_numeric(&mut self, value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
-        let value = <E::Wire as NumericWireType>::from_value(value).ok_or(StopScan)?;
+    fn on_numeric(
+        &mut self,
+        value: NumericField,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        let value = <E::Wire as NumericWireType>::from_value(value)?;
         let value = E::decode(value).map_err(Into::into)?;
         self.0 = Some(value);
         Ok(Some(value))
     }
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan> {
-        Err(StopScan)
+    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        Err(WrongWireType.into())
     }
 
     fn on_length_delimited(
         &mut self,
         _delimited: impl LengthDelimited,
-    ) -> Result<Option<Self::ScanEvent>, StopScan> {
-        Err(StopScan)
+    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        Err(WrongWireType.into())
     }
 }
 
@@ -127,30 +131,40 @@ impl<E: Encoding> IntoScanOutput for SaveRepeated<E> {
 #[cfg(feature = "std")]
 impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveRepeated<E> {
     type ScanEvent = Infallible;
-    fn on_numeric(&mut self, value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
-        let value = <E::Wire as NumericWireType>::from_value(value).ok_or(StopScan)?;
+    
+    fn on_numeric(
+        &mut self,
+        value: NumericField,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        let value = <E::Wire as NumericWireType>::from_value(value)?;
         self.0.extend([E::decode(value).map_err(Into::into)?]);
         Ok(None)
     }
 
     fn on_length_delimited(
         &mut self,
-        delimited: impl LengthDelimited,
-    ) -> Result<Option<Self::ScanEvent>, StopScan> {
+        delimited: impl LengthDelimited<ReadTypes = R>,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
         let mut packed = delimited.into_packed::<E::Wire>();
         let mut result = Ok(None);
         self.0.extend(core::iter::from_fn(|| {
-            let value = packed.next()?.ok().and_then(|w| E::decode(w).ok());
-            if value.is_none() {
-                result = Err(StopScan);
+            let value = packed
+                .next()?
+                .map_err(ScanError::from)
+                .and_then(|w| Ok(E::decode(w).map_err(Into::into)?));
+            match value {
+                Err(e) => {
+                    result = Err(e);
+                    None
+                }
+                Ok(v) => Some(v),
             }
-            value
         }));
         result
     }
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan> {
-        Err(StopScan)
+    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        Err(WrongWireType.into())
     }
 }
 
@@ -204,20 +218,24 @@ impl DecodeFromBytes for [u8] {
 
 impl<T: DecodeFromBytes + ?Sized, R: ReadTypes> OnScanField<R> for SaveBytesScanner<T, R> {
     type ScanEvent = Infallible;
-    fn on_numeric(&mut self, _value: NumericField) -> Result<Option<Self::ScanEvent>, StopScan> {
-        Err(StopScan)
+    
+    fn on_numeric(
+        &mut self,
+        _value: NumericField,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        Err(WrongWireType.into())
     }
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, StopScan> {
-        Err(StopScan)
+    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        Err(WrongWireType.into())
     }
 
     fn on_length_delimited(
         &mut self,
         delimited: impl LengthDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, StopScan> {
-        let bytes = delimited.into_bytes().map_err(|_| StopScan)?;
-        let decoded = T::decode(bytes).map_err(|_| StopScan)?;
+    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        let bytes = delimited.into_bytes()?;
+        let decoded = T::decode(bytes).map_err(|_| ScanError::Utf8)?;
         self.0 = Some(decoded);
         Ok(None)
     }

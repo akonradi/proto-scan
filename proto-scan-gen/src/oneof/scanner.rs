@@ -248,7 +248,7 @@ impl<'a> OneofScanner<'a> {
                     &mut self,
                     field: #field_number_type,
                     value: ::proto_scan::wire::NumericField,
-                ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
+                ) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
                     if self.proto_scan_last_set.is_some_and(|e| e != field) {
                         ::proto_scan::scan::Resettable::reset(self);
                     }
@@ -257,7 +257,7 @@ impl<'a> OneofScanner<'a> {
                     })
                 }
 
-                fn on_group(&mut self, field: #field_number_type, value: ::proto_scan::wire::GroupOp) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
+                fn on_group(&mut self, field: #field_number_type, value: ::proto_scan::wire::GroupOp) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
                     if self.proto_scan_last_set.is_some_and(|e| e != field) {
                         ::proto_scan::scan::Resettable::reset(self);
                     }
@@ -270,7 +270,7 @@ impl<'a> OneofScanner<'a> {
                     &mut self,
                     field: #field_number_type,
                     value: impl ::proto_scan::wire::LengthDelimited<ReadTypes=R>,
-                ) -> Result<Self::ScanEvent, ::proto_scan::scan::StopScan> {
+                ) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
                     if self.proto_scan_last_set.is_some_and(|e| e != field) {
                         ::proto_scan::scan::Resettable::reset(self);
                     }

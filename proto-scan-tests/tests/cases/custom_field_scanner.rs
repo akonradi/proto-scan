@@ -21,7 +21,7 @@ impl<R: ReadTypes> OnScanField<R> for CustomScanner<'_> {
     fn on_numeric(
         &mut self,
         value: NumericField,
-    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::StopScan> {
+    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::ScanError<R::Error>> {
         *self.0 = Some(value);
         Ok(Some(CustomEvent))
     }
@@ -29,14 +29,14 @@ impl<R: ReadTypes> OnScanField<R> for CustomScanner<'_> {
     fn on_group(
         &mut self,
         _op: proto_scan::wire::GroupOp,
-    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::StopScan> {
+    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::ScanError<R::Error>> {
         Ok(None)
     }
 
     fn on_length_delimited(
         &mut self,
         _delimited: impl proto_scan::wire::LengthDelimited,
-    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::StopScan> {
+    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::ScanError<R::Error>> {
         Ok(None)
     }
 }

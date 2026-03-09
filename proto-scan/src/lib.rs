@@ -85,7 +85,9 @@
 //!     pub a: i64,
 //! }
 //!
-//! fn read_a<R: read::Read>(r: R) -> Result<Option<i64>, scan::StopScan> {
+//! fn read_a<R: read::Read>(
+//!     r: R,
+//! ) -> Result<Option<i64>, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
 //!     let scanner = Test1::scanner().a(scan::field::Save);
 //!     let ScanTest1Output { a } = scanner.scan(r).read_all()?;
 //!     Ok(a)
@@ -136,7 +138,9 @@
 //!     pub c: ::core::option::Option<Test1>,
 //! }
 //!
-//! fn read_a_from_c<R: read::Read>(r: R) -> Result<Option<i64>, scan::StopScan> {
+//! fn read_a_from_c<R: read::Read>(
+//!     r: R,
+//! ) -> Result<Option<i64>, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
 //!     let scanner = Test3::scanner().c(Test1::scanner().a(scan::field::Save));
 //!     let ScanTest3Output {
 //!         c: ScanTest1Output { a },
@@ -196,7 +200,7 @@
 //!     r: R,
 //! ) -> Result<
 //!     Option<<<R::ReadTypes as read::ReadTypes>::Buffer as read::ReadBuffer>::String>,
-//!     scan::StopScan,
+//!     scan::ScanError<<R::ReadTypes as read::ReadError>::Error>,
 //! > {
 //!     let scanner = SampleMessage::scanner()
 //!         .test_oneof(sample_message::TestOneof::scanner().name(scan::field::Save));

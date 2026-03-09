@@ -166,7 +166,7 @@ impl<R: ReadTypes, F> ScanCallbacks<R, F> for SaveLastFieldNumber<'_, F> {
         &mut self,
         field: F,
         _value: proto_scan::wire::NumericField,
-    ) -> Result<Self::ScanEvent, proto_scan::scan::StopScan> {
+    ) -> Result<Self::ScanEvent, proto_scan::scan::ScanError<R::Error>> {
         *self.0 = Some(field);
         Ok(())
     }
@@ -174,7 +174,7 @@ impl<R: ReadTypes, F> ScanCallbacks<R, F> for SaveLastFieldNumber<'_, F> {
         &mut self,
         field: F,
         _delimited: impl proto_scan::wire::LengthDelimited<ReadTypes = R>,
-    ) -> Result<Self::ScanEvent, proto_scan::scan::StopScan> {
+    ) -> Result<Self::ScanEvent, proto_scan::scan::ScanError<R::Error>> {
         *self.0 = Some(field);
         Ok(())
     }
@@ -182,7 +182,7 @@ impl<R: ReadTypes, F> ScanCallbacks<R, F> for SaveLastFieldNumber<'_, F> {
         &mut self,
         field: F,
         _op: proto_scan::wire::GroupOp,
-    ) -> Result<Self::ScanEvent, proto_scan::scan::StopScan> {
+    ) -> Result<Self::ScanEvent, proto_scan::scan::ScanError<R::Error>> {
         *self.0 = Some(field);
         Ok(())
     }

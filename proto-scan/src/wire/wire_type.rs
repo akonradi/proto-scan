@@ -12,8 +12,10 @@ pub trait NumericWireType: sealed::Sealed {
         r: &mut R,
     ) -> Result<Self::Repr, DecodeError<<R::ReadTypes as ReadError>::Error>>;
 
-    fn from_value(s: NumericField) -> Option<Self::Repr>;
+    fn from_value(s: NumericField) -> Result<Self::Repr, WrongWireType>;
 }
+
+pub struct WrongWireType;
 
 pub struct Varint(Never);
 
@@ -39,10 +41,10 @@ impl NumericWireType for Varint {
         super::parse_base128_varint(r)
     }
 
-    fn from_value(s: NumericField) -> Option<Self::Repr> {
+    fn from_value(s: NumericField) -> Result<u64, WrongWireType> {
         match s {
-            NumericField::Varint(v) => Some(v),
-            NumericField::I64(_) | NumericField::I32(_) => None,
+            NumericField::Varint(v) => Ok(v),
+            NumericField::I64(_) | NumericField::I32(_) => Err(WrongWireType),
         }
     }
 }
@@ -71,10 +73,10 @@ impl NumericWireType for I64 {
         read_fixed_from(r)
     }
 
-    fn from_value(s: NumericField) -> Option<Self::Repr> {
+    fn from_value(s: NumericField) -> Result<u64, WrongWireType> {
         match s {
-            NumericField::I64(i) => Some(i),
-            NumericField::Varint(_) | NumericField::I32(_) => None,
+            NumericField::I64(i) => Ok(i),
+            NumericField::Varint(_) | NumericField::I32(_) => Err(WrongWireType),
         }
     }
 }
@@ -89,10 +91,10 @@ impl NumericWireType for I32 {
         read_fixed_from(r)
     }
 
-    fn from_value(s: NumericField) -> Option<Self::Repr> {
+    fn from_value(s: NumericField) -> Result<u32, WrongWireType> {
         match s {
-            NumericField::I32(i) => Some(i),
-            NumericField::Varint(_) | NumericField::I64(_) => None,
+            NumericField::I32(i) => Ok(i),
+            NumericField::Varint(_) | NumericField::I64(_) => Err(WrongWireType),
         }
     }
 }
