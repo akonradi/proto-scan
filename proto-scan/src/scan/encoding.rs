@@ -1,6 +1,6 @@
 use core::convert::Infallible;
 use core::marker::PhantomData;
-use std::num::TryFromIntError;
+use core::num::TryFromIntError;
 
 use crate::wire::NumericWireType;
 

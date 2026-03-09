@@ -1,5 +1,5 @@
-use std::convert::Infallible;
-use std::ops::DerefMut;
+use core::convert::Infallible;
+use core::ops::DerefMut;
 
 use crate::read::ReadTypes;
 use crate::scan::field::{Message, OnScanField};
@@ -111,8 +111,10 @@ impl<R: ReadTypes, S: ScanCallbacks<R>, F: RepeatStrategyScanner<R, S>> OnScanFi
 /// [`RepeatStrategyScanner::on_message`], uses it to scan the message input,
 /// then saves the output into a [`Vec`]. The saved contents are produced as
 /// this type's [`IntoScanOutput::ScanOutput`].
+#[cfg(feature = "std")]
 pub struct RepeatedSave<S: IntoScanOutput>(Vec<S::ScanOutput>);
 
+#[cfg(feature = "std")]
 impl<M: MessageScanner + IntoScanner<M::Message>> RepeatStrategy<M> for SaveCloned {
     type Impl<R: ReadTypes> = RepeatedSave<M::Scanner<R>>;
     fn into_impl<R: ReadTypes>(self) -> Self::Impl<R> {
@@ -120,6 +122,7 @@ impl<M: MessageScanner + IntoScanner<M::Message>> RepeatStrategy<M> for SaveClon
     }
 }
 
+#[cfg(feature = "std")]
 impl<R: ReadTypes, S: ScanCallbacks<R> + Clone> RepeatStrategyScanner<R, S> for RepeatedSave<S> {
     fn on_message(
         &mut self,
@@ -133,6 +136,7 @@ impl<R: ReadTypes, S: ScanCallbacks<R> + Clone> RepeatStrategyScanner<R, S> for 
     }
 }
 
+#[cfg(feature = "std")]
 impl<S: IntoScanOutput> IntoScanOutput for RepeatedSave<S> {
     type ScanOutput = Vec<S::ScanOutput>;
     fn into_scan_output(self) -> Self::ScanOutput {

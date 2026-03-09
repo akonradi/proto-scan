@@ -1,9 +1,11 @@
 use core::convert::Infallible;
 
 use crate::read::{ReadBuffer, ReadTypes};
+#[cfg(feature = "std")]
+use crate::scan::Repeated;
 use crate::scan::encoding::{Encoding, Fixed, Varint, ZigZag};
 use crate::scan::field::OnScanField;
-use crate::scan::{IntoResettable, IntoScanOutput, IntoScanner, Repeated, Resettable, ScanError};
+use crate::scan::{IntoResettable, IntoScanOutput, IntoScanner, Resettable, ScanError};
 use crate::wire::{GroupOp, LengthDelimited, NumericField, NumericWireType, WrongWireType};
 
 /// [`OnScanField`] implementation that produces the read value as the event output.
@@ -69,7 +71,6 @@ impl<E: Encoding> Clone for SaveNumeric<E> {
 
 impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveNumeric<E> {
     type ScanEvent = E::Repr;
-    
 
     fn on_numeric(
         &mut self,
@@ -131,7 +132,7 @@ impl<E: Encoding> IntoScanOutput for SaveRepeated<E> {
 #[cfg(feature = "std")]
 impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveRepeated<E> {
     type ScanEvent = Infallible;
-    
+
     fn on_numeric(
         &mut self,
         value: NumericField,
@@ -168,6 +169,7 @@ impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveRepeated<E> {
     }
 }
 
+#[cfg(feature = "std")]
 impl<E: Encoding> IntoResettable for SaveRepeated<E> {
     type Resettable = Self;
     fn into_resettable(self) -> Self::Resettable {
@@ -218,7 +220,7 @@ impl DecodeFromBytes for [u8] {
 
 impl<T: DecodeFromBytes + ?Sized, R: ReadTypes> OnScanField<R> for SaveBytesScanner<T, R> {
     type ScanEvent = Infallible;
-    
+
     fn on_numeric(
         &mut self,
         _value: NumericField,
