@@ -79,7 +79,11 @@ pub trait ParseEventReader {
 type ParseEventReaderOutput<RT, LD> =
     Result<(FieldNumber, ParseEvent<LD>), DecodeError<<RT as ReadError>::Error>>;
 
-/// An event returned by [`ParseEventReader::next`].
+/// A tag and value parsed from a protobuf stream.
+///
+/// Each instance corresponds to a protobuf wire format tag and its
+/// corresponding contents. Numeric values are accessible directly and
+/// length-delimited contents are available via the [`LengthDelimited`] trait.
 #[derive(Debug)]
 pub enum ParseEvent<L> {
     /// A numeric field was encountered.
@@ -87,6 +91,9 @@ pub enum ParseEvent<L> {
     /// An group was opened or closed.
     Group(GroupOp),
     /// A length-delimited field was encountered.
+    ///
+    /// Handling code can use the methods of the [`LengthDelimited`] trait to
+    /// access the contents of the field.
     LengthDelimited(L),
 }
 

@@ -1,5 +1,6 @@
 //! The low-level event interface uses [`ParseEventReader`] to read protobuf
-//! wire format tags from a [`Read`] implementation.
+//! wire format tags from a [`Read`] implementation. Calling code must handle
+//! each [`ParseEvent`] as it is read.
 //! 
 //! ```
 //! # use proto_scan::*;
@@ -13,8 +14,7 @@
 //!     // }
 //!     let mut reader = wire::parse(r);
 //!     let mut found_a = None;
-//!     while let Some(event) = reader.next() {
-//!         let (field_number, event) = event?;
+//!     while let Some((field_number, event)) = reader.next().transpose()? {
 //!         match event {
 //!             wire::ParseEvent::Numeric(s) if field_number == 1 => match s {
 //!                 wire::NumericField::Varint(v) => {
