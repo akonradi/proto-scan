@@ -58,6 +58,7 @@ impl OneofScannerField<'_> {
         let field_name = &inner.field.field_name;
         let field_type = &inner.field.field_type;
         let output_type = parent.scan_output_name();
+        let field_variant = &inner.field.variant_name;
 
         let into_scanner_type = field_type.as_into_scanner_type();
         let custom_fn = SwapSingleFieldFn {
@@ -70,7 +71,7 @@ impl OneofScannerField<'_> {
                     encountering the field `{field_name}` defined in the source
                     oneof. The output of the provided field scanner will be
                     included in the overall scan output as
-                    [`{output_type}::{field_name}`]."
+                    [`{output_type}::{field_variant}`]."
                 ),
             ],
             generics: &[
