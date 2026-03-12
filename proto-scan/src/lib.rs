@@ -1,67 +1,15 @@
-//! Scanning protobuf message contents as event streams.
-//!
-//! This crate provides two methods of streaming access to the contents of a
-//! protobuf message stream. The parse event stream API provides [low-level]
-//! typed access to the protobuf wire format, while the [high-level] scan API
-//! enables reading an event stream with conventional protobuf message
-//! semantics.
-//!
-//! # Low-level: parse event stream
-//!
-//! The low-level event interface uses [`wire::ParseEventReader`] to read
-//! protobuf wire format tags from a [`read::Read`] implementation:
-//! ```
-//! # use proto_scan::*;
-//! use wire::ParseEventReader;
-//! fn read_a<R: read::Read>(
-//!     r: R,
-//! ) -> Result<Option<i64>, DecodeError<<R::ReadTypes as read::ReadError>::Error>> {
-//!     // From the protobuf documentation encoding guide.
-//!     // message Test1 {
-//!     //   int64 a = 1;
-//!     // }
-//!     let mut reader = wire::parse(r);
-//!     let mut found_a = None;
-//!     while let Some(event) = reader.next() {
-//!         let (field_number, event) = event?;
-//!         match event {
-//!             wire::ParseEvent::Numeric(s) if field_number == 1 => match s {
-//!                 wire::NumericField::Varint(v) => {
-//!                     found_a = Some(
-//!                         // cast bits according to protobuf encoding format
-//!                         v as i64,
-//!                     )
-//!                 }
-//!                 wire::NumericField::I64(_) | wire::NumericField::I32(_) => found_a = None,
-//!             },
-//!             wire::ParseEvent::Numeric(_)
-//!             | wire::ParseEvent::Group(_)
-//!             | wire::ParseEvent::LengthDelimited(_) => {}
-//!         }
-//!     }
-//!     Ok(found_a)
-//! }
-//!
-//! fn main() {
-//!     // From the protobuf documentation encoding guide, this is a Test message
-//!     // with a = 150.
-//!     const INPUT: &[u8] = &[0x08, 0x96, 0x01];
-//!
-//!     assert_eq!(read_a(&mut &INPUT[..]), Ok(Some(150)))
-//! }
-//! ```
-//!
-//! In this example, the `read_a` method scans the provided input for a tag with
-//! a varint wire type and field number 1. The last one found, if any, is
-//! returned. Any other tag types or fields are ignored. The input is a `&mut &[u8]`
-//! which has an implementation of [`Read`](read::Read).
+//! This crate provides allocation-free access to fields in a protobuf message.
+//! It's most useful when only one or two values are needed from a larger
+//! message and the performance cost of deserializing the other fields or
+//! embedded messages is prohibitive.
+//! 
+//! There are two ways of getting streaming access to the contents of a protobuf
+//! message stream. The [high-level] scan API uses generated code to enable
+//! reading an event stream with conventional protobuf message semantics, while the
+//! low-level parse event stream API provides typed access to the protobuf wire
+//! format.
 //!
 //! # High-level: generated scanner types
-//!
-//! The high-level API allows treating a parse event stream as the contents of a
-//! single protobuf message with typed fields. While usable on their own, the
-//! types and traits in this crate are intended to be used by generated code
-//! to provide extraction of individual fields from a message.
 //!
 //! With the `derive` feature enabled, this crate exports a `#[derive]` macro
 //! that generate these message field extractors. The macro works with message
@@ -69,162 +17,70 @@
 //! [`proto-scan-build`] crate can be used to generate similar code from
 //! protobuf message descriptors.
 //!
-//! Usage of the high-level scanner API looks like this:
+//! Usage of this API is easiest to see from an example. Consider the following
+//! protobuf message definition:
+//! ```proto
+//! message Contact {
+//!   string name = 1;
+//!   Address address = 2;
+//! }
+//!
+//! message Address {
+//!   string street = 1;
+//!   string city = 2;
+//!   string state = 3;
+//!   int zip_code = 4;
+//! }
 //! ```
+//!
+//! Suppose only the zip code from a `Contact` needs to be extracted. The scanner
+//! API makes that easy:
+//! ```
+//! mod proto {
+//!     //! generated code...
+//! #   #[derive(::proto_scan::ScanMessage, Clone, PartialEq, Eq, Hash, ::prost::Message)]
+//! #   pub struct Contact {
+//! #       #[prost(string, tag = "1")]
+//! #       pub name: ::prost::alloc::string::String,
+//! #       #[prost(message, optional, tag = "2")]
+//! #       pub address: ::core::option::Option<Address>,
+//! #   }
+//! #   #[derive(::proto_scan::ScanMessage, Clone, PartialEq, Eq, Hash, ::prost::Message)]
+//! #   pub struct Address {
+//! #       #[prost(string, tag = "1")]
+//! #       pub street: ::prost::alloc::string::String,
+//! #       #[prost(string, tag = "2")]
+//! #       pub city: ::prost::alloc::string::String,
+//! #       #[prost(string, tag = "3")]
+//! #       pub state: ::prost::alloc::string::String,
+//! #       #[prost(int32, tag = "4")]
+//! #       pub zip_code: i32,
+//! #   }
+//! }
+//!
 //! # use proto_scan::*;
-//! use scan::{ScanMessage, ScannerBuilder};
-//! // From the protobuf documentation encoding guide.
-//! // message Test1 {
-//! //   int64 a = 1;
-//! // }
-//! #[derive(ScanMessage)] // attach our derive macro to...
-//! // the type definition generated by `prost`:
-//! #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
-//! pub struct Test1 {
-//!     #[prost(int64, tag = "1")]
-//!     pub a: i64,
-//! }
+//! use scan::{ScanMessage, ScannerBuilder, field::Save};
 //!
-//! fn read_a<R: read::Read>(
-//!     r: R,
-//! ) -> Result<Option<i64>, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
-//!     let scanner = Test1::scanner().a(scan::field::Save);
-//!     let ScanTest1Output { a } = scanner.scan(r).read_all()?;
-//!     Ok(a)
-//! }
+//! fn read_zip<R: read::Read>(
+//!     reader: R,
+//! ) -> Result<Option<i32>, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
+//!    let scanner = proto::Contact::scanner().address(proto::Address::scanner().zip_code(Save));
+//!    let proto::ScanContactOutput {
+//!        address: proto::ScanAddressOutput { zip_code, .. },
+//!        ..
+//!    } = scanner.scan(reader).read_all()?;
 //!
-//! fn main() {
-//!     // From the protobuf documentation encoding guide, this is a Test1 message
-//!     // with a = 150.
-//!     const INPUT: &[u8] = &[0x08, 0x96, 0x01];
-//!
-//!     assert_eq!(read_a(&mut &INPUT[..]), Ok(Some(150)))
+//!    Ok(zip_code)
 //! }
 //! ```
 //!
-//! Calling the [`scan::ScanMessage::scanner`] method from the impl generated
-//! for `Test1` returns an instance of a generated builder type `ScanTest1`.
-//! `ScanTest1` has a builder method `a` that takes a scanner (here
-//! [`scan::field::Save`]) and produces a new `ScanTest1`.  When the built
-//! scanner processes the input, it records the value of the last `a` field
-//! found in the input. When `ScanTest1`'s [`read_all()`](scan::Scan::read_all)
-//! method is called, it returns (on success) a `ScanTest1Output`. That
-//! generated type has a single field `a` that contains the decoded output. Any
-//! other tag types or fields are ignored.  The input to `read_a` is a `&mut
-//! &[u8]` which has an implementation of [`Read`](read::Read).
+//! For more on the high-level API, see the documentation for the [`scan`] module.
 //!
-//! ## Embedded messages
+//! # Low-level: parse event stream
 //!
-//! The contents of embedded messages can be accessed by setting a scanner for the
-//! message field:
-//! ```
-//! # use proto_scan::*;
-//! use scan::{ScanMessage, ScannerBuilder};
-//! // From the protobuf documentation encoding guide.
-//! // message Test3 {
-//! //   Test1 c = 3;
-//! // }
-//! # #[derive(ScanMessage)]
-//! # #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
-//! # pub struct Test1 {
-//! #     #[prost(int64, tag = "1")]
-//! #     pub a: i64,
-//! # }
-//! #[derive(ScanMessage)] // attach our derive macro to...
-//! // the type definition generated by `prost`:
-//! #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
-//! pub struct Test3 {
-//!     #[prost(message, optional, tag = "3")]
-//!     pub c: ::core::option::Option<Test1>,
-//! }
-//!
-//! fn read_a_from_c<R: read::Read>(
-//!     r: R,
-//! ) -> Result<Option<i64>, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
-//!     let scanner = Test3::scanner().c(Test1::scanner().a(scan::field::Save));
-//!     let ScanTest3Output {
-//!         c: ScanTest1Output { a },
-//!     } = scanner.scan(r).read_all()?;
-//!     Ok(a)
-//! }
-//!
-//! fn main() {
-//!     // From the protobuf documentation encoding guide, this is a Test3 message
-//!     // with c's a set to 150.
-//!     const INPUT: &[u8] = &[0x1a, 0x03, 0x08, 0x96, 0x01];
-//!
-//!     assert_eq!(read_a_from_c(&mut &INPUT[..]), Ok(Some(150)))
-//! }
-//! ```
-//!
-//! The basic concept is the same, but instead of using the `Save` scanner for field `c`,
-//! a scanner for the inner message type is provided instead. The output of that scanner
-//! is provided as the output of `ScanTest3Output::c`.
-//!
-//! ## Oneofs
-//!
-//! The contents of a oneof field group can be accessed by setting a scanner for
-//! the group:
-//! ```
-//! # use proto_scan::*;
-//! use scan::{ScanMessage, ScannerBuilder};
-//! // From the protobuf documentation for oneofs.
-//! // message SampleMessage {
-//! //   oneof test_oneof {
-//! //      string name = 4;
-//! //      SubMessage sub_message = 9;
-//! //   }
-//! // }
-//! //
-//! // message SubMessage {}
-//! // The type definitions generated by `prost`, with our derive macro attached:
-//! #[derive(::proto_scan::ScanMessage, Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
-//! pub struct SubMessage {}
-//! #[derive(::proto_scan::ScanMessage, Clone, PartialEq, Eq, Hash, ::prost::Message)]
-//! pub struct SampleMessage {
-//!     #[prost(oneof = "sample_message::TestOneof", tags = "4, 9")]
-//!     pub test_oneof: ::core::option::Option<sample_message::TestOneof>,
-//! }
-//! /// Nested message and enum types in `SampleMessage`.
-//! pub mod sample_message {
-//!     #[derive(::proto_scan::ScanMessage, Clone, PartialEq, Eq, Hash, ::prost::Oneof)]
-//!     pub enum TestOneof {
-//!         #[prost(string, tag = "4")]
-//!         Name(::prost::alloc::string::String),
-//!         #[prost(message, tag = "9")]
-//!         SubMessage(super::SubMessage),
-//!     }
-//! }
-//!
-//! fn read_name<R: read::Read>(
-//!     r: R,
-//! ) -> Result<
-//!     Option<<<R::ReadTypes as read::ReadTypes>::Buffer as read::ReadBuffer>::String>,
-//!     scan::ScanError<<R::ReadTypes as read::ReadError>::Error>,
-//! > {
-//!     let scanner = SampleMessage::scanner()
-//!         .test_oneof(sample_message::TestOneof::scanner().name(scan::field::Save));
-//!     let ScanSampleMessageOutput { test_oneof } = scanner.scan(r).read_all()?;
-//!
-//!     Ok(match test_oneof {
-//!         None => None,
-//!         Some(sample_message::ScanTestOneofOutput::Name(name)) => name,
-//!         Some(sample_message::ScanTestOneofOutput::SubMessage(())) => None,
-//!     })
-//! }
-//!
-//! fn main() {
-//!     // Construct a sample input.
-//!     let input = {
-//!         let message = SampleMessage {
-//!             test_oneof: Some(sample_message::TestOneof::Name("Marco".to_owned())),
-//!         };
-//!         prost::Message::encode_to_vec(&message)
-//!     };
-//!
-//!     assert_eq!(read_name(&mut input.as_slice()), Ok(Some("Marco")))
-//! }
-//! ```
+//! The low-level event interface uses [`wire::ParseEventReader`] to read
+//! protobuf wire format tags from a [`read::Read`] implementation. For more,
+//! including example usage, see the documentation for the [`wire`] module.
 //!
 //! [low-level]: #low-level-parse-event-stream
 //! [high-level]: #high-level-generated-scanner-types
