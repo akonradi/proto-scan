@@ -1,11 +1,6 @@
-use std::collections::HashSet;
-
 use prost::Message as _;
-use proto_scan::read::ReadTypes;
-use proto_scan::scan::field::{OnScanField, Save};
-use proto_scan::scan::{
-    IntoScanOutput, IntoScanner, SaveMap, ScanMessage as _, ScannerBuilder as _,
-};
+use proto_scan::scan::field::Save;
+use proto_scan::scan::{SaveMap, ScanMessage as _, ScannerBuilder as _};
 use test_case::test_case;
 
 use super::*;

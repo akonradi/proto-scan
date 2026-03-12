@@ -89,7 +89,7 @@ impl<P, S> Scan<P, S> {
 /// [`IntoIterator::IntoIter`] type for [`Scan`].
 ///
 /// Implements [`Iterator`] by applying events from a [`ParseEventReader`] to a
-/// [`ScanCallbacks`] and yielding the resulting [`ScanTypes::ScanEvent`] or
+/// [`ScanCallbacks`] and yielding the resulting [`ScanCallbacks::ScanEvent`] or
 /// an error.
 pub struct IntoIter<P, S>(P, S);
 
