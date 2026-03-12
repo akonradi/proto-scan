@@ -133,6 +133,13 @@ impl<R: Read, L: Read<ReadTypes = R::ReadTypes>> Read for Either<L, R> {
 pub struct IoRead<R>(R);
 
 #[cfg(feature = "std")]
+impl<R> IoRead<R> {
+    pub fn new(read: R) -> Self {
+        Self(read)
+    }
+}
+
+#[cfg(feature = "std")]
 impl<R: std::io::Read> ReadError for IoRead<R> {
     type Error = std::io::Error;
 }
