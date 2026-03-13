@@ -83,13 +83,12 @@
 //!     Ok(a)
 //! }
 //!
-//! fn main() {
-//!     // From the protobuf documentation encoding guide, this is a Test3 message
-//!     // with c's a set to 150.
-//!     const INPUT: &[u8] = &[0x1a, 0x03, 0x08, 0x96, 0x01];
-//!
-//!     assert_eq!(read_a_from_c(&mut &INPUT[..]), Ok(Some(150)))
-//! }
+//! # fn main() {
+//! #     // From the protobuf documentation encoding guide, this is a Test3 message
+//! #     // with c's a set to 150.
+//! #     const INPUT: &[u8] = &[0x1a, 0x03, 0x08, 0x96, 0x01];
+//! #     assert_eq!(read_a_from_c(&mut &INPUT[..]), Ok(Some(150)))
+//! # }
 //! ```
 //!
 //! The basic concept is the same, but instead of using the `Save` scanner for field `c`,
@@ -148,18 +147,44 @@
 //!     })
 //! }
 //!
-//! fn main() {
-//!     // Construct a sample input.
-//!     let input = {
-//!         let message = SampleMessage {
-//!             test_oneof: Some(sample_message::TestOneof::Name("Marco".to_owned())),
-//!         };
-//!         prost::Message::encode_to_vec(&message)
-//!     };
-//!
-//!     assert_eq!(read_name(&mut input.as_slice()), Ok(Some("Marco")))
-//! }
+//! # fn main() {
+//! #     // Construct a sample input.
+//! #     let input = {
+//! #         let message = SampleMessage {
+//! #             test_oneof: Some(sample_message::TestOneof::Name("Marco".to_owned())),
+//! #         };
+//! #         prost::Message::encode_to_vec(&message)
+//! #     };
+//! #     assert_eq!(read_name(&mut input.as_slice()), Ok(Some("Marco")))
+//! # }
 //! ```
+//! 
+//! # Maps
+//! 
+//! Like other field types, protobuf maps can be read by supplying a scanner for the field:
+//! ```
+//! // message WithMap {
+//! //     map<i32, int32> i32_to_i32 = 1;
+//! // }
+//! # #[derive(Clone, PartialEq, ::prost::Message, ::proto_scan::ScanMessage)]
+//! # pub struct WithMap {
+//! #     #[prost(map = "int32, int32", tag = "1")]
+//! #     pub i32_to_i32: ::std::collections::HashMap<i32, i32>,
+//! # }
+//! use std::collections::HashMap;
+//! # use proto_scan::*;
+//! use scan::{ScanMessage, ScannerBuilder};
+//! 
+//! fn read_map<R: read::Read>(r: R) -> Result<HashMap<i32, i32>, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
+//!   let scanner = WithMap::scanner().i32_to_i32(scan::SaveMap::with_value(scan::field::Save));
+//!   let ScanWithMapOutput { i32_to_i32 } = scanner.scan(r).read_all()?;
+//!   Ok(i32_to_i32.into_iter().map(|(k, v)| (k, v.unwrap_or_default())).collect())
+//! }
+//! ``` 
+//! 
+//! Library support for scanners of maps is limited, but reading code can always
+//! supply its own implementations of [`IntoScanner`] and
+//! [`field::OnScanField`].
 use crate::read::{ReadError, ReadTypes};
 use crate::wire::{FieldNumber, GroupOp, I32, I64, NumericField, Varint};
 use crate::wire::{LengthDelimited, ParseEvent, ParseEventReader};
