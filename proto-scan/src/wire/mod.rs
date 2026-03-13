@@ -1,51 +1,60 @@
-//! The low-level event interface uses [`ParseEventReader`] to read protobuf
-//! wire format tags from a [`Read`] implementation. Calling code must handle
-//! each [`ParseEvent`] as it is read.
+//! The low-level event interface treats the input stream as a sequence of events
+//! corresponding to individual tags and their contents. The entry point is
+//! the [`parse`] function, which returns a [`ParseEventReader`] implementation.
 //! 
+//! The `ParseEventReader` is a lending iterator. On a call to
+//! [`ParseEventReader::next`], it reads the next protobuf tag from the input stream,
+//! decodes it, and then returns a corresponding [`ParseEvent`] that mutably
+//! borrows the reader. The mutable borrow allows the [`ParseEvent::LengthDelimited`]
+//! variant to hold a [`LengthDelimited`] implementation that can be used to
+//! access (or skip over) the contents of a length-delimited field.
+//! 
+//! To read a message in full, calling code must call `ParseEventReader::next`
+//! until it returns `None`, signaling the end of the input. At any point,
+//! calling code can drop the reader to avoid reading the rest of the input
+//! stream (though, given the merge semantics of protocol buffers, this isn't
+//! frequently useful).
+//! 
+//! As an example, here is a method that scans for a protobuf int64 field and
+//! returns its value, if found.
 //! ```
 //! # use proto_scan::*;
 //! use wire::ParseEventReader;
-//! fn read_a<R: read::Read>(
+//! fn read_int64<R: read::Read>(
+//!     field_number: u32,
 //!     r: R,
 //! ) -> Result<Option<i64>, DecodeError<<R::ReadTypes as read::ReadError>::Error>> {
-//!     // From the protobuf documentation encoding guide.
-//!     // message Test1 {
-//!     //   int64 a = 1;
-//!     // }
 //!     let mut reader = wire::parse(r);
-//!     let mut found_a = None;
-//!     while let Some((field_number, event)) = reader.next().transpose()? {
+//!     let mut found = None;
+//!     while let Some((number, event)) = reader.next().transpose()? {
 //!         match event {
-//!             wire::ParseEvent::Numeric(s) if field_number == 1 => match s {
+//!             wire::ParseEvent::Numeric(s) if number == field_number => match s {
 //!                 wire::NumericField::Varint(v) => {
-//!                     found_a = Some(
+//!                     found = Some(
 //!                         // cast bits according to protobuf encoding format
 //!                         v as i64,
 //!                     )
 //!                 }
-//!                 wire::NumericField::I64(_) | wire::NumericField::I32(_) => found_a = None,
+//!                 wire::NumericField::I64(_) | wire::NumericField::I32(_) => found = None,
 //!             },
 //!             wire::ParseEvent::Numeric(_)
 //!             | wire::ParseEvent::Group(_)
 //!             | wire::ParseEvent::LengthDelimited(_) => {}
 //!         }
 //!     }
-//!     Ok(found_a)
+//!     Ok(found)
 //! }
-//!
-//! fn main() {
-//!     // From the protobuf documentation encoding guide, this is a Test message
-//!     // with a = 150.
-//!     const INPUT: &[u8] = &[0x08, 0x96, 0x01];
-//!
-//!     assert_eq!(read_a(&mut &INPUT[..]), Ok(Some(150)))
-//! }
+//! # // Make sure the example actually works.
+//! # fn main() {
+//! #     // From the protobuf documentation encoding guide.
+//! #     // message Test1 {
+//! #     //   int64 a = 1;
+//! #     // }
+//! #     // This is a Test message with a = 150.
+//! #     const INPUT: &[u8] = &[0x08, 0x96, 0x01];
+//! #     assert_eq!(read_int64(1, &mut &INPUT[..]), Ok(Some(150)))
+//! # }
 //! ```
-//!
-//! In this example, the `read_a` method scans the provided input for a tag with
-//! a varint wire type and field number 1. The last one found, if any, is
-//! returned. Any other tag types or fields are ignored. The input is a `&mut &[u8]`
-//! which has an implementation of [`Read`].
 use core::ops::{BitAnd, BitOrAssign, Shl, Shr, ShrAssign};
 
 use crate::DecodeError;
