@@ -158,9 +158,9 @@
 //! #     assert_eq!(read_name(&mut input.as_slice()), Ok(Some("Marco")))
 //! # }
 //! ```
-//! 
+//!
 //! # Maps
-//! 
+//!
 //! Like other field types, protobuf maps can be read by supplying a scanner for the field:
 //! ```
 //! // message WithMap {
@@ -174,14 +174,16 @@
 //! use std::collections::HashMap;
 //! # use proto_scan::*;
 //! use scan::{ScanMessage, ScannerBuilder};
-//! 
-//! fn read_map<R: read::Read>(r: R) -> Result<HashMap<i32, i32>, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
-//!   let scanner = WithMap::scanner().i32_to_i32(scan::SaveMap::with_value(scan::field::Save));
-//!   let ScanWithMapOutput { i32_to_i32 } = scanner.scan(r).read_all()?;
-//!   Ok(i32_to_i32)
+//!
+//! fn read_map<R: read::Read>(
+//!     r: R,
+//! ) -> Result<HashMap<i32, i32>, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
+//!     let scanner = WithMap::scanner().i32_to_i32(scan::field::Save);
+//!     let ScanWithMapOutput { i32_to_i32 } = scanner.scan(r).read_all()?;
+//!     Ok(i32_to_i32)
 //! }
-//! ``` 
-//! 
+//! ```
+//!
 //! Library support for scanners of maps is limited, but reading code can always
 //! supply its own implementations of [`IntoScanner`] and
 //! [`field::OnScanField`].
@@ -195,14 +197,8 @@ pub mod encoding;
 pub mod error;
 pub use error::ScanError;
 pub mod field;
-mod map;
-pub use map::{Map, SaveMap};
 mod resettable;
 pub use resettable::{IntoResettable, Resettable};
-mod repeated;
-pub use repeated::{
-    Fold, RepeatStrategy, RepeatStrategyScanner, Repeated, SaveCloned, ScanRepeated, WriteCloned,
-};
 mod save_from;
 pub use save_from::SaveFrom;
 

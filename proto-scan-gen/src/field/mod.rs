@@ -161,11 +161,11 @@ impl MessageFieldType {
             MessageFieldType::Repeated(repeated_field) => match &repeated_field.ty {
                 RepeatedFieldType::Single(single) => {
                     let inner = single.encoding_type();
-                    parse_quote!(::proto_scan::scan::Repeated<#inner>)
+                    parse_quote!(::proto_scan::scan::field::Repeated<#inner>)
                 }
                 RepeatedFieldType::Message { type_path } => {
                     let m = type_path;
-                    parse_quote!(::proto_scan::scan::Repeated<#m>)
+                    parse_quote!(::proto_scan::scan::field::Repeated<#m>)
                 }
             },
             MessageFieldType::Bytes(bytes_field) => bytes_field.as_into_scanner_type(),
@@ -184,7 +184,7 @@ impl MessageFieldType {
             }) => {
                 let key_type = key.encoding_type();
                 let value_type = value.encoding_type();
-                parse_quote!(::proto_scan::scan::Map<#key_type, #value_type>)
+                parse_quote!(::proto_scan::scan::field::Map<#key_type, #value_type>)
             }
             MessageFieldType::Unsupported => quote! { () },
         }

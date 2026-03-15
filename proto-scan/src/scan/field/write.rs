@@ -4,10 +4,10 @@ use core::ops::DerefMut;
 
 use crate::read::{BoundsOnlyReadTypes, ReadTypes};
 use crate::scan::encoding::{Encoding, Fixed, Varint, ZigZag};
-use crate::scan::field::OnScanField;
 use crate::scan::field::save::DecodeFromBytes;
+use crate::scan::field::{OnScanField, Repeated};
 use crate::scan::save_from::SaveFrom;
-use crate::scan::{GroupOp, IntoScanOutput, IntoScanner, NumericField, Repeated, ScanError};
+use crate::scan::{GroupOp, IntoScanOutput, IntoScanner, NumericField, ScanError};
 use crate::scan::{IntoResettable, Resettable};
 use crate::wire::{LengthDelimited, NumericWireType, WrongWireType};
 

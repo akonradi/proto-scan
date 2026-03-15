@@ -4,14 +4,20 @@ use crate::scan::{IntoScanOutput, ScanError};
 use crate::wire::FieldNumber;
 use crate::wire::{GroupOp, LengthDelimited, NumericField};
 
+mod map;
 mod message;
 mod no_op;
+mod repeated;
 mod save;
 mod write;
 
+pub use map::{Map, MapKey};
 pub use message::Message;
 pub use no_op::NoOp;
-pub use save::Save;
+pub use repeated::{
+    Fold, RepeatStrategy, RepeatStrategyScanner, Repeated, ScanRepeated, WriteCloned,
+};
+pub use save::{Save, SaveCloned};
 pub use write::Write;
 
 /// Implemented by a visitor for a fixed [`FieldNumber`].

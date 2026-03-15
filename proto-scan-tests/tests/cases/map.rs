@@ -1,6 +1,6 @@
 use prost::Message as _;
 use proto_scan::scan::field::Save;
-use proto_scan::scan::{SaveMap, ScanMessage as _, ScannerBuilder as _};
+use proto_scan::scan::{ScanMessage as _, ScannerBuilder as _};
 use test_case::test_case;
 
 use super::*;
@@ -13,10 +13,10 @@ fn scan_message(input: InputKind) {
     let bytes = input.encode_to_vec();
 
     let scanner = proto::WithMap::scanner()
-        .fixed64_to_i32(SaveMap::with_value(Save))
-        .fixed64_to_message(SaveMap::with_value(proto::MapValue::scanner().id(Save)))
-        .string_to_i32(SaveMap::with_value(Save))
-        .string_to_message(SaveMap::with_value(proto::MapValue::scanner().id(Save)));
+        .fixed64_to_i32(Save)
+        .fixed64_to_message(Save::with_value(proto::MapValue::scanner().id(Save)))
+        .string_to_i32(Save)
+        .string_to_message(Save::with_value(proto::MapValue::scanner().id(Save)));
 
     let output = scanner.scan(&mut bytes.as_slice()).read_all().unwrap();
 

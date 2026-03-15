@@ -9,9 +9,6 @@ use crate::wire::{GroupOp, LengthDelimited, NumericField, WrongWireType};
 /// Marker type for protobuf `repeated`.
 pub struct Repeated<T>(pub T);
 
-/// [`RepeatStrategy`] that clones a message scanner and saves its output in a [`Vec`].
-pub struct SaveCloned;
-
 /// [`RepeatStrategy`] that folds message scanner outputs together.
 pub struct Fold<F>(F);
 
@@ -102,45 +99,6 @@ impl<R: ReadTypes, S: ScanCallbacks<R>, F: RepeatStrategyScanner<R, S>> OnScanFi
         delimited: impl LengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
         self.1.on_message(&self.0, delimited).map(|()| None)
-    }
-}
-
-/// Implementation of [`RepeatStrategyScanner`] for [`SaveCloned`].
-///
-/// On encountering a new embedded message, this clones the scanner provided to
-/// [`RepeatStrategyScanner::on_message`], uses it to scan the message input,
-/// then saves the output into a [`Vec`]. The saved contents are produced as
-/// this type's [`IntoScanOutput::ScanOutput`].
-#[cfg(feature = "std")]
-pub struct RepeatedSave<S: IntoScanOutput>(Vec<S::ScanOutput>);
-
-#[cfg(feature = "std")]
-impl<M: MessageScanner + IntoScanner<M::Message>> RepeatStrategy<M> for SaveCloned {
-    type Impl<R: ReadTypes> = RepeatedSave<M::Scanner<R>>;
-    fn into_impl<R: ReadTypes>(self) -> Self::Impl<R> {
-        RepeatedSave(Vec::new())
-    }
-}
-
-#[cfg(feature = "std")]
-impl<R: ReadTypes, S: ScanCallbacks<R> + Clone> RepeatStrategyScanner<R, S> for RepeatedSave<S> {
-    fn on_message(
-        &mut self,
-        scanner: &S,
-        input: impl LengthDelimited<ReadTypes = R>,
-    ) -> Result<(), ScanError<R::Error>> {
-        let mut scanner = Message::new(scanner.clone());
-        let _event = scanner.on_length_delimited(input)?;
-        self.0.push(scanner.into_scan_output());
-        Ok(())
-    }
-}
-
-#[cfg(feature = "std")]
-impl<S: IntoScanOutput> IntoScanOutput for RepeatedSave<S> {
-    type ScanOutput = Vec<S::ScanOutput>;
-    fn into_scan_output(self) -> Self::ScanOutput {
-        self.0
     }
 }
 

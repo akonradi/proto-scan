@@ -1,20 +1,20 @@
-use core::convert::Infallible;
-use core::hash::Hash;
-use core::marker::PhantomData;
+#![doc(hidden)]
+
 #[cfg(any(feature = "std", doc))]
 use std::collections::HashMap;
+#[cfg(feature = "std")]
+use {core::convert::Infallible, core::hash::Hash, core::marker::PhantomData};
 
 use either::Either;
 
 use crate::read::ReadTypes;
+#[cfg(feature = "std")]
 use crate::scan::IntoScanner;
-use crate::scan::encoding::{Encoding, Fixed, Varint, ZigZag};
-use crate::scan::field::{OnScanField, Save};
+use crate::scan::field::OnScanField;
+#[cfg(feature = "std")]
+use crate::scan::field::{Map, MapKey, Save};
 use crate::scan::{IntoScanOutput, ScanCallbacks, ScanError};
 use crate::wire::{GroupOp, LengthDelimited, NumericField};
-
-/// Marker type for protobuf map field
-pub struct Map<K: ?Sized, V: ?Sized>(PhantomData<K>, PhantomData<V>, Infallible);
 
 /// Saves map keys and the output of a provided value scanner.
 ///
@@ -28,47 +28,11 @@ impl<V> SaveMap<V> {
     }
 }
 
-/// Valid key type for a map.
-///
-/// Per the protobuf documentation this can be any integral or string type. This
-/// is implemented on the type representing the protobuf wire format, like
-/// [`Varint`] or [`str`].
-pub trait MapKey {
-    /// Scanner for the map key.
-    // This should just be from a IntoScanner supertrait but there's no way to
-    // specify a "forall" bound on the Scanner generic associated type.
-    type Scanner<R: ReadTypes>: OnScanField<R> + IntoScanOutput<ScanOutput: Eq + Hash> + Default;
-}
-
-macro_rules! impl_map_key_for {
-    ($p:ty) => {
-        impl MapKey for $p
-        where
-            <Self as Encoding>::Repr: Default + Hash + Eq,
-        {
-            type Scanner<R: ReadTypes> = <Save as IntoScanner<$p>>::Scanner<R>;
-        }
-    };
-}
-
-impl_map_key_for!(Varint<bool>);
-impl_map_key_for!(Varint<i32>);
-impl_map_key_for!(Varint<i64>);
-impl_map_key_for!(Varint<u32>);
-impl_map_key_for!(Varint<u64>);
-impl_map_key_for!(Varint<ZigZag<i32>>);
-impl_map_key_for!(Varint<ZigZag<i64>>);
-impl_map_key_for!(Fixed<u64>);
-impl_map_key_for!(Fixed<u32>);
-impl_map_key_for!(Fixed<i64>);
-impl_map_key_for!(Fixed<i32>);
-
-impl MapKey for str {
-    type Scanner<R: ReadTypes> = <Save as IntoScanner<str>>::Scanner<R>;
-}
-
 #[cfg(feature = "std")]
-impl<K: MapKey + ?Sized, V: ?Sized, SV: IntoScanner<V>> IntoScanner<Map<K, V>> for SaveMap<SV> {
+impl<K: MapKey + ?Sized, V: ?Sized, SV: IntoScanner<V>> IntoScanner<Map<K, V>> for SaveMap<SV>
+where
+    Save: IntoScanner<K>,
+{
     type Scanner<R: ReadTypes> = SaveMapScanner<K, SV::Scanner<R>, R>;
 
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
@@ -78,16 +42,23 @@ impl<K: MapKey + ?Sized, V: ?Sized, SV: IntoScanner<V>> IntoScanner<Map<K, V>> f
 
 #[cfg(feature = "std")]
 pub struct SaveMapScanner<K: MapKey + ?Sized, SV: IntoScanOutput, R: ReadTypes>(
-    HashMap<<K::Scanner<R> as IntoScanOutput>::ScanOutput, SV::ScanOutput>,
+    HashMap<<<Save as IntoScanner<K>>::Scanner<R> as IntoScanOutput>::ScanOutput, SV::ScanOutput>,
     SV,
     PhantomData<R>,
-);
+)
+where
+    Save: IntoScanner<K>;
 
 #[cfg(feature = "std")]
 impl<K: MapKey + ?Sized, SV: IntoScanOutput, R: ReadTypes> IntoScanOutput
     for SaveMapScanner<K, SV, R>
+where
+    Save: IntoScanner<K>,
 {
-    type ScanOutput = HashMap<<K::Scanner<R> as IntoScanOutput>::ScanOutput, SV::ScanOutput>;
+    type ScanOutput = HashMap<
+        <<Save as IntoScanner<K>>::Scanner<R> as IntoScanOutput>::ScanOutput,
+        SV::ScanOutput,
+    >;
 
     fn into_scan_output(self) -> Self::ScanOutput {
         self.0
@@ -97,6 +68,8 @@ impl<K: MapKey + ?Sized, SV: IntoScanOutput, R: ReadTypes> IntoScanOutput
 #[cfg(feature = "std")]
 impl<K: MapKey + ?Sized, SV: OnScanField<R> + Clone, R: ReadTypes> OnScanField<R>
     for SaveMapScanner<K, SV, R>
+where
+    Save: IntoScanner<K, Scanner<R>: OnScanField<R> + IntoScanOutput<ScanOutput: Hash + Eq>>,
 {
     type ScanEvent = Infallible;
 
@@ -116,7 +89,7 @@ impl<K: MapKey + ?Sized, SV: OnScanField<R> + Clone, R: ReadTypes> OnScanField<R
         delimited: impl LengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
         let Self(map, value_scanner, PhantomData) = self;
-        let scanner = MapEntry(K::Scanner::default(), value_scanner.clone());
+        let scanner = MapEntry(IntoScanner::<K>::into_scanner(Save), value_scanner.clone());
         let scan = crate::scan::Scan::new(delimited.into_events(), scanner);
         let (key, value) = scan.read_all()?;
         map.insert(key, value);

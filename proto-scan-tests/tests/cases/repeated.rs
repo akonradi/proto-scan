@@ -1,8 +1,8 @@
 use prost::Message;
+use proto_scan::scan::field::{Fold, SaveCloned};
 use proto_scan::scan::field::{Save, Write};
-use proto_scan::scan::{
-    Fold, SaveCloned, ScanMessage as _, ScanRepeated as _, ScannerBuilder as _, WriteCloned,
-};
+use proto_scan::scan::field::{ScanRepeated as _, WriteCloned};
+use proto_scan::scan::{ScanMessage as _, ScannerBuilder as _};
 use test_case::test_case;
 
 use super::*;
