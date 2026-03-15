@@ -157,7 +157,7 @@ mod test {
         let scan = Scan::new(crate::wire::parse(&mut input), scanner);
         let result = scan.read_all();
 
-        assert_matches!(result, Ok(ScanOutput(ScanOutput(Some(150)))))
+        assert_matches!(result, Ok(ScanOutput(ScanOutput(150))))
     }
 
     #[test]

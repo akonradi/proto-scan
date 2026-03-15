@@ -63,7 +63,7 @@
 //!
 //! fn read_zip<R: read::Read>(
 //!     reader: R,
-//! ) -> Result<Option<i32>, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
+//! ) -> Result<i32, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
 //!    let scanner = proto::Contact::scanner().address(proto::Address::scanner().zip_code(Save));
 //!    let proto::ScanContactOutput {
 //!        address: proto::ScanAddressOutput { zip_code, .. },

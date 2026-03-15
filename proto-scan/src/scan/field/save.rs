@@ -19,7 +19,7 @@ macro_rules! impl_into_scanner {
             type Scanner<R: ReadTypes> = SaveNumeric<$p>;
 
             fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-                SaveNumeric(None)
+                SaveNumeric(Default::default())
             }
         }
         #[cfg(feature = "std")]
@@ -50,18 +50,83 @@ impl_into_scanner!(Fixed<f32>);
 impl IntoScanner<str> for Save {
     type Scanner<R: ReadTypes> = SaveBytesScanner<str, R>;
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-        SaveBytesScanner(None)
+        SaveBytesScanner(Default::default())
     }
 }
 
 impl IntoScanner<[u8]> for Save {
     type Scanner<R: ReadTypes> = SaveBytesScanner<[u8], R>;
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-        SaveBytesScanner(None)
+        SaveBytesScanner(Default::default())
     }
 }
 
-pub struct SaveNumeric<E: Encoding>(Option<E::Repr>);
+#[derive(Clone, Default)]
+pub struct SaveOptional<S> {
+    inner: S,
+    present: bool,
+}
+
+impl<S> SaveOptional<S> {
+    pub fn new(inner: S) -> Self {
+        Self {
+            inner,
+            present: false,
+        }
+    }
+}
+
+impl<S: IntoScanOutput> IntoScanOutput for SaveOptional<S> {
+    type ScanOutput = Option<S::ScanOutput>;
+    fn into_scan_output(self) -> Self::ScanOutput {
+        let Self { inner, present } = self;
+        present.then(|| inner.into_scan_output())
+    }
+}
+
+impl<N> IntoScanner<Option<N>> for Save
+where
+    Save: IntoScanner<N>,
+{
+    type Scanner<R: ReadTypes> = SaveOptional<<Save as IntoScanner<N>>::Scanner<R>>;
+
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+        SaveOptional {
+            inner: Save.into_scanner(),
+            present: false,
+        }
+    }
+}
+
+impl<S: OnScanField<R>, R: ReadTypes> OnScanField<R> for SaveOptional<S> {
+    type ScanEvent = S::ScanEvent;
+
+    fn on_numeric(
+        &mut self,
+        value: NumericField,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        let event = self.inner.on_numeric(value)?;
+        self.present = true;
+        Ok(event)
+    }
+
+    fn on_group(&mut self, op: GroupOp) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        let event = self.inner.on_group(op)?;
+        self.present = true;
+        Ok(event)
+    }
+
+    fn on_length_delimited(
+        &mut self,
+        delimited: impl LengthDelimited<ReadTypes = R>,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        let event = self.inner.on_length_delimited(delimited)?;
+        self.present = true;
+        Ok(event)
+    }
+}
+
+pub struct SaveNumeric<E: Encoding>(E::Repr);
 
 impl<E: Encoding> Clone for SaveNumeric<E> {
     fn clone(&self) -> Self {
@@ -71,7 +136,7 @@ impl<E: Encoding> Clone for SaveNumeric<E> {
 
 impl<E: Encoding> Default for SaveNumeric<E> {
     fn default() -> Self {
-        Self(None)
+        Self(Default::default())
     }
 }
 
@@ -84,7 +149,7 @@ impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveNumeric<E> {
     ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
         let value = <E::Wire as NumericWireType>::from_value(value)?;
         let value = E::decode(value).map_err(Into::into)?;
-        self.0 = Some(value);
+        self.0 = value;
         Ok(Some(value))
     }
 
@@ -102,7 +167,7 @@ impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveNumeric<E> {
 
 impl<E: Encoding> Resettable for SaveNumeric<E> {
     fn reset(&mut self) {
-        self.0 = None;
+        self.0 = Default::default();
     }
 }
 
@@ -114,7 +179,7 @@ impl<E: Encoding> IntoResettable for SaveNumeric<E> {
 }
 
 impl<E: Encoding> IntoScanOutput for SaveNumeric<E> {
-    type ScanOutput = Option<E::Repr>;
+    type ScanOutput = E::Repr;
     fn into_scan_output(self) -> Self::ScanOutput {
         self.0
     }
@@ -191,7 +256,7 @@ impl<E: Encoding> Resettable for SaveRepeated<E> {
 }
 
 /// [`OnScanField`] impl that produces the read value as the event output.
-pub struct SaveBytesScanner<E: DecodeFromBytes + ?Sized, R: ReadTypes>(Option<E::Decoded<R>>);
+pub struct SaveBytesScanner<E: DecodeFromBytes + ?Sized, R: ReadTypes>(E::Decoded<R>);
 
 impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> Clone for SaveBytesScanner<E, R>
 where
@@ -204,13 +269,13 @@ where
 
 impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> Default for SaveBytesScanner<E, R> {
     fn default() -> Self {
-        Self(None)
+        Self(Default::default())
     }
 }
 
 pub trait DecodeFromBytes {
     type Error;
-    type Decoded<R: ReadTypes>;
+    type Decoded<R: ReadTypes>: Default;
     fn decode<R: ReadTypes>(bytes: R::Buffer) -> Result<Self::Decoded<R>, Self::Error>;
 }
 
@@ -249,14 +314,13 @@ impl<T: DecodeFromBytes + ?Sized, R: ReadTypes> OnScanField<R> for SaveBytesScan
         delimited: impl LengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
         let bytes = delimited.into_bytes()?;
-        let decoded = T::decode(bytes).map_err(|_| ScanError::Utf8)?;
-        self.0 = Some(decoded);
+        self.0 = T::decode(bytes).map_err(|_| ScanError::Utf8)?;
         Ok(None)
     }
 }
 
 impl<T: DecodeFromBytes + ?Sized, R: ReadTypes> IntoScanOutput for SaveBytesScanner<T, R> {
-    type ScanOutput = Option<T::Decoded<R>>;
+    type ScanOutput = T::Decoded<R>;
     fn into_scan_output(self) -> Self::ScanOutput {
         self.0
     }
@@ -264,6 +328,6 @@ impl<T: DecodeFromBytes + ?Sized, R: ReadTypes> IntoScanOutput for SaveBytesScan
 
 impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> Resettable for SaveBytesScanner<E, R> {
     fn reset(&mut self) {
-        self.0 = None;
+        self.0 = Default::default();
     }
 }

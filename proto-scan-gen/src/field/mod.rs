@@ -65,6 +65,7 @@ impl<'a> FieldGeneric<'a, MessageFieldType> {
 pub struct SingleField {
     pub ty: SingleFieldType,
     pub number: u32,
+    pub optional: bool,
 }
 
 #[derive(Debug)]
@@ -150,7 +151,12 @@ impl MessageFieldType {
     pub fn as_into_scanner_type(&self) -> TokenStream {
         match self {
             MessageFieldType::Single(single_field) => {
-                single_field.ty.encoding_type().to_token_stream()
+                let single = single_field.ty.encoding_type();
+                if single_field.optional {
+                    quote!(::core::option::Option<#single>)
+                } else {
+                    single.to_token_stream()
+                }
             }
             MessageFieldType::Repeated(repeated_field) => match &repeated_field.ty {
                 RepeatedFieldType::Single(single) => {

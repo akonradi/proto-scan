@@ -155,7 +155,7 @@ impl<'m> MessageScanner<'m> {
                               variant_name,
                           }| {
                         match field_type {
-                            MessageFieldType::Single(SingleField { ty: _, number })
+                            MessageFieldType::Single(SingleField { ty: _, number, optional: _ })
                             | MessageFieldType::Repeated(RepeatedField {ty: _, number})
                             | MessageFieldType::Message(MessageField {
                                 number,

@@ -195,9 +195,14 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
             Multiple(Vec<u32>),
         }
 
+        enum Presence {
+            Repeated,
+            Optional,
+        }
+
         let mut field_type = None;
         let mut field_number = None;
-        let mut repeated = false;
+        let mut presence = None;
 
         let field_type_names = [
             ("bool", VarintFieldType::Bool.into()),
@@ -261,7 +266,11 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
             }
             if attr.path().is_ident("repeated") {
                 let _ = attr.require_path_only();
-                repeated = true;
+                presence = Some(Presence::Repeated);
+            }
+            if attr.path().is_ident("optional") {
+                let _ = attr.require_path_only()?;
+                presence = Some(Presence::Optional);
             }
             if attr.path().is_ident("tag") {
                 let value = &attr.require_name_value()?.value;
@@ -313,31 +322,49 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
             }
         }
 
-        let field_type = match (field_type, field_number, repeated) {
-            (Some(ParsedFieldType::Single(ty)), Some(FieldNumber::Single(number)), true) => {
-                MessageFieldType::Repeated(RepeatedField {
-                    number,
-                    ty: ty.into(),
-                })
-            }
-            (Some(ParsedFieldType::Single(ty)), Some(FieldNumber::Single(number)), false) => {
-                MessageFieldType::Single(SingleField { ty, number })
-            }
-            (Some(ParsedFieldType::Message), Some(FieldNumber::Single(number)), false) => {
+        let field_type = match (field_type, field_number, presence) {
+            (
+                Some(ParsedFieldType::Single(ty)),
+                Some(FieldNumber::Single(number)),
+                Some(Presence::Repeated),
+            ) => MessageFieldType::Repeated(RepeatedField {
+                number,
+                ty: ty.into(),
+            }),
+            (
+                Some(ParsedFieldType::Single(ty)),
+                Some(FieldNumber::Single(number)),
+                presence @ (Some(Presence::Optional) | None),
+            ) => MessageFieldType::Single(SingleField {
+                ty,
+                number,
+                optional: presence.is_some(),
+            }),
+            (
+                Some(ParsedFieldType::Message),
+                Some(FieldNumber::Single(number)),
+                None | Some(Presence::Optional),
+            ) => {
                 let type_path = strip_outer_path(&rust_field_type)?;
                 MessageFieldType::Message(MessageField { number, type_path })
             }
-            (Some(ParsedFieldType::Message), Some(FieldNumber::Single(number)), true) => {
+            (
+                Some(ParsedFieldType::Message),
+                Some(FieldNumber::Single(number)),
+                Some(Presence::Repeated),
+            ) => {
                 let type_path = strip_outer_path(&rust_field_type)?;
                 MessageFieldType::Repeated(RepeatedField {
                     number,
                     ty: RepeatedFieldType::Message { type_path },
                 })
             }
-            (Some(ParsedFieldType::Bytes { utf8 }), Some(FieldNumber::Single(number)), false) => {
-                MessageFieldType::Bytes(BytesField { utf8, number })
-            }
-            (Some(ParsedFieldType::Map(map)), Some(FieldNumber::Single(number)), false) => {
+            (
+                Some(ParsedFieldType::Bytes { utf8 }),
+                Some(FieldNumber::Single(number)),
+                None | Some(Presence::Optional),
+            ) => MessageFieldType::Bytes(BytesField { utf8, number }),
+            (Some(ParsedFieldType::Map(map)), Some(FieldNumber::Single(number)), None) => {
                 let MapFieldType { key, value } = map;
                 let value = match value {
                     MapValueType::Single(single_field_type) => {
@@ -366,28 +393,33 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                     "only oneofs support multiple tags",
                 ));
             }
-            (Some(ParsedFieldType::OneOf { ty }), Some(FieldNumber::Multiple(numbers)), false) => {
-                MessageFieldType::OneOf {
-                    type_name: ty,
-                    numbers,
-                }
-            }
+            (
+                Some(ParsedFieldType::OneOf { ty }),
+                Some(FieldNumber::Multiple(numbers)),
+                None | Some(Presence::Optional),
+            ) => MessageFieldType::OneOf {
+                type_name: ty,
+                numbers,
+            },
             (Some(ParsedFieldType::OneOf { .. }), Some(FieldNumber::Single(_)), _) => {
                 return Err(syn::Error::new(
                     Span::call_site(),
                     "oneofs require multiple tags",
                 ));
             }
-            (Some(ParsedFieldType::OneOf { .. }), _, true) => {
+            (Some(ParsedFieldType::OneOf { .. }), _, Some(Presence::Repeated)) => {
                 return Err(syn::Error::new(
                     Span::call_site(),
                     "oneofs can't be repeated",
                 ));
             }
-            (Some(ParsedFieldType::Map(_)), _, true) => {
-                return Err(syn::Error::new(Span::call_site(), "maps can't be repeated"));
+            (Some(ParsedFieldType::Map(_)), _, Some(Presence::Repeated | Presence::Optional)) => {
+                return Err(syn::Error::new(
+                    Span::call_site(),
+                    "maps can't be repeated or optional",
+                ));
             }
-            (Some(ParsedFieldType::Bytes { utf8: _ }), Some(_number), true) => {
+            (Some(ParsedFieldType::Bytes { utf8: _ }), Some(_number), Some(Presence::Repeated)) => {
                 MessageFieldType::Unsupported
             }
             (None, _, _) => MessageFieldType::Unsupported,

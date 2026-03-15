@@ -45,6 +45,5 @@ fn main() {
         ..
     } = output;
 
-    let zip_code = Option::unwrap_or_default(zip_code);
     println!("zip code: {zip_code}");
 }

@@ -9,7 +9,7 @@ use either::Either;
 use crate::read::{ReadBuffer, ReadTypes};
 use crate::scan::IntoScanner;
 use crate::scan::encoding::{Encoding, Fixed, Varint, ZigZag};
-use crate::scan::field::{OnScanField, SaveBytesScanner};
+use crate::scan::field::{OnScanField, SaveBytesScanner, SaveOptional};
 use crate::scan::{IntoScanOutput, ScanCallbacks, ScanError};
 use crate::wire::{GroupOp, LengthDelimited, NumericField};
 
@@ -17,7 +17,7 @@ use crate::wire::{GroupOp, LengthDelimited, NumericField};
 pub struct Map<K: ?Sized, V: ?Sized>(PhantomData<K>, PhantomData<V>, Infallible);
 
 /// Saves map keys and the output of a provided value scanner.
-/// 
+///
 /// Implements [`IntoScanner`]; the provided scanner produces as output a
 /// [`HashMap`] of keys from the map to the values.
 pub struct SaveMap<V>(V);
@@ -29,7 +29,7 @@ impl<V> SaveMap<V> {
 }
 
 /// Valid key type for a map.
-/// 
+///
 /// Per the protobuf documentation this can be any integral or string type. This
 /// is implemented on the type representing the protobuf wire format, like
 /// [`Varint`] or [`str`].
@@ -45,7 +45,7 @@ pub trait MapKey {
         + Default;
 
     /// Output type of the map key scanner.
-    /// 
+    ///
     /// Ideally this would be an `impl Into<Self::Output<R>>` in place of its
     /// usage in the [`Self::Scanner`] bound above but the language doesn't
     /// allow that.
@@ -59,7 +59,7 @@ macro_rules! impl_map_key_for {
             <Self as Encoding>::Repr: Default + Hash + Eq,
         {
             type Repr<R: ReadTypes> = <Self as Encoding>::Repr;
-            type Scanner<R: ReadTypes> = super::field::SaveNumeric<Self>;
+            type Scanner<R: ReadTypes> = SaveOptional<super::field::SaveNumeric<Self>>;
             type ScannerOutput<R: ReadTypes> = Self::Repr<R>;
         }
     };
@@ -81,7 +81,7 @@ impl MapKey for str {
     type Repr<R: ReadTypes> = <R::Buffer as ReadBuffer>::String;
 
     type ScannerOutput<R: ReadTypes> = <R::Buffer as ReadBuffer>::String;
-    type Scanner<R: ReadTypes> = SaveBytesScanner<str, R>;
+    type Scanner<R: ReadTypes> = SaveOptional<SaveBytesScanner<str, R>>;
 }
 
 #[cfg(feature = "std")]

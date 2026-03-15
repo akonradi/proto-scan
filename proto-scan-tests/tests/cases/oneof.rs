@@ -37,13 +37,13 @@ fn save_field(input: InputKind) {
         oneof_group,
         input.oneof_group.map(|g| match g {
             crate::prost_proto::scan_example::OneofGroup::OneofBool(b) =>
-                proto::scan_example::ScanOneofGroupOutput::OneofBool(b.then_some(true)),
+                proto::scan_example::ScanOneofGroupOutput::OneofBool(b),
             crate::prost_proto::scan_example::OneofGroup::OneofFixed32(f) =>
-                proto::scan_example::ScanOneofGroupOutput::OneofFixed32(Some(f)),
+                proto::scan_example::ScanOneofGroupOutput::OneofFixed32(f),
             crate::prost_proto::scan_example::OneofGroup::OneofMessage(_) =>
                 proto::scan_example::ScanOneofGroupOutput::OneofMessage(
                     proto::ScanMultiFieldMessageOutput {
-                        id: None,
+                        id: 0,
                         ..Default::default()
                     }
                 ),
@@ -70,9 +70,9 @@ fn save_oneof_message_field() {
     let scan = scanner.scan(bytes.as_slice());
 
     let oneof_group = scan.read_all().unwrap().oneof_group;
-    let found = oneof_group.and_then(|g| match g {
+    let found = oneof_group.map(|g| match g {
         proto::scan_example::ScanOneofGroupOutput::OneofMessage(m) => m.name,
-        _ => None,
+        _ => "",
     });
     assert_eq!(found, Some("abc123"));
 }

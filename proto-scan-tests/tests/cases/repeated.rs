@@ -44,7 +44,7 @@ fn save_cloned_repeated_message() {
     let expected = input
         .repeated_msg
         .iter()
-        .map(|m| Some(m.name.as_str()))
+        .map(|m| m.name.as_str())
         .collect::<Vec<_>>();
 
     let input = input.encode_to_vec();
@@ -78,9 +78,7 @@ fn fold_repeated_message() {
         proto::MultiFieldMessage::scanner()
             .id(Save)
             .repeat_by(Fold::new(
-                |prev, input: proto::ScanMultiFieldMessageOutput<_, Option<i32>, _>| {
-                    *prev.id.get_or_insert_default() += input.id.unwrap_or_default()
-                },
+                |prev, input: proto::ScanMultiFieldMessageOutput<_, i32, _>| prev.id += input.id,
             )),
     );
 
@@ -96,7 +94,7 @@ fn fold_repeated_message() {
         oneof_group: (),
     } = scanner.scan(input.as_slice()).read_all().unwrap();
 
-    assert_eq!(repeated_msg.unwrap().id.unwrap(), expected);
+    assert_eq!(repeated_msg.unwrap().id, expected);
 }
 
 #[test]
@@ -114,8 +112,8 @@ fn write_repeated_message() {
         .repeated_msg
         .iter()
         .map(|m| proto::ScanMultiFieldMessageOutput {
-            id: Some(m.id),
-            name: Some(m.name.as_str()),
+            id: m.id,
+            name: m.name.as_str(),
             flag: (),
         })
         .collect::<Vec<_>>();

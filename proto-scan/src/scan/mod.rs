@@ -22,7 +22,7 @@
 //!
 //! fn read_a<R: read::Read>(
 //!     r: R,
-//! ) -> Result<Option<i64>, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
+//! ) -> Result<i64, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
 //!     let scanner = Test1::scanner().a(scan::field::Save);
 //!     let ScanTest1Output { a } = scanner.scan(r).read_all()?;
 //!     Ok(a)
@@ -33,7 +33,7 @@
 //!     // with a = 150.
 //!     const INPUT: &[u8] = &[0x08, 0x96, 0x01];
 //!
-//!     assert_eq!(read_a(&mut &INPUT[..]), Ok(Some(150)))
+//!     assert_eq!(read_a(&mut &INPUT[..]), Ok(150))
 //! }
 //! ```
 //!
@@ -75,7 +75,7 @@
 //!
 //! fn read_a_from_c<R: read::Read>(
 //!     r: R,
-//! ) -> Result<Option<i64>, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
+//! ) -> Result<i64, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
 //!     let scanner = Test3::scanner().c(Test1::scanner().a(scan::field::Save));
 //!     let ScanTest3Output {
 //!         c: ScanTest1Output { a },
@@ -87,7 +87,7 @@
 //! #     // From the protobuf documentation encoding guide, this is a Test3 message
 //! #     // with c's a set to 150.
 //! #     const INPUT: &[u8] = &[0x1a, 0x03, 0x08, 0x96, 0x01];
-//! #     assert_eq!(read_a_from_c(&mut &INPUT[..]), Ok(Some(150)))
+//! #     assert_eq!(read_a_from_c(&mut &INPUT[..]), Ok(150))
 //! # }
 //! ```
 //!
@@ -142,7 +142,7 @@
 //!
 //!     Ok(match test_oneof {
 //!         None => None,
-//!         Some(sample_message::ScanTestOneofOutput::Name(name)) => name,
+//!         Some(sample_message::ScanTestOneofOutput::Name(name)) => Some(name),
 //!         Some(sample_message::ScanTestOneofOutput::SubMessage(())) => None,
 //!     })
 //! }
@@ -178,7 +178,7 @@
 //! fn read_map<R: read::Read>(r: R) -> Result<HashMap<i32, i32>, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
 //!   let scanner = WithMap::scanner().i32_to_i32(scan::SaveMap::with_value(scan::field::Save));
 //!   let ScanWithMapOutput { i32_to_i32 } = scanner.scan(r).read_all()?;
-//!   Ok(i32_to_i32.into_iter().map(|(k, v)| (k, v.unwrap_or_default())).collect())
+//!   Ok(i32_to_i32)
 //! }
 //! ``` 
 //! 

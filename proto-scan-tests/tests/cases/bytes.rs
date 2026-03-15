@@ -50,17 +50,10 @@ fn save_bytes(input: InputKind) {
     let output = { scanner.scan(bytes.as_slice()).read_all().unwrap() };
 
     let expected = proto::ScanBytesFieldTypesOutput {
-        bytes_field: none_if_empty(input.bytes_field.as_slice()),
-        string_field: none_if_empty(input.string_field.as_ref()),
+        bytes_field: input.bytes_field.as_slice(),
+        string_field: input.string_field.as_ref(),
         repeated_bytes_field: (),
         repeated_string_field: (),
     };
     assert_eq!(output, expected);
-}
-
-fn none_if_empty<T: ?Sized>(t: &T) -> Option<&T>
-where
-    T: AsRef<[u8]>,
-{
-    (!t.as_ref().is_empty()).then_some(t)
 }

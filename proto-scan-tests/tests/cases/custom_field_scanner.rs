@@ -41,7 +41,7 @@ impl<R: ReadTypes> OnScanField<R> for CustomScanner<'_> {
     }
 }
 
-impl IntoScanner<Varint<bool>> for CustomScanner<'_> {
+impl IntoScanner<Option<Varint<bool>>> for CustomScanner<'_> {
     type Scanner<R: ReadTypes> = Self;
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         self

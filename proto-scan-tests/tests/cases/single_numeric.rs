@@ -95,20 +95,20 @@ fn save_field(input: InputKind) {
     };
 
     let expected = proto::ScanSingleFieldTypesOutput {
-        int32_field: none_if_default(input.int32_field),
-        int64_field: none_if_default(input.int64_field),
-        uint32_field: none_if_default(input.uint32_field),
-        uint64_field: none_if_default(input.uint64_field),
-        sint32_field: none_if_default(input.sint32_field),
-        sint64_field: none_if_default(input.sint64_field),
-        bool_field: none_if_default(input.bool_field),
+        int32_field: input.int32_field,
+        int64_field: input.int64_field,
+        uint32_field: input.uint32_field,
+        uint64_field: input.uint64_field,
+        sint32_field: input.sint32_field,
+        sint64_field: input.sint64_field,
+        bool_field: input.bool_field,
         enum_field: (),
-        fixed64_field: none_if_default(input.fixed64_field),
-        sfixed64_field: none_if_default(input.sfixed64_field),
-        double_field: none_if_default(input.double_field),
-        fixed32_field: none_if_default(input.fixed32_field),
-        sfixed32_field: none_if_default(input.sfixed32_field),
-        float_field: none_if_default(input.float_field),
+        fixed64_field: input.fixed64_field,
+        sfixed64_field: input.sfixed64_field,
+        double_field: input.double_field,
+        fixed32_field: input.fixed32_field,
+        sfixed32_field: input.sfixed32_field,
+        float_field: input.float_field,
     };
     assert_eq!(output, expected);
 }

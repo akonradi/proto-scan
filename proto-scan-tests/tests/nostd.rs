@@ -29,20 +29,20 @@ mod cases {
         };
 
         let expected = proto::ScanSingleFieldTypesOutput {
-            int32_field: None,
-            int64_field: None,
-            uint32_field: None,
-            uint64_field: None,
-            sint32_field: None,
-            sint64_field: None,
-            bool_field: None,
+            int32_field: 0,
+            int64_field: 0,
+            uint32_field: 0,
+            uint64_field: 0,
+            sint32_field: 0,
+            sint64_field: 0,
+            bool_field: false,
             enum_field: (),
-            fixed64_field: None,
-            sfixed64_field: None,
-            double_field: None,
-            fixed32_field: None,
-            sfixed32_field: None,
-            float_field: None,
+            fixed64_field: 0,
+            sfixed64_field: 0,
+            double_field: 0.0,
+            fixed32_field: 0,
+            sfixed32_field: 0,
+            float_field: 0.0,
         };
         assert_eq!(output, expected);
     }

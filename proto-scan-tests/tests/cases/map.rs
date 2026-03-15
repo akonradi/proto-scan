@@ -21,39 +21,21 @@ fn scan_message(input: InputKind) {
     let output = scanner.scan(&mut bytes.as_slice()).read_all().unwrap();
 
     let expected = proto::ScanWithMapOutput::<_, _, _, _> {
-        fixed64_to_i32: input
-            .fixed64_to_i32
-            .into_iter()
-            .map(|(k, v)| (k, (v != 0).then_some(v)))
-            .collect(),
+        fixed64_to_i32: input.fixed64_to_i32,
         fixed64_to_message: input
             .fixed64_to_message
             .into_iter()
-            .map(|(k, v)| {
-                (
-                    k,
-                    proto::ScanMapValueOutput {
-                        id: (v.id != 0).then_some(v.id),
-                    },
-                )
-            })
+            .map(|(k, v)| (k, proto::ScanMapValueOutput { id: v.id }))
             .collect(),
         string_to_i32: input
             .string_to_i32
             .iter()
-            .map(|(k, v)| (k.as_str(), (*v != 0).then_some(*v)))
+            .map(|(k, v)| (k.as_str(), *v))
             .collect(),
         string_to_message: input
             .string_to_message
             .iter()
-            .map(|(k, v)| {
-                (
-                    k.as_str(),
-                    proto::ScanMapValueOutput {
-                        id: (v.id != 0).then_some(v.id),
-                    },
-                )
-            })
+            .map(|(k, v)| (k.as_str(), proto::ScanMapValueOutput { id: v.id }))
             .collect(),
     };
     assert_eq!(output, expected)

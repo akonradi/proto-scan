@@ -36,7 +36,7 @@ fn scan_message(input: InputKind) {
         proto::ScanMultiFieldMessageOutput {
             name: (),
             id: (),
-            flag: input.single_msg.unwrap_or_default().flag.then_some(true)
+            flag: input.single_msg.unwrap_or_default().flag
         }
     );
 }

@@ -10,7 +10,7 @@ pub struct ZigZag<T>(PhantomData<T>);
 
 pub trait Encoding {
     type Wire: NumericWireType;
-    type Repr: Copy;
+    type Repr: Copy + Default;
     type Error: Into<VarintOutOfBounds>;
 
     fn decode(wire: <Self::Wire as NumericWireType>::Repr) -> Result<Self::Repr, Self::Error>;
