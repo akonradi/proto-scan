@@ -3,7 +3,7 @@
 use crate::read::ReadTypes;
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
-use crate::scan::{IntoResettable, IntoScanOutput, Resettable, ScanError};
+use crate::scan::{IntoResettableScanner, IntoScanOutput, ResettableScanner, ScanError};
 use crate::wire::{GroupOp, LengthDelimited, NumericField, NumericWireType, WrongWireType};
 
 pub struct SaveNumeric<E: Encoding>(E::Repr);
@@ -51,13 +51,13 @@ impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveNumeric<E> {
     }
 }
 
-impl<E: Encoding> Resettable for SaveNumeric<E> {
+impl<E: Encoding> ResettableScanner for SaveNumeric<E> {
     fn reset(&mut self) {
         self.0 = Default::default();
     }
 }
 
-impl<E: Encoding> IntoResettable for SaveNumeric<E> {
+impl<E: Encoding> IntoResettableScanner for SaveNumeric<E> {
     type Resettable = Self;
     fn into_resettable(self) -> Self::Resettable {
         self

@@ -1,4 +1,5 @@
 use core::convert::Infallible;
+use core::marker::PhantomData;
 use core::ops::DerefMut;
 
 use crate::read::ReadTypes;
@@ -7,7 +8,7 @@ use crate::scan::{IntoScanOutput, IntoScanner, MessageScanner, ScanCallbacks, Sc
 use crate::wire::{GroupOp, LengthDelimited, NumericField, WrongWireType};
 
 /// Marker type for protobuf `repeated`.
-pub struct Repeated<T>(pub T);
+pub struct Repeated<T: ?Sized>(PhantomData<T>);
 
 /// [`RepeatStrategy`] that folds message scanner outputs together.
 pub struct Fold<F>(F);

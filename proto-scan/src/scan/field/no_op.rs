@@ -3,7 +3,7 @@ use core::convert::Infallible;
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
 use crate::scan::{
-    GroupOp, IntoResettable, IntoScanOutput, IntoScanner, NumericField, Resettable, ScanCallbacks,
+    GroupOp, IntoResettableScanner, IntoScanOutput, IntoScanner, NumericField, ResettableScanner, ScanCallbacks,
     ScanError,
 };
 use crate::wire::LengthDelimited;
@@ -62,11 +62,11 @@ impl<R: ReadTypes, F> ScanCallbacks<R, F> for NoOp {
     }
 }
 
-impl Resettable for NoOp {
+impl ResettableScanner for NoOp {
     fn reset(&mut self) {}
 }
 
-impl IntoResettable for NoOp {
+impl IntoResettableScanner for NoOp {
     type Resettable = Self;
     fn into_resettable(self) -> Self::Resettable {
         self

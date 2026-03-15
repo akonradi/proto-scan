@@ -30,6 +30,7 @@ arrayvec = { workspace = true, default-features = false }
 hex-literal = { workspace = true }
 # For documentation
 prost = { workspace = true }
+static_assertions = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true

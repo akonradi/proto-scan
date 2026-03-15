@@ -3,7 +3,7 @@ use core::convert::Infallible;
 
 use crate::read::{ReadBuffer, ReadTypes};
 use crate::scan::field::OnScanField;
-use crate::scan::{IntoScanOutput, Resettable, ScanError};
+use crate::scan::{IntoResettableScanner, IntoScanOutput, ResettableScanner, ScanError};
 use crate::wire::{GroupOp, LengthDelimited, NumericField, WrongWireType};
 
 /// [`OnScanField`] impl that produces the read value as the event output.
@@ -76,6 +76,13 @@ impl<T: DecodeFromBytes + ?Sized, R: ReadTypes> OnScanField<R> for SaveBytesScan
     }
 }
 
+impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> IntoResettableScanner for SaveBytesScanner<E, R> {
+    type Resettable = Self;
+    fn into_resettable(self) -> Self::Resettable {
+        self
+    }
+}
+
 impl<T: DecodeFromBytes + ?Sized, R: ReadTypes> IntoScanOutput for SaveBytesScanner<T, R> {
     type ScanOutput = T::Decoded<R>;
     fn into_scan_output(self) -> Self::ScanOutput {
@@ -83,7 +90,7 @@ impl<T: DecodeFromBytes + ?Sized, R: ReadTypes> IntoScanOutput for SaveBytesScan
     }
 }
 
-impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> Resettable for SaveBytesScanner<E, R> {
+impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> ResettableScanner for SaveBytesScanner<E, R> {
     fn reset(&mut self) {
         self.0 = Default::default();
     }

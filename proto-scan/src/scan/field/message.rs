@@ -3,7 +3,8 @@ use core::convert::Infallible;
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
 use crate::scan::{
-    IntoScanOutput, IntoScanner, MessageScanner, Resettable, ScanCallbacks, ScanError, next_event,
+    IntoScanOutput, IntoScanner, MessageScanner, ResettableScanner, ScanCallbacks, ScanError,
+    next_event,
 };
 use crate::wire::{LengthDelimited, WrongWireType};
 
@@ -62,7 +63,7 @@ impl<F: IntoScanOutput> IntoScanOutput for Message<F> {
     }
 }
 
-impl<F: Resettable> Resettable for Message<F> {
+impl<F: ResettableScanner> ResettableScanner for Message<F> {
     fn reset(&mut self) {
         self.0.reset()
     }

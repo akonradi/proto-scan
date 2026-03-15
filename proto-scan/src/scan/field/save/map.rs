@@ -8,11 +8,11 @@ use {core::convert::Infallible, core::hash::Hash, core::marker::PhantomData};
 use either::Either;
 
 use crate::read::ReadTypes;
-#[cfg(feature = "std")]
-use crate::scan::IntoScanner;
 use crate::scan::field::OnScanField;
 #[cfg(feature = "std")]
 use crate::scan::field::{Map, MapKey, Save};
+#[cfg(feature = "std")]
+use crate::scan::{IntoResettableScanner, IntoScanner, ResettableScanner};
 use crate::scan::{IntoScanOutput, ScanCallbacks, ScanError};
 use crate::wire::{GroupOp, LengthDelimited, NumericField};
 
@@ -94,6 +94,33 @@ where
         let (key, value) = scan.read_all()?;
         map.insert(key, value);
         Ok(None)
+    }
+}
+
+#[cfg(feature = "std")]
+impl<
+    K: MapKey + ?Sized,
+    SV: OnScanField<R> + IntoResettableScanner<Resettable: IntoScanOutput>,
+    R: ReadTypes,
+> IntoResettableScanner for SaveMapScanner<K, SV, R>
+where
+    Save: IntoScanner<K, Scanner<R>: OnScanField<R> + IntoScanOutput<ScanOutput: Hash + Eq>>,
+{
+    type Resettable = SaveMapScanner<K, SV::Resettable, R>;
+    fn into_resettable(self) -> Self::Resettable {
+        let Self(_map, sv, PhantomData) = self;
+        SaveMapScanner(HashMap::new(), sv.into_resettable(), PhantomData)
+    }
+}
+
+#[cfg(feature = "std")]
+impl<K: MapKey + ?Sized, SV: IntoScanOutput, R: ReadTypes> ResettableScanner
+    for SaveMapScanner<K, SV, R>
+where
+    Save: IntoScanner<K>,
+{
+    fn reset(&mut self) {
+        self.0.clear();
     }
 }
 

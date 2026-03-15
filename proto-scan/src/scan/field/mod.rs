@@ -39,3 +39,26 @@ pub trait OnScanField<R: ReadTypes>: IntoScanOutput {
         delimited: impl LengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>>;
 }
+
+#[cfg(test)]
+mod test {
+    macro_rules! assert_impl_into_scanner {
+        ($t:ty: IntoScanner<$p:ty>) => {
+            static_assertions::assert_impl_all! ($t: $crate::scan::IntoScanner<$p>);
+            static_assertions::assert_impl_all! (
+                <$t as $crate::scan::IntoScanner<$p>>::Scanner<$crate::read::BoundsOnlyReadTypes>:
+                    $crate::scan::field::OnScanField<$crate::read::BoundsOnlyReadTypes>,
+                    $crate::scan::IntoScanOutput,
+            );
+        };
+        ($t:ty: IntoScanner<$p:ty>; resettable) => {
+            assert_impl_into_scanner!($t: IntoScanner<$p>);
+            static_assertions::assert_impl_all! (
+                <$t as $crate::scan::IntoScanner<$p>>::Scanner<$crate::read::BoundsOnlyReadTypes>:
+                    $crate::scan::IntoResettableScanner
+            );
+        };
+    }
+
+    pub(crate) use assert_impl_into_scanner;
+}

@@ -1,12 +1,17 @@
 #![doc(hidden)]
 
 #[cfg(feature = "std")]
+use crate::scan::field::save::DecodeFromBytes;
+#[cfg(feature = "std")]
+use crate::scan::field::save::bytes::SaveBytesScanner;
+
+#[cfg(feature = "std")]
 use {
     crate::read::ReadTypes,
     crate::scan::encoding::Encoding,
     crate::scan::field::OnScanField,
     crate::scan::field::{Message, RepeatStrategy, RepeatStrategyScanner},
-    crate::scan::{IntoResettable, IntoScanOutput, Resettable, ScanError},
+    crate::scan::{IntoResettableScanner, IntoScanOutput, ResettableScanner, ScanError},
     crate::scan::{IntoScanner, MessageScanner, ScanCallbacks},
     crate::wire::{GroupOp, LengthDelimited, NumericField, NumericWireType, WrongWireType},
     core::convert::Infallible,
@@ -75,7 +80,7 @@ impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveRepeated<E> {
 }
 
 #[cfg(feature = "std")]
-impl<E: Encoding> IntoResettable for SaveRepeated<E> {
+impl<E: Encoding> IntoResettableScanner for SaveRepeated<E> {
     type Resettable = Self;
     fn into_resettable(self) -> Self::Resettable {
         self
@@ -83,7 +88,7 @@ impl<E: Encoding> IntoResettable for SaveRepeated<E> {
 }
 
 #[cfg(feature = "std")]
-impl<E: Encoding> Resettable for SaveRepeated<E> {
+impl<E: Encoding> ResettableScanner for SaveRepeated<E> {
     fn reset(&mut self) {
         self.0.clear()
     }
@@ -128,5 +133,69 @@ impl<S: IntoScanOutput> IntoScanOutput for RepeatedSave<S> {
     type ScanOutput = Vec<S::ScanOutput>;
     fn into_scan_output(self) -> Self::ScanOutput {
         self.0
+    }
+}
+
+/// [`OnScanField`] implementation that produces the read values as the scan output.
+///
+/// Deserializes according to the [`Encoding`] type parameter.
+#[cfg(feature = "std")]
+pub struct SaveRepeatedBytes<E: DecodeFromBytes + ?Sized, R: ReadTypes>(Vec<E::Decoded<R>>);
+
+#[cfg(feature = "std")]
+impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> SaveRepeatedBytes<E, R> {
+    pub(super) fn new() -> Self {
+        Self(Vec::new())
+    }
+}
+
+#[cfg(feature = "std")]
+impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> IntoScanOutput for SaveRepeatedBytes<E, R> {
+    type ScanOutput = Vec<E::Decoded<R>>;
+
+    fn into_scan_output(self) -> Self::ScanOutput {
+        self.0
+    }
+}
+
+#[cfg(feature = "std")]
+impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> OnScanField<R> for SaveRepeatedBytes<E, R> {
+    type ScanEvent = Infallible;
+
+    fn on_numeric(
+        &mut self,
+        _value: NumericField,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        Err(ScanError::WrongWireType)
+    }
+
+    fn on_length_delimited(
+        &mut self,
+        delimited: impl LengthDelimited<ReadTypes = R>,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        let mut scanner = SaveBytesScanner::<E, R>::new();
+        let _event = scanner.on_length_delimited(delimited)?;
+        let value = scanner.into_scan_output();
+        self.0.push(value);
+        Ok(None)
+    }
+
+    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        Err(WrongWireType.into())
+    }
+}
+
+#[cfg(feature = "std")]
+impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> IntoResettableScanner for SaveRepeatedBytes<E, R> {
+    type Resettable = Self;
+    fn into_resettable(self) -> Self::Resettable {
+        self
+    }
+}
+
+#[cfg(feature = "std")]
+impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> ResettableScanner for SaveRepeatedBytes<E, R> {
+    fn reset(&mut self) {
+        self.0.clear()
     }
 }

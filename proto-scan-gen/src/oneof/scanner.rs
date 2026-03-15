@@ -193,7 +193,7 @@ impl<'a> OneofScanner<'a> {
                 inner
              }| {
                 let generic = &inner.field.generic;
-                quote! { #generic: ::proto_scan::scan::field::OnScanField<R> + ::proto_scan::scan::Resettable }
+                quote! { #generic: ::proto_scan::scan::field::OnScanField<R> + ::proto_scan::scan::ResettableScanner }
             },
         );
         let field_number_type = self.field_number_type_name();
@@ -250,7 +250,7 @@ impl<'a> OneofScanner<'a> {
                     value: ::proto_scan::wire::NumericField,
                 ) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
                     if self.proto_scan_last_set.is_some_and(|e| e != field) {
-                        ::proto_scan::scan::Resettable::reset(self);
+                        ::proto_scan::scan::ResettableScanner::reset(self);
                     }
                     Ok(match field {
                         #(#on_numeric_arms)*
@@ -259,7 +259,7 @@ impl<'a> OneofScanner<'a> {
 
                 fn on_group(&mut self, field: #field_number_type, value: ::proto_scan::wire::GroupOp) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
                     if self.proto_scan_last_set.is_some_and(|e| e != field) {
-                        ::proto_scan::scan::Resettable::reset(self);
+                        ::proto_scan::scan::ResettableScanner::reset(self);
                     }
                     Ok(match field {
                         #(#on_group_arms)*
@@ -272,7 +272,7 @@ impl<'a> OneofScanner<'a> {
                     value: impl ::proto_scan::wire::LengthDelimited<ReadTypes=R>,
                 ) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
                     if self.proto_scan_last_set.is_some_and(|e| e != field) {
-                        ::proto_scan::scan::Resettable::reset(self);
+                        ::proto_scan::scan::ResettableScanner::reset(self);
                     }
                     Ok(match field {
                         #(#on_length_delimited_arms)*
@@ -293,8 +293,8 @@ impl<'a> OneofScanner<'a> {
             }
 
             impl<
-                #(#generics: ::proto_scan::scan::Resettable),*
-            > ::proto_scan::scan::Resettable for #type_name< #(#generics),* > {
+                #(#generics: ::proto_scan::scan::ResettableScanner),*
+            > ::proto_scan::scan::ResettableScanner for #type_name< #(#generics),* > {
                 fn reset(&mut self) {
                     let Self { #(#field_names, )* proto_scan_last_set } = self;
                     let ::core::option::Option::Some(proto_scan_last_set) = proto_scan_last_set else {

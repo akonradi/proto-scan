@@ -9,7 +9,9 @@ use crate::scan::encoding::{Fixed, Varint, ZigZag};
 #[cfg(feature = "std")]
 use crate::scan::field::save::map::SaveMapScanner;
 #[cfg(feature = "std")]
-use crate::scan::field::{Map, MapKey};
+use crate::scan::field::save::repeated::SaveRepeatedBytes;
+#[cfg(feature = "std")]
+use crate::scan::field::{Map, MapKey, Repeated};
 
 mod bytes;
 pub(crate) use bytes::DecodeFromBytes;
@@ -106,6 +108,22 @@ where
 }
 
 #[cfg(feature = "std")]
+impl IntoScanner<Repeated<str>> for Save {
+    type Scanner<R: ReadTypes> = SaveRepeatedBytes<str, R>;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+        SaveRepeatedBytes::new()
+    }
+}
+
+#[cfg(feature = "std")]
+impl IntoScanner<Repeated<[u8]>> for Save {
+    type Scanner<R: ReadTypes> = SaveRepeatedBytes<[u8], R>;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+        SaveRepeatedBytes::new()
+    }
+}
+
+#[cfg(feature = "std")]
 impl<K: MapKey + ?Sized, V: ?Sized> IntoScanner<Map<K, V>> for Save
 where
     Save: IntoScanner<K>,
@@ -116,4 +134,40 @@ where
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         IntoScanner::<Map<K, V>>::into_scanner(Save::with_value(Save))
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::scan::field::test::assert_impl_into_scanner;
+
+    macro_rules! assert_impl_into_resettable_scanner {
+        ($t:ty: IntoScanner<$p:ty>) => {
+            assert_impl_into_scanner!($t: IntoScanner<$p>; resettable);
+            assert_impl_into_scanner!($t: IntoScanner<$crate::scan::field::Repeated<$p>>; resettable);
+        };
+        ($t:ty: IntoScanner<$p:ty>; non-repeatable) => {
+            assert_impl_into_scanner!($t: IntoScanner<$p>);
+        };
+    }
+
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<Varint<bool>>);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<Varint<i32>>);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<Varint<i64>>);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<Varint<u32>>);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<Varint<u64>>);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<Varint<ZigZag<i32>>>);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<Varint<ZigZag<i64>>>);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<Fixed<u64>>);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<Fixed<u32>>);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<Fixed<i64>>);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<Fixed<i32>>);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<Fixed<f64>>);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<Fixed<f32>>);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<str>);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<[u8]>);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<Map<str, str>>; non-repeatable);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<Map<str, Fixed<f64>>>; non-repeatable);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<Map<Varint<i64>, str>>; non-repeatable);
+    assert_impl_into_resettable_scanner!(Save: IntoScanner<Map<Varint<i64>, Fixed<f64>>>; non-repeatable);
 }

@@ -8,7 +8,7 @@ use crate::scan::field::save::DecodeFromBytes;
 use crate::scan::field::{OnScanField, Repeated};
 use crate::scan::save_from::SaveFrom;
 use crate::scan::{GroupOp, IntoScanOutput, IntoScanner, NumericField, ScanError};
-use crate::scan::{IntoResettable, Resettable};
+use crate::scan::{IntoResettableScanner, ResettableScanner};
 use crate::wire::{LengthDelimited, NumericWireType, WrongWireType};
 
 pub struct Write<T>(pub T);
@@ -101,7 +101,7 @@ impl<E: Encoding, D> IntoScanOutput for WriteNumeric<E, D> {
 /// Implements [`SaveFrom`] and [`Resettable`] to save and restore a previous value.
 pub struct RestoreOnReset<'t, D>(&'t mut D, Option<D>);
 
-impl<'t, D> Resettable for RestoreOnReset<'t, D> {
+impl<'t, D> ResettableScanner for RestoreOnReset<'t, D> {
     fn reset(&mut self) {
         if let Some(prev) = self.1.take() {
             *self.0 = prev;
@@ -115,7 +115,7 @@ impl<'t, T: Into<D>, D> SaveFrom<T> for RestoreOnReset<'t, D> {
     }
 }
 
-impl<'t, E, D> IntoResettable for WriteNumeric<E, &'t mut D> {
+impl<'t, E, D> IntoResettableScanner for WriteNumeric<E, &'t mut D> {
     type Resettable = WriteNumeric<E, RestoreOnReset<'t, D>>;
 
     fn into_resettable(self) -> Self::Resettable {
@@ -123,7 +123,7 @@ impl<'t, E, D> IntoResettable for WriteNumeric<E, &'t mut D> {
     }
 }
 
-impl<'t, E, D> Resettable for WriteNumeric<E, RestoreOnReset<'t, D>> {
+impl<'t, E, D> ResettableScanner for WriteNumeric<E, RestoreOnReset<'t, D>> {
     fn reset(&mut self) {
         self.0.reset();
     }
@@ -180,7 +180,7 @@ impl<E: Encoding, D> IntoScanOutput for WriteRepeated<E, D> {
 }
 
 #[cfg(feature = "std")]
-impl<'t, E, D> IntoResettable for WriteRepeated<E, &'t mut Vec<D>> {
+impl<'t, E, D> IntoResettableScanner for WriteRepeated<E, &'t mut Vec<D>> {
     type Resettable = WriteRepeated<E, RestoreLenOnReset<'t, Vec<D>>>;
     fn into_resettable(self) -> Self::Resettable {
         WriteRepeated(RestoreLenOnReset::new(self.0), PhantomData)
@@ -199,7 +199,7 @@ impl<'t, T> RestoreLenOnReset<'t, Vec<T>> {
 }
 
 #[cfg(feature = "std")]
-impl<'t, T> Resettable for RestoreLenOnReset<'t, Vec<T>> {
+impl<'t, T> ResettableScanner for RestoreLenOnReset<'t, Vec<T>> {
     fn reset(&mut self) {
         self.0.truncate(self.1);
     }
@@ -220,7 +220,7 @@ impl<'t, T> DerefMut for RestoreLenOnReset<'t, T> {
     }
 }
 
-impl<D: Resettable, E> Resettable for WriteRepeated<E, D> {
+impl<D: ResettableScanner, E> ResettableScanner for WriteRepeated<E, D> {
     fn reset(&mut self) {
         self.0.reset();
     }
@@ -267,13 +267,13 @@ impl<S: ?Sized, D> IntoScanOutput for WriteBytes<S, D> {
     fn into_scan_output(self) -> Self::ScanOutput {}
 }
 
-impl<D: Resettable, E: ?Sized> Resettable for WriteBytes<E, D> {
+impl<D: ResettableScanner, E: ?Sized> ResettableScanner for WriteBytes<E, D> {
     fn reset(&mut self) {
         self.0.reset();
     }
 }
 
-impl<'t, E: ?Sized, D> IntoResettable for WriteBytes<E, &'t mut D> {
+impl<'t, E: ?Sized, D> IntoResettableScanner for WriteBytes<E, &'t mut D> {
     type Resettable = WriteBytes<E, RestoreOnReset<'t, D>>;
 
     fn into_resettable(self) -> Self::Resettable {

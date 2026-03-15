@@ -198,7 +198,7 @@ pub mod error;
 pub use error::ScanError;
 pub mod field;
 mod resettable;
-pub use resettable::{IntoResettable, Resettable};
+pub use resettable::{IntoResettableScanner, ResettableScanner};
 mod save_from;
 pub use save_from::SaveFrom;
 

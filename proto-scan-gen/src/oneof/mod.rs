@@ -76,7 +76,7 @@ impl OneofScannerField<'_> {
             ],
             generics: &[
                 quote!('t),
-                quote!(S: ::proto_scan::scan::IntoScanner<#into_scanner_type, Scanner<::proto_scan::read::BoundsOnlyReadTypes>: ::proto_scan::scan::Resettable> + 't),
+                quote!(S: ::proto_scan::scan::IntoScanner<#into_scanner_type, Scanner<::proto_scan::read::BoundsOnlyReadTypes>: ::proto_scan::scan::ResettableScanner> + 't),
             ],
             args: &[quote!(scanner: S)],
             output_type: quote!(S),
