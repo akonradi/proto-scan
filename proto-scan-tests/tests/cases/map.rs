@@ -41,14 +41,14 @@ fn scan_message(input: InputKind) {
         string_to_i32: input
             .string_to_i32
             .iter()
-            .map(|(k, v)| (k.as_str().into(), (*v != 0).then_some(*v)))
+            .map(|(k, v)| (k.as_str(), (*v != 0).then_some(*v)))
             .collect(),
         string_to_message: input
             .string_to_message
             .iter()
             .map(|(k, v)| {
                 (
-                    k.as_str().into(),
+                    k.as_str(),
                     proto::ScanMapValueOutput {
                         id: (v.id != 0).then_some(v.id),
                     },

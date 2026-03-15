@@ -1,7 +1,6 @@
 use core::convert::Infallible;
 use core::hash::Hash;
 use core::marker::PhantomData;
-use core::ops::Deref;
 #[cfg(any(feature = "std", doc))]
 use std::collections::HashMap;
 
@@ -79,28 +78,10 @@ impl_map_key_for!(Fixed<i64>);
 impl_map_key_for!(Fixed<i32>);
 
 impl MapKey for str {
-    type Repr<R: ReadTypes> = StrKey<<R::Buffer as ReadBuffer>::String>;
+    type Repr<R: ReadTypes> = <R::Buffer as ReadBuffer>::String;
 
     type ScannerOutput<R: ReadTypes> = <R::Buffer as ReadBuffer>::String;
     type Scanner<R: ReadTypes> = SaveBytesScanner<str, R>;
-}
-
-/// Wrapper type to implement Hash + Eq for a [`ReadBuffer::String`].
-#[derive(Copy, Clone, Debug, Default, derive_more::From)]
-pub struct StrKey<B>(B);
-
-impl<B: Deref<Target = str>> PartialEq for StrKey<B> {
-    fn eq(&self, other: &Self) -> bool {
-        *self.0 == *other.0
-    }
-}
-
-impl<B: Deref<Target = str>> Eq for StrKey<B> {}
-
-impl<B: Deref<Target = str>> Hash for StrKey<B> {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        (*self.0).hash(state)
-    }
 }
 
 #[cfg(feature = "std")]
