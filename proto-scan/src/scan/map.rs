@@ -6,10 +6,10 @@ use std::collections::HashMap;
 
 use either::Either;
 
-use crate::read::{ReadBuffer, ReadTypes};
+use crate::read::ReadTypes;
 use crate::scan::IntoScanner;
 use crate::scan::encoding::{Encoding, Fixed, Varint, ZigZag};
-use crate::scan::field::{OnScanField, SaveBytesScanner, SaveOptional};
+use crate::scan::field::{OnScanField, Save};
 use crate::scan::{IntoScanOutput, ScanCallbacks, ScanError};
 use crate::wire::{GroupOp, LengthDelimited, NumericField};
 
@@ -34,22 +34,10 @@ impl<V> SaveMap<V> {
 /// is implemented on the type representing the protobuf wire format, like
 /// [`Varint`] or [`str`].
 pub trait MapKey {
-    /// Rust type for the map key.
-    type Repr<R: ReadTypes>: Default + Hash + Eq;
-
     /// Scanner for the map key.
     // This should just be from a IntoScanner supertrait but there's no way to
     // specify a "forall" bound on the Scanner generic associated type.
-    type Scanner<R: ReadTypes>: OnScanField<R>
-        + IntoScanOutput<ScanOutput = Option<Self::ScannerOutput<R>>>
-        + Default;
-
-    /// Output type of the map key scanner.
-    ///
-    /// Ideally this would be an `impl Into<Self::Output<R>>` in place of its
-    /// usage in the [`Self::Scanner`] bound above but the language doesn't
-    /// allow that.
-    type ScannerOutput<R: ReadTypes>: Into<Self::Repr<R>>;
+    type Scanner<R: ReadTypes>: OnScanField<R> + IntoScanOutput<ScanOutput: Eq + Hash> + Default;
 }
 
 macro_rules! impl_map_key_for {
@@ -58,9 +46,7 @@ macro_rules! impl_map_key_for {
         where
             <Self as Encoding>::Repr: Default + Hash + Eq,
         {
-            type Repr<R: ReadTypes> = <Self as Encoding>::Repr;
-            type Scanner<R: ReadTypes> = SaveOptional<super::field::SaveNumeric<Self>>;
-            type ScannerOutput<R: ReadTypes> = Self::Repr<R>;
+            type Scanner<R: ReadTypes> = <Save as IntoScanner<$p>>::Scanner<R>;
         }
     };
 }
@@ -78,10 +64,7 @@ impl_map_key_for!(Fixed<i64>);
 impl_map_key_for!(Fixed<i32>);
 
 impl MapKey for str {
-    type Repr<R: ReadTypes> = <R::Buffer as ReadBuffer>::String;
-
-    type ScannerOutput<R: ReadTypes> = <R::Buffer as ReadBuffer>::String;
-    type Scanner<R: ReadTypes> = SaveOptional<SaveBytesScanner<str, R>>;
+    type Scanner<R: ReadTypes> = <Save as IntoScanner<str>>::Scanner<R>;
 }
 
 #[cfg(feature = "std")]
@@ -95,7 +78,7 @@ impl<K: MapKey + ?Sized, V: ?Sized, SV: IntoScanner<V>> IntoScanner<Map<K, V>> f
 
 #[cfg(feature = "std")]
 pub struct SaveMapScanner<K: MapKey + ?Sized, SV: IntoScanOutput, R: ReadTypes>(
-    HashMap<K::Repr<R>, SV::ScanOutput>,
+    HashMap<<K::Scanner<R> as IntoScanOutput>::ScanOutput, SV::ScanOutput>,
     SV,
     PhantomData<R>,
 );
@@ -104,7 +87,7 @@ pub struct SaveMapScanner<K: MapKey + ?Sized, SV: IntoScanOutput, R: ReadTypes>(
 impl<K: MapKey + ?Sized, SV: IntoScanOutput, R: ReadTypes> IntoScanOutput
     for SaveMapScanner<K, SV, R>
 {
-    type ScanOutput = HashMap<K::Repr<R>, SV::ScanOutput>;
+    type ScanOutput = HashMap<<K::Scanner<R> as IntoScanOutput>::ScanOutput, SV::ScanOutput>;
 
     fn into_scan_output(self) -> Self::ScanOutput {
         self.0
@@ -136,7 +119,6 @@ impl<K: MapKey + ?Sized, SV: OnScanField<R> + Clone, R: ReadTypes> OnScanField<R
         let scanner = MapEntry(K::Scanner::default(), value_scanner.clone());
         let scan = crate::scan::Scan::new(delimited.into_events(), scanner);
         let (key, value) = scan.read_all()?;
-        let key = key.map(Into::into).unwrap_or_default();
         map.insert(key, value);
         Ok(None)
     }
