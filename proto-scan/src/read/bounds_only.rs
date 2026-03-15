@@ -7,30 +7,15 @@ pub struct BoundsOnlyReadTypes(Never);
 impl ReadError for BoundsOnlyReadTypes {
     type Error = Never;
 }
+
 impl ReadTypes for BoundsOnlyReadTypes {
-    type Buffer = NeverBuffer;
+    type Buffer = [u8; 0];
 }
 
-pub struct NeverBuffer(Never);
-
-impl AsRef<[u8]> for NeverBuffer {
-    fn as_ref(&self) -> &[u8] {
-        match self.0 {}
-    }
-}
-
-impl core::ops::Deref for NeverBuffer {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        match self.0 {}
-    }
-}
-
-impl ReadBuffer for NeverBuffer {
+impl ReadBuffer for [u8; 0] {
     type String = &'static str;
 
     fn into_string(self) -> Result<Self::String, core::str::Utf8Error> {
-        match self.0 {}
+        Ok("")
     }
 }

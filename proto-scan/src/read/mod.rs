@@ -1,4 +1,5 @@
 use core::convert::Infallible as Never;
+use core::hash::Hash;
 use core::ops::Deref;
 use core::str::Utf8Error;
 
@@ -16,8 +17,8 @@ pub trait ReadTypes: ReadError {
     type Buffer: ReadBuffer;
 }
 
-pub trait ReadBuffer: AsRef<[u8]> {
-    type String: Deref<Target = str> + Default;
+pub trait ReadBuffer: AsRef<[u8]> + Default + Eq + Hash {
+    type String: Deref<Target = str> + Default + Eq + Hash;
     fn into_string(self) -> Result<Self::String, core::str::Utf8Error>;
 }
 
