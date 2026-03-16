@@ -66,6 +66,19 @@ impl<T> IntoScanner<str> for Write<T> {
     }
 }
 
+impl<T> IntoScanner<Repeated<[u8]>> for Write<T> {
+    type Scanner<R: ReadTypes> = WriteRepeatedBytes<[u8], T>;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+        WriteRepeatedBytes::new(self.0)
+    }
+}
+impl<T> IntoScanner<Repeated<str>> for Write<T> {
+    type Scanner<R: ReadTypes> = WriteRepeatedBytes<str, T>;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+        WriteRepeatedBytes::new(self.0)
+    }
+}
+
 /// [`OnScanField`] that writes the decoded value to the provided location.
 pub struct WriteNumeric<E, D>(D, PhantomData<E>);
 
@@ -279,4 +292,92 @@ impl<'t, E: ?Sized, D> IntoResettableScanner for WriteBytes<E, &'t mut D> {
     fn into_resettable(self) -> Self::Resettable {
         WriteBytes(RestoreOnReset(self.0, None), PhantomData)
     }
+}
+
+/// [`OnScanField`] that writes the decoded values to the provided location.
+pub struct WriteRepeatedBytes<E: ?Sized, D>(D, PhantomData<E>);
+
+impl<E: ?Sized, D> WriteRepeatedBytes<E, D> {
+    pub fn new(to: D) -> Self {
+        Self(to, PhantomData)
+    }
+}
+
+impl<E: ?Sized, D> IntoScanOutput for WriteRepeatedBytes<E, D> {
+    type ScanOutput = ();
+
+    fn into_scan_output(self) -> Self::ScanOutput {}
+}
+
+impl<B: DecodeFromBytes + ?Sized, D: DerefMut<Target: Extend<B::Decoded<R>>>, R: ReadTypes>
+    OnScanField<R> for WriteRepeatedBytes<B, D>
+{
+    type ScanEvent = Infallible;
+
+    fn on_numeric(
+        &mut self,
+        _value: NumericField,
+    ) -> Result<Option<Infallible>, ScanError<R::Error>> {
+        Err(WrongWireType.into())
+    }
+
+    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Infallible>, ScanError<R::Error>> {
+        Err(WrongWireType.into())
+    }
+
+    fn on_length_delimited(
+        &mut self,
+        delimited: impl LengthDelimited<ReadTypes = R>,
+    ) -> Result<Option<Infallible>, ScanError<R::Error>> {
+        let bytes = delimited.into_bytes()?;
+        let decoded = B::decode(bytes).map_err(|_| ScanError::Utf8)?;
+        self.0.extend([decoded]);
+        Ok(None)
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'t, E: ?Sized, D> IntoResettableScanner for WriteRepeatedBytes<E, &'t mut Vec<D>> {
+    type Resettable = WriteRepeatedBytes<E, RestoreLenOnReset<'t, Vec<D>>>;
+    fn into_resettable(self) -> Self::Resettable {
+        WriteRepeatedBytes(RestoreLenOnReset::new(self.0), PhantomData)
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'t, E: ?Sized, D> ResettableScanner for WriteRepeatedBytes<E, RestoreLenOnReset<'t, Vec<D>>> {
+    fn reset(&mut self) {
+        self.0.reset();
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::scan::field::test::assert_impl_into_scanner;
+
+    use super::*;
+
+    macro_rules! assert_impl_into_repeatable_scanner {
+        (Write<&mut $t:ty>: IntoScanner<$p:ty>) => {
+            assert_impl_into_scanner!(Write<&mut $t>: IntoScanner<$p>; resettable);
+            assert_impl_into_scanner!(Write<&mut Vec<$t>>: IntoScanner<Repeated<$p>>; resettable);
+        };
+    }
+
+    assert_impl_into_repeatable_scanner!(Write<&mut i32>: IntoScanner<Varint<i32>>);
+    assert_impl_into_repeatable_scanner!(Write<&mut bool>: IntoScanner<Varint<bool>>);
+    assert_impl_into_repeatable_scanner!(Write<&mut i32>: IntoScanner<Varint<i32>>);
+    assert_impl_into_repeatable_scanner!(Write<&mut i64>: IntoScanner<Varint<i64>>);
+    assert_impl_into_repeatable_scanner!(Write<&mut u32>: IntoScanner<Varint<u32>>);
+    assert_impl_into_repeatable_scanner!(Write<&mut u64>: IntoScanner<Varint<u64>>);
+    assert_impl_into_repeatable_scanner!(Write<&mut i32>: IntoScanner<Varint<ZigZag<i32>>>);
+    assert_impl_into_repeatable_scanner!(Write<&mut i64>: IntoScanner<Varint<ZigZag<i64>>>);
+    assert_impl_into_repeatable_scanner!(Write<&mut u64>: IntoScanner<Fixed<u64>>);
+    assert_impl_into_repeatable_scanner!(Write<&mut u32>: IntoScanner<Fixed<u32>>);
+    assert_impl_into_repeatable_scanner!(Write<&mut i64>: IntoScanner<Fixed<i64>>);
+    assert_impl_into_repeatable_scanner!(Write<&mut i32>: IntoScanner<Fixed<i32>>);
+    assert_impl_into_repeatable_scanner!(Write<&mut f64>: IntoScanner<Fixed<f64>>);
+    assert_impl_into_repeatable_scanner!(Write<&mut f32>: IntoScanner<Fixed<f32>>);
+    assert_impl_into_repeatable_scanner!(Write<&mut &'static str>: IntoScanner<str>);
+    assert_impl_into_repeatable_scanner!(Write<&mut [u8; 0]>: IntoScanner<[u8]>);
 }
