@@ -257,7 +257,7 @@ impl<'a> OneofScanner<'a> {
                     })
                 }
 
-                fn on_group(&mut self, field: #field_number_type, value: ::proto_scan::wire::GroupOp) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
+                fn on_group(&mut self, field: #field_number_type, value: impl ::proto_scan::scan::GroupDelimited<ReadTypes=R>) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
                     if self.proto_scan_last_set.is_some_and(|e| e != field) {
                         ::proto_scan::scan::ResettableScanner::reset(self);
                     }

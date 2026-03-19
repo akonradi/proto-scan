@@ -1,11 +1,11 @@
 #![doc(hidden)]
 
 #[cfg(feature = "std")]
-use crate::scan::ScanLengthDelimited;
-#[cfg(feature = "std")]
 use crate::scan::field::save::DecodeFromBytes;
 #[cfg(feature = "std")]
 use crate::scan::field::save::bytes::SaveBytesScanner;
+#[cfg(feature = "std")]
+use crate::scan::{GroupDelimited, ScanLengthDelimited};
 
 #[cfg(feature = "std")]
 use {
@@ -17,7 +17,7 @@ use {
         IntoResettableScanner, IntoScanOutput, IntoScanner, MessageScanner, ResettableScanner,
         ScanCallbacks, ScanError,
     },
-    crate::wire::{GroupOp, NumericField, NumericWireType, WrongWireType},
+    crate::wire::{NumericField, NumericWireType, WrongWireType},
     core::convert::Infallible,
 };
 
@@ -78,7 +78,10 @@ impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveRepeated<E> {
         result
     }
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+    fn on_group(
+        &mut self,
+        _group: impl GroupDelimited<ReadTypes = R>,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
         Err(WrongWireType.into())
     }
 }
@@ -186,7 +189,10 @@ impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> OnScanField<R> for SaveRepeatedB
         Ok(None)
     }
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+    fn on_group(
+        &mut self,
+        _group: impl GroupDelimited<ReadTypes = R>,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
         Err(WrongWireType.into())
     }
 }

@@ -202,7 +202,7 @@ impl<'m> MessageScanner<'m> {
                     })
                 }
 
-                fn on_group(&mut self, field: ::proto_scan::wire::FieldNumber, value: ::proto_scan::wire::GroupOp) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
+                fn on_group(&mut self, field: ::proto_scan::wire::FieldNumber, value: impl ::proto_scan::scan::GroupDelimited<ReadTypes=R>) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
                     #[allow(clippy::match_single_binding)]
                     Ok(match u32::from(field) {
                         #(#on_group_arms)*

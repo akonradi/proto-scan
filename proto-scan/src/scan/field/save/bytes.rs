@@ -4,9 +4,10 @@ use core::convert::Infallible;
 use crate::read::{ReadBuffer, ReadTypes};
 use crate::scan::field::OnScanField;
 use crate::scan::{
-    IntoResettableScanner, IntoScanOutput, ResettableScanner, ScanError, ScanLengthDelimited,
+    GroupDelimited, IntoResettableScanner, IntoScanOutput, ResettableScanner, ScanError,
+    ScanLengthDelimited,
 };
-use crate::wire::{GroupOp, NumericField, WrongWireType};
+use crate::wire::{NumericField, WrongWireType};
 
 /// [`OnScanField`] impl that produces the read value as the event output.
 pub struct SaveBytesScanner<E: DecodeFromBytes + ?Sized, R: ReadTypes>(E::Decoded<R>);
@@ -64,7 +65,10 @@ impl<T: DecodeFromBytes + ?Sized, R: ReadTypes> OnScanField<R> for SaveBytesScan
         Err(WrongWireType.into())
     }
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+    fn on_group(
+        &mut self,
+        _group: impl GroupDelimited<ReadTypes = R>,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
         Err(WrongWireType.into())
     }
 

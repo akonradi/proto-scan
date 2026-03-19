@@ -199,6 +199,8 @@ pub mod encoding;
 pub mod error;
 pub use error::ScanError;
 pub mod field;
+mod group;
+pub use group::{GroupDelimited, GroupStack};
 mod resettable;
 pub use resettable::{IntoResettableScanner, ResettableScanner};
 mod save_from;
@@ -243,8 +245,12 @@ pub trait ScanCallbacks<R: ReadTypes, F = FieldNumber> {
         value: NumericField,
     ) -> Result<Self::ScanEvent, ScanError<R::Error>>;
 
-    /// Called when a SGROUP or EGROUP tag is read.
-    fn on_group(&mut self, field: F, op: GroupOp) -> Result<Self::ScanEvent, ScanError<R::Error>>;
+    /// Called when a SGROUP tag is read.
+    fn on_group(
+        &mut self,
+        field: F,
+        group: impl GroupDelimited<ReadTypes = R>,
+    ) -> Result<Self::ScanEvent, ScanError<R::Error>>;
 
     /// Called when a length-delimited field tag is encountered.
     fn on_length_delimited(
@@ -268,9 +274,9 @@ impl<R: ReadTypes, F, S: ScanCallbacks<R, F>> ScanCallbacks<R, F> for &mut S {
     fn on_group(
         &mut self,
         field: F,
-        op: GroupOp,
+        group: impl GroupDelimited<ReadTypes = R>,
     ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
-        (*self).on_group(field, op)
+        (*self).on_group(field, group)
     }
 
     fn on_length_delimited(
@@ -291,16 +297,43 @@ pub trait ScannableOneOf {
 }
 
 /// A scan in progress.
-pub struct Scan<P, S> {
+pub struct Scan<P, S, G> {
     parse: P,
     scanner: S,
+    group_stack: G,
 }
 
-impl<P, S> Scan<P, S> {
+impl<P, S> Scan<P, S, ()> {
     fn new(input: P, scanner: S) -> Self {
         Self {
             parse: input,
             scanner,
+            group_stack: (),
+        }
+    }
+
+    /// Provides a [`GroupStack`] impl for keeping track of nested protobuf groups.
+    ///
+    /// Groups are a deprecated proto2 feature but they exist. Their wire representation
+    /// allows arbitrary nesting, which means that matching start & end tags requires
+    /// keeping a stack of open groups. Encountering an SGROUP tag pushes the
+    /// field number on, if there is space, and an EGROUP tag pops and checks
+    /// the top tag.  The default stack type is the empty tuple, and its
+    /// [`GroupStack`] impl always signals "no more space", so a scan that
+    /// encounters a group will result in a [`ScanError::GroupOverflow`].
+    ///
+    /// This method allows providing an alternative. Good options include
+    /// [`Vec<u32>`] or [`arrayvec::ArrayVec`].
+    pub fn with_group_stack<G: GroupStack>(self, group_stack: G) -> Scan<P, S, G> {
+        let Self {
+            parse,
+            scanner,
+            group_stack: (),
+        } = self;
+        Scan {
+            parse,
+            scanner,
+            group_stack,
         }
     }
 }
@@ -310,49 +343,90 @@ impl<P, S> Scan<P, S> {
 /// Implements [`Iterator`] by applying events from a [`ParseEventReader`] to a
 /// [`ScanCallbacks`] and yielding the resulting [`ScanCallbacks::ScanEvent`] or
 /// an error.
-pub struct IntoIter<P, S> {
+pub struct IntoIter<P, S, G> {
     parse: P,
     scanner: S,
+    group_stack: G,
 }
 
 type ParseEventReaderScanError<P> =
     ScanError<<<P as ParseEventReader>::ReadTypes as ReadError>::Error>;
 
-impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>> IntoIterator for Scan<P, S> {
+impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>, G: GroupStack> IntoIterator
+    for Scan<P, S, G>
+{
     type Item = Result<S::ScanEvent, ParseEventReaderScanError<P>>;
-    type IntoIter = IntoIter<P, S>;
+    type IntoIter = IntoIter<P, S, G>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let Self { parse, scanner } = self;
-        IntoIter { parse, scanner }
+        let Self {
+            parse,
+            scanner,
+            group_stack,
+        } = self;
+        IntoIter {
+            parse,
+            scanner,
+            group_stack,
+        }
     }
 }
 
-impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>> Iterator for IntoIter<P, S> {
+impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>, G: GroupStack> Iterator
+    for IntoIter<P, S, G>
+{
     type Item = Result<S::ScanEvent, ParseEventReaderScanError<P>>;
     fn next(
         &mut self,
     ) -> Option<Result<S::ScanEvent, ScanError<<P::ReadTypes as ReadError>::Error>>> {
-        let Self { parse, scanner } = self;
+        let Self {
+            parse,
+            scanner,
+            group_stack,
+        } = self;
 
-        let (field_number, event) = match parse.next() {
-            Some(Err(e)) => return Some(Err(e.into())),
-            None => return None,
-            Some(Ok(event)) => event,
-        };
-
-        let output = match event {
-            ParseEvent::Numeric(numeric_field) => scanner.on_numeric(field_number, numeric_field),
-            ParseEvent::Group(group_op) => scanner.on_group(field_number, group_op),
-            ParseEvent::LengthDelimited(l) => {
-                scanner.on_length_delimited(field_number, delimited::ScanDelimited::new(l))
-            }
-        };
-        Some(output)
+        next_event(parse, scanner, group_stack)
     }
 }
 
-impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes> + IntoScanOutput> Scan<P, S> {
+#[allow(type_alias_bounds)]
+type ScanEvent<S: ScanCallbacks<P::ReadTypes>, P: ParseEventReader> =
+    Result<S::ScanEvent, ScanError<<P::ReadTypes as ReadError>::Error>>;
+
+#[inline]
+fn next_event<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>, G: GroupStack>(
+    parse: &mut P,
+    scanner: &mut S,
+    group_stack: &mut G,
+) -> Option<ScanEvent<S, P>> {
+    let (field_number, event) = match parse.next() {
+        Some(Err(e)) => return Some(Err(e.into())),
+        None => return None,
+        Some(Ok(event)) => event,
+    };
+
+    Some(match event {
+        ParseEvent::Numeric(numeric_field) => scanner.on_numeric(field_number, numeric_field),
+        ParseEvent::Group(GroupOp::Start) => {
+            drop(event);
+            group::GroupDelimitedImpl::new(parse, group_stack).scan_through(scanner, field_number)
+        }
+        ParseEvent::Group(GroupOp::End) => {
+            // If this was paired with a GroupOp::Start, it would have
+            // been read by the arm for that method. This must be an
+            // unmatched end tag.
+            Err(ScanError::GroupMismatch)
+        }
+        ParseEvent::LengthDelimited(length_delimited) => scanner.on_length_delimited(
+            field_number,
+            delimited::ScanDelimited::new(length_delimited, group_stack),
+        ),
+    })
+}
+
+impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes> + IntoScanOutput, G: GroupStack>
+    Scan<P, S, G>
+{
     pub fn read_all(self) -> Result<S::ScanOutput, ParseEventReaderScanError<P>> {
         let mut it = self.into_iter();
         for r in it.by_ref() {

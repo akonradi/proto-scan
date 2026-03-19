@@ -2,7 +2,9 @@ use prost::Message as _;
 use proto_scan::read::ReadTypes;
 use proto_scan::scan::encoding::Varint;
 use proto_scan::scan::field::OnScanField;
-use proto_scan::scan::{IntoScanOutput, IntoScanner, ScanMessage as _, ScannerBuilder as _};
+use proto_scan::scan::{
+    GroupDelimited, IntoScanOutput, IntoScanner, ScanMessage as _, ScannerBuilder as _,
+};
 use proto_scan::wire::NumericField;
 use test_case::test_case;
 
@@ -28,7 +30,7 @@ impl<R: ReadTypes> OnScanField<R> for CustomScanner<'_> {
 
     fn on_group(
         &mut self,
-        _op: proto_scan::wire::GroupOp,
+        _group: impl GroupDelimited,
     ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::ScanError<R::Error>> {
         Ok(None)
     }

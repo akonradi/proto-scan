@@ -18,6 +18,7 @@ std = []
 
 [dependencies]
 assert_matches = { workspace = true }
+arrayvec = { workspace = true, default-features = false }
 bytes = { workspace = true, optional = true }
 bytes-utils = { workspace = true, optional = true }
 derive_more = { workspace = true }
@@ -26,7 +27,6 @@ num-traits = { workspace = true }
 proto-scan-derive = { workspace = true , optional = true }
 
 [dev-dependencies]
-arrayvec = { workspace = true, default-features = false }
 hex-literal = { workspace = true }
 # For documentation
 prost = { workspace = true }

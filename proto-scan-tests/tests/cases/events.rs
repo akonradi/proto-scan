@@ -36,7 +36,7 @@ impl<R: ReadTypes, T: Clone> OnScanField<R> for EmitEvent<T> {
     }
     fn on_group(
         &mut self,
-        _op: proto_scan::wire::GroupOp,
+        _group: impl proto_scan::scan::GroupDelimited,
     ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::ScanError<R::Error>> {
         Ok(Some(self.0.clone()))
     }

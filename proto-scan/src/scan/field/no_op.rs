@@ -3,8 +3,8 @@ use core::convert::Infallible;
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
 use crate::scan::{
-    GroupOp, IntoResettableScanner, IntoScanOutput, IntoScanner, NumericField, ResettableScanner,
-    ScanCallbacks, ScanError, ScanLengthDelimited,
+    GroupDelimited, IntoResettableScanner, IntoScanOutput, IntoScanner, NumericField,
+    ResettableScanner, ScanCallbacks, ScanError, ScanLengthDelimited,
 };
 
 /// [`OnScanField`] impl that does nothing and always succeeds.
@@ -21,7 +21,10 @@ impl<R: ReadTypes> OnScanField<R> for NoOp {
         Ok(None)
     }
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+    fn on_group(
+        &mut self,
+        _group: impl GroupDelimited<ReadTypes = R>,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
         Ok(None)
     }
 
@@ -47,8 +50,8 @@ impl<R: ReadTypes, F> ScanCallbacks<R, F> for NoOp {
     fn on_group(
         &mut self,
         _field: F,
-        _op: GroupOp,
-    ) -> Result<Self::ScanEvent, ScanError<R::Error>> {
+        _group: impl GroupDelimited<ReadTypes = R>,
+    ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
         Ok(())
     }
 

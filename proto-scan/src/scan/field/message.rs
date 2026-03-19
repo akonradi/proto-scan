@@ -3,8 +3,8 @@ use core::convert::Infallible;
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
 use crate::scan::{
-    IntoScanOutput, IntoScanner, MessageScanner, ResettableScanner, ScanCallbacks, ScanError,
-    ScanLengthDelimited,
+    GroupDelimited, IntoScanOutput, IntoScanner, MessageScanner, ResettableScanner, ScanCallbacks,
+    ScanError, ScanLengthDelimited,
 };
 use crate::wire::WrongWireType;
 
@@ -37,8 +37,8 @@ impl<F: ScanCallbacks<R> + IntoScanOutput, R: ReadTypes> OnScanField<R> for Mess
 
     fn on_group(
         &mut self,
-        _op: crate::scan::GroupOp,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+        _group: impl GroupDelimited<ReadTypes = R>,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
         Err(WrongWireType.into())
     }
 
@@ -74,7 +74,7 @@ mod test {
     use crate::scan::field::{NoOp, Save};
     #[cfg(feature = "std")]
     use crate::scan::field::{Repeated, Write};
-    use crate::scan::{FieldNumber, NumericField, Scan};
+    use crate::scan::{FieldNumber, GroupDelimited, NumericField, Scan};
 
     use super::*;
     struct Scanner<T = NoOp>(u32, T);
@@ -99,10 +99,10 @@ mod test {
         fn on_group(
             &mut self,
             field: FieldNumber,
-            op: crate::scan::GroupOp,
-        ) -> Result<Self::ScanEvent, ScanError<R::Error>> {
+            delimited: impl GroupDelimited<ReadTypes = R>,
+        ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
             if field == self.0 {
-                self.1.on_group(op).map(|e| e.map(|e| (e,)))
+                self.1.on_group(delimited).map(|e| e.map(|e| (e,)))
             } else {
                 Ok(None)
             }

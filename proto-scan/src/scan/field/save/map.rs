@@ -11,10 +11,10 @@ use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
 #[cfg(feature = "std")]
 use crate::scan::field::{Map, MapKey, Save};
+use crate::scan::{GroupDelimited, IntoScanOutput, ScanCallbacks, ScanError, ScanLengthDelimited};
 #[cfg(feature = "std")]
 use crate::scan::{IntoResettableScanner, IntoScanner, ResettableScanner};
-use crate::scan::{IntoScanOutput, ScanCallbacks, ScanError, ScanLengthDelimited};
-use crate::wire::{GroupOp, NumericField};
+use crate::wire::NumericField;
 
 /// Saves map keys and the output of a provided value scanner.
 ///
@@ -80,7 +80,10 @@ where
         Err(ScanError::WrongWireType)
     }
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
+    fn on_group(
+        &mut self,
+        _group: impl GroupDelimited<ReadTypes = R>,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
         Err(ScanError::WrongWireType)
     }
 
@@ -155,11 +158,11 @@ impl<SK: OnScanField<R>, SV: OnScanField<R>, R: ReadTypes> ScanCallbacks<R> for 
     fn on_group(
         &mut self,
         field: crate::wire::FieldNumber,
-        op: GroupOp,
+        group: impl GroupDelimited<ReadTypes = R>,
     ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
         Ok(match u32::from(field) {
-            1 => self.0.on_group(op)?.map(Either::Left),
-            2 => self.1.on_group(op)?.map(Either::Right),
+            1 => self.0.on_group(group)?.map(Either::Left),
+            2 => self.1.on_group(group)?.map(Either::Right),
             _ => None,
         })
     }

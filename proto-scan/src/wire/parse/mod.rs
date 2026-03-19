@@ -76,7 +76,7 @@ pub trait ParseEventReader {
     >;
 }
 
-type ParseEventReaderOutput<RT, LD> =
+pub(crate) type ParseEventReaderOutput<RT, LD> =
     Result<(FieldNumber, ParseEvent<LD>), DecodeError<<RT as ReadError>::Error>>;
 
 /// A tag and value parsed from a protobuf stream.

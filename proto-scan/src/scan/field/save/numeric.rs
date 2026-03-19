@@ -4,9 +4,10 @@ use crate::read::ReadTypes;
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
 use crate::scan::{
-    IntoResettableScanner, IntoScanOutput, ResettableScanner, ScanError, ScanLengthDelimited,
+    GroupDelimited, IntoResettableScanner, IntoScanOutput, ResettableScanner, ScanError,
+    ScanLengthDelimited,
 };
-use crate::wire::{GroupOp, NumericField, NumericWireType, WrongWireType};
+use crate::wire::{NumericField, NumericWireType, WrongWireType};
 
 pub struct SaveNumeric<E: Encoding>(E::Repr);
 
@@ -41,7 +42,10 @@ impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveNumeric<E> {
         Ok(Some(value))
     }
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+    fn on_group(
+        &mut self,
+        _group: impl GroupDelimited<ReadTypes = R>,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
         Err(WrongWireType.into())
     }
 

@@ -181,7 +181,7 @@ impl<R: ReadTypes, F> ScanCallbacks<R, F> for SaveLastFieldNumber<'_, F> {
     fn on_group(
         &mut self,
         field: F,
-        _op: proto_scan::wire::GroupOp,
+        _group: impl proto_scan::scan::GroupDelimited,
     ) -> Result<Self::ScanEvent, proto_scan::scan::ScanError<R::Error>> {
         *self.0 = Some(field);
         Ok(())

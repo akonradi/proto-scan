@@ -11,6 +11,8 @@ pub enum ScanError<R> {
     VarintOutOfBounds,
     WrongWireType,
     Utf8,
+    GroupOverflow,
+    GroupMismatch,
 }
 
 impl<R> From<Infallible> for ScanError<R> {

@@ -10,7 +10,7 @@ pub trait ScannerBuilder<M: ?Sized>: Sized {
     /// Starts a scan over the provided input.
     ///
     /// Consumes `self` and produces a [`Scan`] over the input stream.
-    fn scan_events<P: ParseEventReader>(self, read: P) -> Scan<P, Self::Scanner<P::ReadTypes>>
+    fn scan_events<P: ParseEventReader>(self, read: P) -> Scan<P, Self::Scanner<P::ReadTypes>, ()>
     where
         Self: IntoScanner<M>,
         Self::Scanner<P::ReadTypes>: ScanCallbacks<P::ReadTypes>,
@@ -24,7 +24,7 @@ pub trait ScannerBuilder<M: ?Sized>: Sized {
     fn scan<'r, R: Read + 'r>(
         self,
         read: R,
-    ) -> Scan<impl ParseEventReader<ReadTypes = R::ReadTypes> + 'r, Self::Scanner<R::ReadTypes>>
+    ) -> Scan<impl ParseEventReader<ReadTypes = R::ReadTypes> + 'r, Self::Scanner<R::ReadTypes>, ()>
     where
         Self: IntoScanner<M>,
         Self::Scanner<R::ReadTypes>: ScanCallbacks<R::ReadTypes>,

@@ -12,8 +12,8 @@ use crate::scan::field::write::RestoreLenOnReset;
 use crate::scan::field::write::RestoreOnReset;
 use crate::scan::save_from::SaveFrom;
 use crate::scan::{
-    GroupOp, IntoResettableScanner, IntoScanOutput, NumericField, ResettableScanner, ScanError,
-    ScanLengthDelimited,
+    GroupDelimited, IntoResettableScanner, IntoScanOutput, NumericField, ResettableScanner,
+    ScanError, ScanLengthDelimited,
 };
 use crate::wire::{NumericWireType, WrongWireType};
 
@@ -38,7 +38,10 @@ impl<E: Encoding, D: SaveFrom<E::Repr>, R: ReadTypes> OnScanField<R> for WriteNu
         Ok(None)
     }
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Infallible>, ScanError<R::Error>> {
+    fn on_group(
+        &mut self,
+        _group: impl GroupDelimited<ReadTypes = R>,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
         Err(WrongWireType.into())
     }
 
@@ -93,7 +96,10 @@ impl<E: Encoding, R: ReadTypes, D: DerefMut<Target: Extend<E::Repr>>> OnScanFiel
         Ok(None)
     }
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Infallible>, ScanError<R::Error>> {
+    fn on_group(
+        &mut self,
+        _group: impl GroupDelimited<ReadTypes = R>,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
         Err(WrongWireType.into())
     }
 

@@ -7,7 +7,7 @@ use crate::scan::field::{Message, OnScanField};
 use crate::scan::{
     IntoScanOutput, IntoScanner, MessageScanner, ScanCallbacks, ScanError, ScanLengthDelimited,
 };
-use crate::wire::{GroupOp, NumericField, WrongWireType};
+use crate::wire::{NumericField, WrongWireType};
 
 /// Marker type for protobuf `repeated`.
 pub struct Repeated<T: ?Sized>(PhantomData<T>);
@@ -93,7 +93,10 @@ impl<R: ReadTypes, S: ScanCallbacks<R>, F: RepeatStrategyScanner<R, S>> OnScanFi
         Err(WrongWireType.into())
     }
 
-    fn on_group(&mut self, _op: GroupOp) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+    fn on_group(
+        &mut self,
+        _group: impl crate::scan::GroupDelimited<ReadTypes = R>,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
         Err(WrongWireType.into())
     }
 

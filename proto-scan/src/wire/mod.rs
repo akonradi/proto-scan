@@ -74,7 +74,7 @@ mod parse;
 mod tag;
 mod wire_type;
 
-trait ParseVarint:
+pub(crate) trait ParseVarint:
     num_traits::Unsigned
     + num_traits::Zero
     + BitOrAssign
@@ -125,7 +125,7 @@ fn parse_base128_varint<R: Read, V: ParseVarint>(
 }
 
 #[cfg(test)]
-fn serialize_base128_varint<V: ParseVarint>(mut value: V) -> arrayvec::ArrayVec<u8, 10> {
+pub(crate) fn serialize_base128_varint<V: ParseVarint>(mut value: V) -> arrayvec::ArrayVec<u8, 10> {
     let mut bytes = arrayvec::ArrayVec::new();
 
     loop {

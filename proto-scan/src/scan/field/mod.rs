@@ -1,8 +1,8 @@
 use crate::read::ReadTypes;
-use crate::scan::{IntoScanOutput, ScanError, ScanLengthDelimited};
+use crate::scan::{GroupDelimited, IntoScanOutput, ScanError, ScanLengthDelimited};
 #[cfg(doc)]
 use crate::wire::FieldNumber;
-use crate::wire::{GroupOp, NumericField};
+use crate::wire::NumericField;
 
 mod map;
 mod message;
@@ -30,8 +30,11 @@ pub trait OnScanField<R: ReadTypes>: IntoScanOutput {
         value: NumericField,
     ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>>;
 
-    /// Called when a SGROUP or EGROUP tag is read.
-    fn on_group(&mut self, op: GroupOp) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>>;
+    /// Called when a SGROUP tag is read.
+    fn on_group(
+        &mut self,
+        group: impl GroupDelimited<ReadTypes = R>,
+    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>>;
 
     /// Called when a length-delimited tag is read.
     fn on_length_delimited(
