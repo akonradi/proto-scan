@@ -1,5 +1,6 @@
 #![doc(hidden)]
 
+#[cfg(feature = "std")]
 use core::ops::DerefMut;
 
 use crate::scan::ResettableScanner;

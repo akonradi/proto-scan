@@ -144,6 +144,7 @@ mod test {
     macro_rules! assert_impl_into_resettable_scanner {
         ($t:ty: IntoScanner<$p:ty>) => {
             assert_impl_into_scanner!($t: IntoScanner<$p>; resettable);
+            #[cfg(feature = "std")]
             assert_impl_into_scanner!($t: IntoScanner<$crate::scan::field::Repeated<$p>>; resettable);
         };
         ($t:ty: IntoScanner<$p:ty>; non-repeatable) => {
@@ -164,10 +165,16 @@ mod test {
     assert_impl_into_resettable_scanner!(Save: IntoScanner<Fixed<i32>>);
     assert_impl_into_resettable_scanner!(Save: IntoScanner<Fixed<f64>>);
     assert_impl_into_resettable_scanner!(Save: IntoScanner<Fixed<f32>>);
+    #[cfg(feature = "std")]
     assert_impl_into_resettable_scanner!(Save: IntoScanner<str>);
+    #[cfg(feature = "std")]
     assert_impl_into_resettable_scanner!(Save: IntoScanner<[u8]>);
+    #[cfg(feature = "std")]
     assert_impl_into_resettable_scanner!(Save: IntoScanner<Map<str, str>>; non-repeatable);
+    #[cfg(feature = "std")]
     assert_impl_into_resettable_scanner!(Save: IntoScanner<Map<str, Fixed<f64>>>; non-repeatable);
+    #[cfg(feature = "std")]
     assert_impl_into_resettable_scanner!(Save: IntoScanner<Map<Varint<i64>, str>>; non-repeatable);
+    #[cfg(feature = "std")]
     assert_impl_into_resettable_scanner!(Save: IntoScanner<Map<Varint<i64>, Fixed<f64>>>; non-repeatable);
 }

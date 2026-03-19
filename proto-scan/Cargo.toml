@@ -34,3 +34,7 @@ static_assertions = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true
+
+[[example]]
+name = "zip_code"
+required-features = ["std"]

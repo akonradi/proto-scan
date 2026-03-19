@@ -75,8 +75,10 @@ mod test {
     use hex_literal::hex;
 
     use crate::scan::encoding::Varint;
-    use crate::scan::field::{NoOp, Repeated, Save, Write};
-    use crate::scan::{FieldNumber, NumericField, Scan};
+    use crate::scan::field::{NoOp, Save};
+    #[cfg(feature = "std")]
+    use crate::scan::field::{Repeated, Write};
+        use crate::scan::{FieldNumber, NumericField, Scan};
 
     use super::*;
     struct Scanner<T = NoOp>(u32, T);

@@ -87,6 +87,7 @@ mod test {
     macro_rules! assert_impl_into_repeatable_scanner {
         (Write<&mut $t:ty>: IntoScanner<$p:ty>) => {
             assert_impl_into_scanner!(Write<&mut $t>: IntoScanner<$p>; resettable);
+            #[cfg(feature = "std")]
             assert_impl_into_scanner!(Write<&mut Vec<$t>>: IntoScanner<Repeated<$p>>; resettable);
         };
     }
