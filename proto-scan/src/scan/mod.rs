@@ -289,11 +289,17 @@ pub trait ScannableOneOf {
 }
 
 /// A scan in progress.
-pub struct Scan<P, S>(P, S);
+pub struct Scan<P, S> {
+    parse: P,
+    scanner: S,
+}
 
 impl<P, S> Scan<P, S> {
     pub fn new(input: P, scanner: S) -> Self {
-        Self(input, scanner)
+        Self {
+            parse: input,
+            scanner,
+        }
     }
 }
 
@@ -302,7 +308,10 @@ impl<P, S> Scan<P, S> {
 /// Implements [`Iterator`] by applying events from a [`ParseEventReader`] to a
 /// [`ScanCallbacks`] and yielding the resulting [`ScanCallbacks::ScanEvent`] or
 /// an error.
-pub struct IntoIter<P, S>(P, S);
+pub struct IntoIter<P, S> {
+    parse: P,
+    scanner: S,
+}
 
 type ParseEventReaderScanError<P> =
     ScanError<<<P as ParseEventReader>::ReadTypes as ReadError>::Error>;
@@ -312,7 +321,8 @@ impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>> IntoIterator for Scan<
     type IntoIter = IntoIter<P, S>;
 
     fn into_iter(self) -> Self::IntoIter {
-        IntoIter(self.0, self.1)
+        let Self { parse, scanner } = self;
+        IntoIter { parse, scanner }
     }
 }
 
@@ -321,7 +331,7 @@ impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>> Iterator for IntoIter<
     fn next(
         &mut self,
     ) -> Option<Result<S::ScanEvent, ScanError<<P::ReadTypes as ReadError>::Error>>> {
-        let Self(parse, fields) = self;
+        let Self { parse, scanner } = self;
 
         let (field_number, event) = match parse.next() {
             Some(Err(e)) => return Some(Err(e.into())),
@@ -330,9 +340,9 @@ impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>> Iterator for IntoIter<
         };
 
         let output = match event {
-            ParseEvent::Numeric(numeric_field) => fields.on_numeric(field_number, numeric_field),
-            ParseEvent::Group(group_op) => fields.on_group(field_number, group_op),
-            ParseEvent::LengthDelimited(l) => fields.on_length_delimited(field_number, l),
+            ParseEvent::Numeric(numeric_field) => scanner.on_numeric(field_number, numeric_field),
+            ParseEvent::Group(group_op) => scanner.on_group(field_number, group_op),
+            ParseEvent::LengthDelimited(l) => scanner.on_length_delimited(field_number, l),
         };
         Some(output)
     }
@@ -344,6 +354,6 @@ impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes> + IntoScanOutput> Scan<
         for r in it.by_ref() {
             let _ = r?;
         }
-        Ok(it.1.into_scan_output())
+        Ok(it.scanner.into_scan_output())
     }
 }
