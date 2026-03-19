@@ -1,20 +1,20 @@
 //! The low-level event interface treats the input stream as a sequence of events
 //! corresponding to individual tags and their contents. The entry point is
 //! the [`parse`] function, which returns a [`ParseEventReader`] implementation.
-//! 
+//!
 //! The `ParseEventReader` is a lending iterator. On a call to
 //! [`ParseEventReader::next`], it reads the next protobuf tag from the input stream,
 //! decodes it, and then returns a corresponding [`ParseEvent`] that mutably
 //! borrows the reader. The mutable borrow allows the [`ParseEvent::LengthDelimited`]
 //! variant to hold a [`LengthDelimited`] implementation that can be used to
 //! access (or skip over) the contents of a length-delimited field.
-//! 
+//!
 //! To read a message in full, calling code must call `ParseEventReader::next`
 //! until it returns `None`, signaling the end of the input. At any point,
 //! calling code can drop the reader to avoid reading the rest of the input
 //! stream (though, given the merge semantics of protocol buffers, this isn't
 //! frequently useful).
-//! 
+//!
 //! As an example, here is a method that scans for a protobuf int64 field and
 //! returns its value, if found.
 //! ```

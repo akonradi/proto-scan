@@ -2,7 +2,7 @@
 //! It's most useful when only one or two values are needed from a larger
 //! message and the performance cost of deserializing the other fields or
 //! embedded messages is prohibitive.
-//! 
+//!
 //! There are two ways of getting streaming access to the contents of a protobuf
 //! message stream. The [high-level] scan API uses generated code to enable
 //! reading an event stream with conventional protobuf message semantics, while the

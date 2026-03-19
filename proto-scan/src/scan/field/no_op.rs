@@ -3,8 +3,8 @@ use core::convert::Infallible;
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
 use crate::scan::{
-    GroupOp, IntoResettableScanner, IntoScanOutput, IntoScanner, NumericField, ResettableScanner, ScanCallbacks,
-    ScanError,
+    GroupOp, IntoResettableScanner, IntoScanOutput, IntoScanner, NumericField, ResettableScanner,
+    ScanCallbacks, ScanError,
 };
 use crate::wire::LengthDelimited;
 
