@@ -231,7 +231,7 @@ pub trait IntoScanOutput {
 }
 
 /// Callbacks for parse inputs encountered during a scan.
-pub trait ScanCallbacks<R: ReadTypes, F = FieldNumber>: IntoScanOutput {
+pub trait ScanCallbacks<R: ReadTypes, F = FieldNumber> {
     type ScanEvent;
 
     /// Called when a numeric field is parsed.
@@ -250,6 +250,34 @@ pub trait ScanCallbacks<R: ReadTypes, F = FieldNumber>: IntoScanOutput {
         field: F,
         delimited: impl LengthDelimited<ReadTypes = R>,
     ) -> Result<Self::ScanEvent, ScanError<R::Error>>;
+}
+
+impl<R: ReadTypes, F, S: ScanCallbacks<R, F>> ScanCallbacks<R, F> for &mut S {
+    type ScanEvent = S::ScanEvent;
+
+    fn on_numeric(
+        &mut self,
+        field: F,
+        value: NumericField,
+    ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
+        (*self).on_numeric(field, value)
+    }
+
+    fn on_group(
+        &mut self,
+        field: F,
+        op: GroupOp,
+    ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
+        (*self).on_group(field, op)
+    }
+
+    fn on_length_delimited(
+        &mut self,
+        field: F,
+        delimited: impl LengthDelimited<ReadTypes = R>,
+    ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
+        (*self).on_length_delimited(field, delimited)
+    }
 }
 
 /// A oneof grouping in a message that can be scanned for.
@@ -293,29 +321,24 @@ impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>> Iterator for IntoIter<
     fn next(
         &mut self,
     ) -> Option<Result<S::ScanEvent, ScanError<<P::ReadTypes as ReadError>::Error>>> {
-        next_event(&mut self.0, &mut self.1)
+        let Self(parse, fields) = self;
+
+        let (field_number, event) = match parse.next() {
+            Some(Err(e)) => return Some(Err(e.into())),
+            None => return None,
+            Some(Ok(event)) => event,
+        };
+
+        let output = match event {
+            ParseEvent::Numeric(numeric_field) => fields.on_numeric(field_number, numeric_field),
+            ParseEvent::Group(group_op) => fields.on_group(field_number, group_op),
+            ParseEvent::LengthDelimited(l) => fields.on_length_delimited(field_number, l),
+        };
+        Some(output)
     }
 }
 
-pub(crate) fn next_event<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>>(
-    parse: &mut P,
-    fields: &mut S,
-) -> Option<Result<S::ScanEvent, ParseEventReaderScanError<P>>> {
-    let (field_number, event) = match parse.next() {
-        Some(Err(e)) => return Some(Err(e.into())),
-        None => return None,
-        Some(Ok(event)) => event,
-    };
-
-    let output = match event {
-        ParseEvent::Numeric(numeric_field) => fields.on_numeric(field_number, numeric_field),
-        ParseEvent::Group(group_op) => fields.on_group(field_number, group_op),
-        ParseEvent::LengthDelimited(l) => fields.on_length_delimited(field_number, l),
-    };
-    Some(output)
-}
-
-impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>> Scan<P, S> {
+impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes> + IntoScanOutput> Scan<P, S> {
     pub fn read_all(self) -> Result<S::ScanOutput, ParseEventReaderScanError<P>> {
         let mut it = self.into_iter();
         for r in it.by_ref() {

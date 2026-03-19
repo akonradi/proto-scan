@@ -115,7 +115,7 @@ impl<M: MessageScanner + IntoScanner<M::Message>> RepeatStrategy<M> for SaveClon
 }
 
 #[cfg(feature = "std")]
-impl<R: ReadTypes, S: ScanCallbacks<R> + Clone> RepeatStrategyScanner<R, S> for RepeatedSave<S> {
+impl<R: ReadTypes, S: ScanCallbacks<R> + IntoScanOutput + Clone> RepeatStrategyScanner<R, S> for RepeatedSave<S> {
     fn on_message(
         &mut self,
         scanner: &S,

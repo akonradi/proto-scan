@@ -3,8 +3,7 @@ use core::convert::Infallible;
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
 use crate::scan::{
-    IntoScanOutput, IntoScanner, MessageScanner, ResettableScanner, ScanCallbacks, ScanError,
-    next_event,
+    IntoScanOutput, IntoScanner, MessageScanner, ResettableScanner, Scan, ScanCallbacks, ScanError,
 };
 use crate::wire::{LengthDelimited, WrongWireType};
 
@@ -25,7 +24,7 @@ impl<M, S: MessageScanner<Message = M> + IntoScanner<M>> IntoScanner<Message<M>>
     }
 }
 
-impl<F: ScanCallbacks<R>, R: ReadTypes> OnScanField<R> for Message<F> {
+impl<F: ScanCallbacks<R> + IntoScanOutput, R: ReadTypes> OnScanField<R> for Message<F> {
     type ScanEvent = Infallible;
 
     fn on_numeric(
@@ -46,9 +45,10 @@ impl<F: ScanCallbacks<R>, R: ReadTypes> OnScanField<R> for Message<F> {
         &mut self,
         delimited: impl LengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
-        let mut parse = delimited.into_events();
+        let parse = delimited.into_events();
         let fields = &mut self.0;
-        while let Some(next) = next_event(&mut parse, fields) {
+
+        for next in Scan::new(parse, fields) {
             let _event: F::ScanEvent = next?;
         }
         Ok(None)
@@ -78,7 +78,7 @@ mod test {
     use crate::scan::field::{NoOp, Save};
     #[cfg(feature = "std")]
     use crate::scan::field::{Repeated, Write};
-        use crate::scan::{FieldNumber, NumericField, Scan};
+    use crate::scan::{FieldNumber, NumericField, Scan};
 
     use super::*;
     struct Scanner<T = NoOp>(u32, T);

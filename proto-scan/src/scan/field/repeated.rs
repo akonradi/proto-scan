@@ -127,8 +127,11 @@ impl<S: IntoScanOutput, F> IntoScanOutput for RepeatedFold<S, F> {
     }
 }
 
-impl<R: ReadTypes, S: ScanCallbacks<R> + Clone, F: Fn(&mut S::ScanOutput, S::ScanOutput)>
-    RepeatStrategyScanner<R, S> for RepeatedFold<S, F>
+impl<
+    R: ReadTypes,
+    S: ScanCallbacks<R> + IntoScanOutput + Clone,
+    F: Fn(&mut S::ScanOutput, S::ScanOutput),
+> RepeatStrategyScanner<R, S> for RepeatedFold<S, F>
 {
     fn on_message(
         &mut self,
@@ -161,8 +164,11 @@ impl<D> IntoScanOutput for RepeatedWriteCloned<D> {
     fn into_scan_output(self) -> Self::ScanOutput {}
 }
 
-impl<R: ReadTypes, S: ScanCallbacks<R> + Clone, D: DerefMut<Target: Extend<S::ScanOutput>>>
-    RepeatStrategyScanner<R, S> for RepeatedWriteCloned<D>
+impl<
+    R: ReadTypes,
+    S: ScanCallbacks<R> + IntoScanOutput + Clone,
+    D: DerefMut<Target: Extend<S::ScanOutput>>,
+> RepeatStrategyScanner<R, S> for RepeatedWriteCloned<D>
 {
     fn on_message(
         &mut self,
