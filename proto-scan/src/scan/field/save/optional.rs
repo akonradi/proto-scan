@@ -2,8 +2,8 @@
 
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
-use crate::scan::{IntoScanOutput, ScanError};
-use crate::wire::{GroupOp, LengthDelimited, NumericField};
+use crate::scan::{IntoScanOutput, ScanError, ScanLengthDelimited};
+use crate::wire::{GroupOp, NumericField};
 
 #[derive(Clone, Default)]
 pub struct SaveOptional<S> {
@@ -48,7 +48,7 @@ impl<S: OnScanField<R>, R: ReadTypes> OnScanField<R> for SaveOptional<S> {
 
     fn on_length_delimited(
         &mut self,
-        delimited: impl LengthDelimited<ReadTypes = R>,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
         let event = self.inner.on_length_delimited(delimited)?;
         self.present = true;

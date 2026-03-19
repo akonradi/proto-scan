@@ -4,8 +4,10 @@ use core::ops::DerefMut;
 
 use crate::read::ReadTypes;
 use crate::scan::field::{Message, OnScanField};
-use crate::scan::{IntoScanOutput, IntoScanner, MessageScanner, ScanCallbacks, ScanError};
-use crate::wire::{GroupOp, LengthDelimited, NumericField, WrongWireType};
+use crate::scan::{
+    IntoScanOutput, IntoScanner, MessageScanner, ScanCallbacks, ScanError, ScanLengthDelimited,
+};
+use crate::wire::{GroupOp, NumericField, WrongWireType};
 
 /// Marker type for protobuf `repeated`.
 pub struct Repeated<T: ?Sized>(PhantomData<T>);
@@ -36,7 +38,7 @@ pub trait RepeatStrategyScanner<R: ReadTypes, S: ScanCallbacks<R>>: IntoScanOutp
     fn on_message(
         &mut self,
         scanner: &S,
-        input: impl LengthDelimited<ReadTypes = R>,
+        input: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>>;
 }
 
@@ -97,7 +99,7 @@ impl<R: ReadTypes, S: ScanCallbacks<R>, F: RepeatStrategyScanner<R, S>> OnScanFi
 
     fn on_length_delimited(
         &mut self,
-        delimited: impl LengthDelimited<ReadTypes = R>,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
         self.1.on_message(&self.0, delimited).map(|()| None)
     }
@@ -136,7 +138,7 @@ impl<
     fn on_message(
         &mut self,
         scanner: &S,
-        input: impl LengthDelimited<ReadTypes = R>,
+        input: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>> {
         let mut scanner = Message::new(scanner.clone());
         let _event = scanner.on_length_delimited(input)?;
@@ -173,7 +175,7 @@ impl<
     fn on_message(
         &mut self,
         scanner: &S,
-        input: impl LengthDelimited<ReadTypes = R>,
+        input: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>> {
         let mut scanner = Message::new(scanner.clone());
         let _event = scanner.on_length_delimited(input);

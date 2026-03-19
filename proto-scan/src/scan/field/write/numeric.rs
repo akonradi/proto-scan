@@ -11,9 +11,11 @@ use crate::scan::field::OnScanField;
 use crate::scan::field::write::RestoreLenOnReset;
 use crate::scan::field::write::RestoreOnReset;
 use crate::scan::save_from::SaveFrom;
-use crate::scan::{GroupOp, IntoScanOutput, NumericField, ScanError};
-use crate::scan::{IntoResettableScanner, ResettableScanner};
-use crate::wire::{LengthDelimited, NumericWireType, WrongWireType};
+use crate::scan::{
+    GroupOp, IntoResettableScanner, IntoScanOutput, NumericField, ResettableScanner, ScanError,
+    ScanLengthDelimited,
+};
+use crate::wire::{NumericWireType, WrongWireType};
 
 /// [`OnScanField`] that writes the decoded value to the provided location.
 pub struct WriteNumeric<E, D>(D, PhantomData<E>);
@@ -42,7 +44,7 @@ impl<E: Encoding, D: SaveFrom<E::Repr>, R: ReadTypes> OnScanField<R> for WriteNu
 
     fn on_length_delimited(
         &mut self,
-        _delimited: impl LengthDelimited,
+        _delimited: impl ScanLengthDelimited,
     ) -> Result<Option<Infallible>, ScanError<R::Error>> {
         Err(WrongWireType.into())
     }
@@ -97,7 +99,7 @@ impl<E: Encoding, R: ReadTypes, D: DerefMut<Target: Extend<E::Repr>>> OnScanFiel
 
     fn on_length_delimited(
         &mut self,
-        delimited: impl LengthDelimited<ReadTypes = R>,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Infallible>, ScanError<R::Error>> {
         let mut packed = delimited.into_packed::<E::Wire>();
         let mut result = Ok(None);

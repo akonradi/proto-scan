@@ -13,8 +13,8 @@ use crate::scan::field::OnScanField;
 use crate::scan::field::{Map, MapKey, Save};
 #[cfg(feature = "std")]
 use crate::scan::{IntoResettableScanner, IntoScanner, ResettableScanner};
-use crate::scan::{IntoScanOutput, ScanCallbacks, ScanError};
-use crate::wire::{GroupOp, LengthDelimited, NumericField};
+use crate::scan::{IntoScanOutput, ScanCallbacks, ScanError, ScanLengthDelimited};
+use crate::wire::{GroupOp, NumericField};
 
 /// Saves map keys and the output of a provided value scanner.
 ///
@@ -86,13 +86,13 @@ where
 
     fn on_length_delimited(
         &mut self,
-        delimited: impl LengthDelimited<ReadTypes = R>,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
         let Self(map, value_scanner, PhantomData) = self;
-        let scanner = MapEntry(IntoScanner::<K>::into_scanner(Save), value_scanner.clone());
-        let scan = crate::scan::Scan::new(delimited.into_events(), scanner);
-        let (key, value) = scan.read_all()?;
-        map.insert(key, value);
+        let mut scanner = MapEntry(IntoScanner::<K>::into_scanner(Save), value_scanner.clone());
+        delimited.scan_with(&mut scanner)?;
+        let MapEntry(key, value) = scanner;
+        map.insert(key.into_scan_output(), value.into_scan_output());
         Ok(None)
     }
 }
@@ -167,7 +167,7 @@ impl<SK: OnScanField<R>, SV: OnScanField<R>, R: ReadTypes> ScanCallbacks<R> for 
     fn on_length_delimited(
         &mut self,
         field: crate::wire::FieldNumber,
-        delimited: impl LengthDelimited<ReadTypes = R>,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
         Ok(match u32::from(field) {
             1 => self.0.on_length_delimited(delimited)?.map(Either::Left),

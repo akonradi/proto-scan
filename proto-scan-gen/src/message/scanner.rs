@@ -213,7 +213,7 @@ impl<'m> MessageScanner<'m> {
                 fn on_length_delimited(
                     &mut self,
                     field: ::proto_scan::wire::FieldNumber,
-                    value: impl ::proto_scan::wire::LengthDelimited<ReadTypes=R>,
+                    value: impl ::proto_scan::scan::ScanLengthDelimited<ReadTypes=R>,
                 ) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
                     #[allow(clippy::match_single_binding)]
                     Ok(match u32::from(field) {

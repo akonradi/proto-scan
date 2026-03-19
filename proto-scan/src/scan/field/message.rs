@@ -3,9 +3,10 @@ use core::convert::Infallible;
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
 use crate::scan::{
-    IntoScanOutput, IntoScanner, MessageScanner, ResettableScanner, Scan, ScanCallbacks, ScanError,
+    IntoScanOutput, IntoScanner, MessageScanner, ResettableScanner, ScanCallbacks, ScanError,
+    ScanLengthDelimited,
 };
-use crate::wire::{LengthDelimited, WrongWireType};
+use crate::wire::WrongWireType;
 
 #[derive(Clone)]
 pub struct Message<F>(F);
@@ -43,14 +44,9 @@ impl<F: ScanCallbacks<R> + IntoScanOutput, R: ReadTypes> OnScanField<R> for Mess
 
     fn on_length_delimited(
         &mut self,
-        delimited: impl LengthDelimited<ReadTypes = R>,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
-        let parse = delimited.into_events();
-        let fields = &mut self.0;
-
-        for next in Scan::new(parse, fields) {
-            let _event: F::ScanEvent = next?;
-        }
+        delimited.scan_with(&mut self.0)?;
         Ok(None)
     }
 }
@@ -115,7 +111,7 @@ mod test {
         fn on_length_delimited(
             &mut self,
             field: FieldNumber,
-            delimited: impl LengthDelimited<ReadTypes = R>,
+            delimited: impl ScanLengthDelimited<ReadTypes = R>,
         ) -> Result<Self::ScanEvent, ScanError<R::Error>> {
             if field == self.0 {
                 self.1

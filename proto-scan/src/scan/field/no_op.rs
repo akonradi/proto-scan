@@ -4,9 +4,8 @@ use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
 use crate::scan::{
     GroupOp, IntoResettableScanner, IntoScanOutput, IntoScanner, NumericField, ResettableScanner,
-    ScanCallbacks, ScanError,
+    ScanCallbacks, ScanError, ScanLengthDelimited,
 };
-use crate::wire::LengthDelimited;
 
 /// [`OnScanField`] impl that does nothing and always succeeds.
 #[derive(Copy, Clone, Default)]
@@ -28,7 +27,7 @@ impl<R: ReadTypes> OnScanField<R> for NoOp {
 
     fn on_length_delimited(
         &mut self,
-        _delimited: impl LengthDelimited,
+        _delimited: impl ScanLengthDelimited,
     ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
         Ok(None)
     }
@@ -56,7 +55,7 @@ impl<R: ReadTypes, F> ScanCallbacks<R, F> for NoOp {
     fn on_length_delimited(
         &mut self,
         _field: F,
-        _delimited: impl LengthDelimited<ReadTypes = R>,
+        _delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<Self::ScanEvent, ScanError<R::Error>> {
         Ok(())
     }

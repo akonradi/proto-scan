@@ -3,8 +3,10 @@ use core::convert::Infallible;
 
 use crate::read::{ReadBuffer, ReadTypes};
 use crate::scan::field::OnScanField;
-use crate::scan::{IntoResettableScanner, IntoScanOutput, ResettableScanner, ScanError};
-use crate::wire::{GroupOp, LengthDelimited, NumericField, WrongWireType};
+use crate::scan::{
+    IntoResettableScanner, IntoScanOutput, ResettableScanner, ScanError, ScanLengthDelimited,
+};
+use crate::wire::{GroupOp, NumericField, WrongWireType};
 
 /// [`OnScanField`] impl that produces the read value as the event output.
 pub struct SaveBytesScanner<E: DecodeFromBytes + ?Sized, R: ReadTypes>(E::Decoded<R>);
@@ -68,7 +70,7 @@ impl<T: DecodeFromBytes + ?Sized, R: ReadTypes> OnScanField<R> for SaveBytesScan
 
     fn on_length_delimited(
         &mut self,
-        delimited: impl LengthDelimited<ReadTypes = R>,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
         let bytes = delimited.into_bytes()?;
         self.0 = T::decode(bytes).map_err(|_| ScanError::Utf8)?;

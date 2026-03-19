@@ -11,9 +11,11 @@ use crate::scan::field::save::DecodeFromBytes;
 use crate::scan::field::write::RestoreLenOnReset;
 use crate::scan::field::write::RestoreOnReset;
 use crate::scan::save_from::SaveFrom;
-use crate::scan::{GroupOp, IntoScanOutput, NumericField, ScanError};
-use crate::scan::{IntoResettableScanner, ResettableScanner};
-use crate::wire::{LengthDelimited, WrongWireType};
+use crate::scan::{
+    GroupOp, IntoResettableScanner, IntoScanOutput, NumericField, ResettableScanner, ScanError,
+    ScanLengthDelimited,
+};
+use crate::wire::WrongWireType;
 
 /// [`OnScanField`] that writes the decoded values to the provided location.
 pub struct WriteBytes<E: ?Sized, D>(D, PhantomData<E>);
@@ -42,7 +44,7 @@ impl<B: DecodeFromBytes + ?Sized, D: SaveFrom<B::Decoded<R>>, R: ReadTypes> OnSc
 
     fn on_length_delimited(
         &mut self,
-        delimited: impl LengthDelimited<ReadTypes = R>,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Infallible>, ScanError<R::Error>> {
         let bytes = delimited.into_bytes()?;
         let decoded = B::decode(bytes).map_err(|_| ScanError::Utf8)?;
@@ -103,7 +105,7 @@ impl<B: DecodeFromBytes + ?Sized, D: DerefMut<Target: Extend<B::Decoded<R>>>, R:
 
     fn on_length_delimited(
         &mut self,
-        delimited: impl LengthDelimited<ReadTypes = R>,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Infallible>, ScanError<R::Error>> {
         let bytes = delimited.into_bytes()?;
         let decoded = B::decode(bytes).map_err(|_| ScanError::Utf8)?;

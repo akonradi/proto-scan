@@ -1,8 +1,8 @@
 use crate::read::ReadTypes;
-use crate::scan::{IntoScanOutput, ScanError};
+use crate::scan::{IntoScanOutput, ScanError, ScanLengthDelimited};
 #[cfg(doc)]
 use crate::wire::FieldNumber;
-use crate::wire::{GroupOp, LengthDelimited, NumericField};
+use crate::wire::{GroupOp, NumericField};
 
 mod map;
 mod message;
@@ -36,7 +36,7 @@ pub trait OnScanField<R: ReadTypes>: IntoScanOutput {
     /// Called when a length-delimited tag is read.
     fn on_length_delimited(
         &mut self,
-        delimited: impl LengthDelimited<ReadTypes = R>,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>>;
 }
 

@@ -189,10 +189,12 @@
 //! [`field::OnScanField`].
 use crate::read::{ReadError, ReadTypes};
 use crate::wire::{FieldNumber, GroupOp, I32, I64, NumericField, Varint};
-use crate::wire::{LengthDelimited, ParseEvent, ParseEventReader};
+use crate::wire::{ParseEvent, ParseEventReader};
 
 mod builder;
 pub use builder::ScannerBuilder;
+mod delimited;
+pub use delimited::ScanLengthDelimited;
 pub mod encoding;
 pub mod error;
 pub use error::ScanError;
@@ -248,7 +250,7 @@ pub trait ScanCallbacks<R: ReadTypes, F = FieldNumber> {
     fn on_length_delimited(
         &mut self,
         field: F,
-        delimited: impl LengthDelimited<ReadTypes = R>,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<Self::ScanEvent, ScanError<R::Error>>;
 }
 
@@ -274,7 +276,7 @@ impl<R: ReadTypes, F, S: ScanCallbacks<R, F>> ScanCallbacks<R, F> for &mut S {
     fn on_length_delimited(
         &mut self,
         field: F,
-        delimited: impl LengthDelimited<ReadTypes = R>,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
         (*self).on_length_delimited(field, delimited)
     }
@@ -295,7 +297,7 @@ pub struct Scan<P, S> {
 }
 
 impl<P, S> Scan<P, S> {
-    pub fn new(input: P, scanner: S) -> Self {
+    fn new(input: P, scanner: S) -> Self {
         Self {
             parse: input,
             scanner,
@@ -342,7 +344,9 @@ impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>> Iterator for IntoIter<
         let output = match event {
             ParseEvent::Numeric(numeric_field) => scanner.on_numeric(field_number, numeric_field),
             ParseEvent::Group(group_op) => scanner.on_group(field_number, group_op),
-            ParseEvent::LengthDelimited(l) => scanner.on_length_delimited(field_number, l),
+            ParseEvent::LengthDelimited(l) => {
+                scanner.on_length_delimited(field_number, delimited::ScanDelimited::new(l))
+            }
         };
         Some(output)
     }

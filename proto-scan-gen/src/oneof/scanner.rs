@@ -269,7 +269,7 @@ impl<'a> OneofScanner<'a> {
                 fn on_length_delimited(
                     &mut self,
                     field: #field_number_type,
-                    value: impl ::proto_scan::wire::LengthDelimited<ReadTypes=R>,
+                    value: impl ::proto_scan::scan::ScanLengthDelimited<ReadTypes=R>,
                 ) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
                     if self.proto_scan_last_set.is_some_and(|e| e != field) {
                         ::proto_scan::scan::ResettableScanner::reset(self);

@@ -1,6 +1,8 @@
 #![doc(hidden)]
 
 #[cfg(feature = "std")]
+use crate::scan::ScanLengthDelimited;
+#[cfg(feature = "std")]
 use crate::scan::field::save::DecodeFromBytes;
 #[cfg(feature = "std")]
 use crate::scan::field::save::bytes::SaveBytesScanner;
@@ -11,9 +13,11 @@ use {
     crate::scan::encoding::Encoding,
     crate::scan::field::OnScanField,
     crate::scan::field::{Message, RepeatStrategy, RepeatStrategyScanner},
-    crate::scan::{IntoResettableScanner, IntoScanOutput, ResettableScanner, ScanError},
-    crate::scan::{IntoScanner, MessageScanner, ScanCallbacks},
-    crate::wire::{GroupOp, LengthDelimited, NumericField, NumericWireType, WrongWireType},
+    crate::scan::{
+        IntoResettableScanner, IntoScanOutput, IntoScanner, MessageScanner, ResettableScanner,
+        ScanCallbacks, ScanError,
+    },
+    crate::wire::{GroupOp, NumericField, NumericWireType, WrongWireType},
     core::convert::Infallible,
 };
 
@@ -54,7 +58,7 @@ impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveRepeated<E> {
 
     fn on_length_delimited(
         &mut self,
-        delimited: impl LengthDelimited<ReadTypes = R>,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
         let mut packed = delimited.into_packed::<E::Wire>();
         let mut result = Ok(None);
@@ -115,11 +119,13 @@ impl<M: MessageScanner + IntoScanner<M::Message>> RepeatStrategy<M> for SaveClon
 }
 
 #[cfg(feature = "std")]
-impl<R: ReadTypes, S: ScanCallbacks<R> + IntoScanOutput + Clone> RepeatStrategyScanner<R, S> for RepeatedSave<S> {
+impl<R: ReadTypes, S: ScanCallbacks<R> + IntoScanOutput + Clone> RepeatStrategyScanner<R, S>
+    for RepeatedSave<S>
+{
     fn on_message(
         &mut self,
         scanner: &S,
-        input: impl LengthDelimited<ReadTypes = R>,
+        input: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>> {
         let mut scanner = Message::new(scanner.clone());
         let _event = scanner.on_length_delimited(input)?;
@@ -171,7 +177,7 @@ impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> OnScanField<R> for SaveRepeatedB
 
     fn on_length_delimited(
         &mut self,
-        delimited: impl LengthDelimited<ReadTypes = R>,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
         let mut scanner = SaveBytesScanner::<E, R>::new();
         let _event = scanner.on_length_delimited(delimited)?;
