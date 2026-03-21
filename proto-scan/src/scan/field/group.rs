@@ -1,5 +1,3 @@
-use core::convert::Infallible;
-
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
 use crate::scan::{
@@ -21,27 +19,22 @@ impl<M, S: MessageScanner<Message = M> + IntoScanner<M>> IntoScanner<Group<M>> f
 }
 
 impl<F: ScanCallbacks<R> + IntoScanOutput, R: ReadTypes> OnScanField<R> for Group<F> {
-    type ScanEvent = Infallible;
-
-    fn on_numeric(
-        &mut self,
-        _value: crate::scan::NumericField,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+    fn on_numeric(&mut self, _value: crate::scan::NumericField) -> Result<(), ScanError<R::Error>> {
         Err(WrongWireType.into())
     }
 
     fn on_group(
         &mut self,
         delimited: impl GroupDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
+    ) -> Result<(), ScanError<<R>::Error>> {
         delimited.scan_with(&mut self.0)?;
-        Ok(None)
+        Ok(())
     }
 
     fn on_length_delimited(
         &mut self,
         _delimited: impl ScanLengthDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+    ) -> Result<(), ScanError<R::Error>> {
         Err(WrongWireType.into())
     }
 }

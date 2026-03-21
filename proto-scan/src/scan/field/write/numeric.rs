@@ -1,6 +1,5 @@
 #![doc(hidden)]
 
-use core::convert::Infallible;
 use core::marker::PhantomData;
 use core::ops::DerefMut;
 
@@ -27,28 +26,23 @@ impl<E, D> WriteNumeric<E, D> {
 }
 
 impl<E: Encoding, D: SaveFrom<E::Repr>, R: ReadTypes> OnScanField<R> for WriteNumeric<E, D> {
-    type ScanEvent = Infallible;
-
-    fn on_numeric(
-        &mut self,
-        value: NumericField,
-    ) -> Result<Option<Infallible>, ScanError<R::Error>> {
+    fn on_numeric(&mut self, value: NumericField) -> Result<(), ScanError<R::Error>> {
         let value = <E::Wire as NumericWireType>::from_value(value)?;
         self.0.save_from(E::decode(value).map_err(Into::into)?);
-        Ok(None)
+        Ok(())
     }
 
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
+    ) -> Result<(), ScanError<<R>::Error>> {
         Err(WrongWireType.into())
     }
 
     fn on_length_delimited(
         &mut self,
         _delimited: impl ScanLengthDelimited,
-    ) -> Result<Option<Infallible>, ScanError<R::Error>> {
+    ) -> Result<(), ScanError<R::Error>> {
         Err(WrongWireType.into())
     }
 }
@@ -84,31 +78,26 @@ impl<E, D> WriteRepeatedNumeric<E, D> {
 impl<E: Encoding, R: ReadTypes, D: DerefMut<Target: Extend<E::Repr>>> OnScanField<R>
     for WriteRepeatedNumeric<E, D>
 {
-    type ScanEvent = Infallible;
-
-    fn on_numeric(
-        &mut self,
-        value: NumericField,
-    ) -> Result<Option<Infallible>, ScanError<R::Error>> {
+    fn on_numeric(&mut self, value: NumericField) -> Result<(), ScanError<R::Error>> {
         let value = <E::Wire as NumericWireType>::from_value(value)?;
         let decoded = E::decode(value).map_err(Into::into)?;
         self.0.extend([decoded]);
-        Ok(None)
+        Ok(())
     }
 
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
+    ) -> Result<(), ScanError<<R>::Error>> {
         Err(WrongWireType.into())
     }
 
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
-    ) -> Result<Option<Infallible>, ScanError<R::Error>> {
+    ) -> Result<(), ScanError<R::Error>> {
         let mut packed = delimited.into_packed::<E::Wire>();
-        let mut result = Ok(None);
+        let mut result = Ok(());
         self.0.extend(core::iter::from_fn(|| {
             let value = packed
                 .next()?

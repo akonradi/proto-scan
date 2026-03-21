@@ -115,7 +115,6 @@ fn enum_impl(name: Ident, data_enum: DataEnum) -> Result<TokenStream> {
     Ok([
         scanner.scanner_type_definition(),
         scanner.output_type_definition(),
-        scanner.event_type_definition(),
         scanner.field_number_type_definition(),
         scanner.field_number_type_impls(),
         oneof.impl_scan_message(),
@@ -166,7 +165,6 @@ fn message_impl(name: Ident, data_struct: DataStruct) -> Result<TokenStream> {
     Ok([
         message.impl_scan_message(),
         scanner.type_definition(),
-        scanner.scan_event_defn(),
         scanner.impl_scanner_builder(),
         scanner.impl_into_scan(),
         scanner.impl_into_scan_output(),

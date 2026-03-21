@@ -3,9 +3,7 @@
 #[cfg(any(feature = "std", doc))]
 use std::collections::HashMap;
 #[cfg(feature = "std")]
-use {core::convert::Infallible, core::hash::Hash, core::marker::PhantomData};
-
-use either::Either;
+use {core::hash::Hash, core::marker::PhantomData};
 
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
@@ -71,32 +69,27 @@ impl<K: MapKey + ?Sized, SV: OnScanField<R> + Clone, R: ReadTypes> OnScanField<R
 where
     Save: IntoScanner<K, Scanner<R>: OnScanField<R> + IntoScanOutput<ScanOutput: Hash + Eq>>,
 {
-    type ScanEvent = Infallible;
-
-    fn on_numeric(
-        &mut self,
-        _value: NumericField,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
+    fn on_numeric(&mut self, _value: NumericField) -> Result<(), ScanError<<R>::Error>> {
         Err(ScanError::WrongWireType)
     }
 
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
+    ) -> Result<(), ScanError<<R>::Error>> {
         Err(ScanError::WrongWireType)
     }
 
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
+    ) -> Result<(), ScanError<<R>::Error>> {
         let Self(map, value_scanner, PhantomData) = self;
         let mut scanner = MapEntry(IntoScanner::<K>::into_scanner(Save), value_scanner.clone());
         delimited.scan_with(&mut scanner)?;
         let MapEntry(key, value) = scanner;
         map.insert(key.into_scan_output(), value.into_scan_output());
-        Ok(None)
+        Ok(())
     }
 }
 
@@ -141,41 +134,42 @@ impl<SK: IntoScanOutput, SV: IntoScanOutput> IntoScanOutput for MapEntry<SK, SV>
 }
 
 impl<SK: OnScanField<R>, SV: OnScanField<R>, R: ReadTypes> ScanCallbacks<R> for MapEntry<SK, SV> {
-    type ScanEvent = Option<Either<SK::ScanEvent, SV::ScanEvent>>;
-
     fn on_numeric(
         &mut self,
         field: crate::wire::FieldNumber,
         value: NumericField,
-    ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
-        Ok(match u32::from(field) {
-            1 => self.0.on_numeric(value)?.map(Either::Left),
-            2 => self.1.on_numeric(value)?.map(Either::Right),
-            _ => None,
-        })
+    ) -> Result<(), ScanError<<R>::Error>> {
+        let _: () = match u32::from(field) {
+            1 => self.0.on_numeric(value)?,
+            2 => self.1.on_numeric(value)?,
+            _ => (),
+        };
+        Ok(())
     }
 
     fn on_group(
         &mut self,
         field: crate::wire::FieldNumber,
         group: impl GroupDelimited<ReadTypes = R>,
-    ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
-        Ok(match u32::from(field) {
-            1 => self.0.on_group(group)?.map(Either::Left),
-            2 => self.1.on_group(group)?.map(Either::Right),
-            _ => None,
-        })
+    ) -> Result<(), ScanError<<R>::Error>> {
+        let _: () = match u32::from(field) {
+            1 => self.0.on_group(group)?,
+            2 => self.1.on_group(group)?,
+            _ => (),
+        };
+        Ok(())
     }
 
     fn on_length_delimited(
         &mut self,
         field: crate::wire::FieldNumber,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
-    ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
-        Ok(match u32::from(field) {
-            1 => self.0.on_length_delimited(delimited)?.map(Either::Left),
-            2 => self.1.on_length_delimited(delimited)?.map(Either::Right),
-            _ => None,
-        })
+    ) -> Result<(), ScanError<<R>::Error>> {
+        let _: () = match u32::from(field) {
+            1 => self.0.on_length_delimited(delimited)?,
+            2 => self.1.on_length_delimited(delimited)?,
+            _ => (),
+        };
+        Ok(())
     }
 }

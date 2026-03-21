@@ -18,9 +18,7 @@ fn save_repeated_bool(input: InputKind) {
     {
         let bytes = input.encode_to_vec();
         for event in scanner.scan(bytes.as_slice()) {
-            match Result::unwrap(event) {
-                None | Some(proto::ScanScanExampleEvent::OneofGroup(())) => (),
-            }
+            let () = Result::unwrap(event);
         }
     }
     assert_eq!(

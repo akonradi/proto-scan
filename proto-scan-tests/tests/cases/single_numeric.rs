@@ -44,9 +44,7 @@ fn write_field(input: InputKind) {
     {
         let bytes = input.encode_to_vec();
         for event in scanner.scan(bytes.as_slice()) {
-            match Result::unwrap(event) {
-                None => {}
-            }
+            let () = Result::unwrap(event);
         }
     }
 

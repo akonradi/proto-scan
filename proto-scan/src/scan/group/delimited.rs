@@ -28,7 +28,7 @@ impl<'t, P: ParseEventReader, G: GroupStack> GroupDelimitedImpl<'t, P, G> {
         mut self,
         scanner: &mut S,
         field_number: FieldNumber,
-    ) -> Result<S::ScanEvent, ScanError<<P::ReadTypes as ReadTypes>::Error>> {
+    ) -> Result<(), ScanError<<P::ReadTypes as ReadTypes>::Error>> {
         self.scan_through_mut(scanner, field_number)
     }
 
@@ -39,12 +39,12 @@ impl<'t, P: ParseEventReader, G: GroupStack> GroupDelimitedImpl<'t, P, G> {
         &mut self,
         scanner: &mut S,
         field_number: FieldNumber,
-    ) -> Result<S::ScanEvent, ScanError<<P::ReadTypes as ReadTypes>::Error>> {
+    ) -> Result<(), ScanError<<P::ReadTypes as ReadTypes>::Error>> {
         self.group_stack.push(field_number.into())?;
         self.open_count += 1;
-        let event = scanner.on_group(field_number, &mut *self)?;
+        scanner.on_group(field_number, &mut *self)?;
         self.read_to_end()?;
-        Ok(event)
+        Ok(())
     }
 
     fn read_to_end(&mut self) -> Result<(), ParseEventReaderScanError<P>> {

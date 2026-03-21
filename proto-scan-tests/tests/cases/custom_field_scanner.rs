@@ -12,34 +12,31 @@ use super::*;
 use InputKind::*;
 
 struct CustomScanner<'t>(&'t mut Option<NumericField>);
-#[derive(Debug, PartialEq)]
-struct CustomEvent;
+
 #[derive(Debug, Default, PartialEq)]
 struct CustomOutput;
 
 impl<R: ReadTypes> OnScanField<R> for CustomScanner<'_> {
-    type ScanEvent = CustomEvent;
-
     fn on_numeric(
         &mut self,
         value: NumericField,
-    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::ScanError<R::Error>> {
+    ) -> Result<(), proto_scan::scan::ScanError<R::Error>> {
         *self.0 = Some(value);
-        Ok(Some(CustomEvent))
+        Ok(())
     }
 
     fn on_group(
         &mut self,
         _group: impl GroupDelimited,
-    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::ScanError<R::Error>> {
-        Ok(None)
+    ) -> Result<(), proto_scan::scan::ScanError<R::Error>> {
+        Ok(())
     }
 
     fn on_length_delimited(
         &mut self,
         _delimited: impl proto_scan::wire::LengthDelimited,
-    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::ScanError<R::Error>> {
-        Ok(None)
+    ) -> Result<(), proto_scan::scan::ScanError<R::Error>> {
+        Ok(())
     }
 }
 

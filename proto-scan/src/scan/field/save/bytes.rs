@@ -56,29 +56,24 @@ impl DecodeFromBytes for [u8] {
 }
 
 impl<T: DecodeFromBytes + ?Sized, R: ReadTypes> OnScanField<R> for SaveBytesScanner<T, R> {
-    type ScanEvent = Infallible;
-
-    fn on_numeric(
-        &mut self,
-        _value: NumericField,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+    fn on_numeric(&mut self, _value: NumericField) -> Result<(), ScanError<R::Error>> {
         Err(WrongWireType.into())
     }
 
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
+    ) -> Result<(), ScanError<<R>::Error>> {
         Err(WrongWireType.into())
     }
 
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+    ) -> Result<(), ScanError<R::Error>> {
         let bytes = delimited.into_bytes()?;
         self.0 = T::decode(bytes).map_err(|_| ScanError::Utf8)?;
-        Ok(None)
+        Ok(())
     }
 }
 

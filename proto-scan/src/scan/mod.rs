@@ -242,38 +242,26 @@ pub trait IntoScanOutput {
 
 /// Callbacks for parse inputs encountered during a scan.
 pub trait ScanCallbacks<R: ReadTypes, F = FieldNumber> {
-    type ScanEvent;
-
     /// Called when a numeric field is parsed.
-    fn on_numeric(
-        &mut self,
-        field: F,
-        value: NumericField,
-    ) -> Result<Self::ScanEvent, ScanError<R::Error>>;
+    fn on_numeric(&mut self, field: F, value: NumericField) -> Result<(), ScanError<R::Error>>;
 
     /// Called when a SGROUP tag is read.
     fn on_group(
         &mut self,
         field: F,
         group: impl GroupDelimited<ReadTypes = R>,
-    ) -> Result<Self::ScanEvent, ScanError<R::Error>>;
+    ) -> Result<(), ScanError<R::Error>>;
 
     /// Called when a length-delimited field tag is encountered.
     fn on_length_delimited(
         &mut self,
         field: F,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
-    ) -> Result<Self::ScanEvent, ScanError<R::Error>>;
+    ) -> Result<(), ScanError<R::Error>>;
 }
 
 impl<R: ReadTypes, F, S: ScanCallbacks<R, F>> ScanCallbacks<R, F> for &mut S {
-    type ScanEvent = S::ScanEvent;
-
-    fn on_numeric(
-        &mut self,
-        field: F,
-        value: NumericField,
-    ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
+    fn on_numeric(&mut self, field: F, value: NumericField) -> Result<(), ScanError<<R>::Error>> {
         (*self).on_numeric(field, value)
     }
 
@@ -281,7 +269,7 @@ impl<R: ReadTypes, F, S: ScanCallbacks<R, F>> ScanCallbacks<R, F> for &mut S {
         &mut self,
         field: F,
         group: impl GroupDelimited<ReadTypes = R>,
-    ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
+    ) -> Result<(), ScanError<<R>::Error>> {
         (*self).on_group(field, group)
     }
 
@@ -289,7 +277,7 @@ impl<R: ReadTypes, F, S: ScanCallbacks<R, F>> ScanCallbacks<R, F> for &mut S {
         &mut self,
         field: F,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
-    ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
+    ) -> Result<(), ScanError<<R>::Error>> {
         (*self).on_length_delimited(field, delimited)
     }
 }
@@ -347,8 +335,7 @@ impl<P, S> Scan<P, S, ()> {
 /// [`IntoIterator::IntoIter`] type for [`Scan`].
 ///
 /// Implements [`Iterator`] by applying events from a [`ParseEventReader`] to a
-/// [`ScanCallbacks`] and yielding the resulting [`ScanCallbacks::ScanEvent`] or
-/// an error.
+/// [`ScanCallbacks`] and yielding each result.
 pub struct IntoIter<P, S, G> {
     parse: P,
     scanner: S,
@@ -361,7 +348,7 @@ type ParseEventReaderScanError<P> =
 impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>, G: GroupStack> IntoIterator
     for Scan<P, S, G>
 {
-    type Item = Result<S::ScanEvent, ParseEventReaderScanError<P>>;
+    type Item = Result<(), ParseEventReaderScanError<P>>;
     type IntoIter = IntoIter<P, S, G>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -381,10 +368,8 @@ impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>, G: GroupStack> IntoIte
 impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>, G: GroupStack> Iterator
     for IntoIter<P, S, G>
 {
-    type Item = Result<S::ScanEvent, ParseEventReaderScanError<P>>;
-    fn next(
-        &mut self,
-    ) -> Option<Result<S::ScanEvent, ScanError<<P::ReadTypes as ReadTypes>::Error>>> {
+    type Item = Result<(), ParseEventReaderScanError<P>>;
+    fn next(&mut self) -> Option<Result<(), ScanError<<P::ReadTypes as ReadTypes>::Error>>> {
         let Self {
             parse,
             scanner,
@@ -395,16 +380,12 @@ impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>, G: GroupStack> Iterato
     }
 }
 
-#[allow(type_alias_bounds)]
-type ScanEvent<S: ScanCallbacks<P::ReadTypes>, P: ParseEventReader> =
-    Result<S::ScanEvent, ScanError<<P::ReadTypes as ReadTypes>::Error>>;
-
 #[inline]
 fn next_event<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>, G: GroupStack>(
     parse: &mut P,
     scanner: &mut S,
     group_stack: &mut G,
-) -> Option<ScanEvent<S, P>> {
+) -> Option<Result<(), ScanError<<P::ReadTypes as ReadTypes>::Error>>> {
     let (field_number, event) = match parse.next() {
         Some(Err(e)) => return Some(Err(e.into())),
         None => return None,
@@ -436,7 +417,7 @@ impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes> + IntoScanOutput, G: Gr
     pub fn read_all(self) -> Result<S::ScanOutput, ParseEventReaderScanError<P>> {
         let mut it = self.into_iter();
         for r in it.by_ref() {
-            let _ = r?;
+            r?;
         }
         Ok(it.scanner.into_scan_output())
     }

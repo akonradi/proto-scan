@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::Ident;
 
@@ -28,11 +28,6 @@ impl<'a> OneofScanner<'a> {
                     field: f,
                 },
             })
-    }
-
-    fn scan_event_name(&self) -> Ident {
-        let scanner_name = self.type_name();
-        Ident::new(&format!("{scanner_name}Event"), Span::call_site())
     }
 
     pub fn scanner_type_definition(&self) -> TokenStream {
@@ -101,24 +96,6 @@ impl<'a> OneofScanner<'a> {
                     let Self { #(#fields,)* proto_scan_last_set } = self;
                     Self::Scanner { #(#fields: #fields.into_scanner(),)* proto_scan_last_set}
                 }
-            }
-        }
-    }
-
-    pub fn event_type_definition(&self) -> TokenStream {
-        let type_name = self.scan_event_name();
-        let generics = self.fields().map(|f| &f.inner.field.generic);
-        let fields = self.fields().map(|f| {
-            let variant = &f.inner.field.variant_name;
-            let generic = &f.inner.field.generic;
-            quote! {
-                #variant(#generic)
-            }
-        });
-        quote! {
-            #[derive(Copy, Clone, Debug, Hash, PartialEq)]
-            pub enum #type_name<#(#generics = ()),*> {
-                #(#fields),*
             }
         }
     }
@@ -213,10 +190,8 @@ impl<'a> OneofScanner<'a> {
             }
         });
 
-        let scan_event_name = self.scan_event_name();
         let field_arms = |fn_name: &str| {
             let field_number_type = &field_number_type;
-            let scan_event_name = &scan_event_name;
             let fn_name = format_ident!("{fn_name}");
             self.fields().map(move |OneofScannerField { inner } | {
                 let Field {field_type, field_name, generic: _, variant_name } = &inner.field;
@@ -226,9 +201,8 @@ impl<'a> OneofScanner<'a> {
                     | OneOfField::Group(_)
                     | OneOfField::Bytes(_) => quote! {
                         #field_number_type::#variant_name => {
-                            let event = self.#field_name.#fn_name(value)?;
+                            self.#field_name.#fn_name(value)?;
                             self.proto_scan_last_set = ::core::option::Option::Some(#field_number_type::#variant_name);
-                            #scan_event_name::#variant_name(event)
                         },
                     },
                 }
@@ -243,13 +217,11 @@ impl<'a> OneofScanner<'a> {
                 #(#generics_with_bounds,)*
                 R: ::proto_scan::read::ReadTypes
             > ::proto_scan::scan::ScanCallbacks<R, #field_number_type> for #type_name< #(#generics),* > {
-                type ScanEvent = #scan_event_name < #(::core::option::Option<<#generics as ::proto_scan::scan::field::OnScanField<R>>::ScanEvent>),* >;
-
                 fn on_numeric(
                     &mut self,
                     field: #field_number_type,
                     value: ::proto_scan::wire::NumericField,
-                ) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
+                ) -> Result<(), ::proto_scan::scan::ScanError<R::Error>> {
                     if self.proto_scan_last_set.is_some_and(|e| e != field) {
                         ::proto_scan::scan::ResettableScanner::reset(self);
                     }
@@ -258,7 +230,7 @@ impl<'a> OneofScanner<'a> {
                     })
                 }
 
-                fn on_group(&mut self, field: #field_number_type, value: impl ::proto_scan::scan::GroupDelimited<ReadTypes=R>) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
+                fn on_group(&mut self, field: #field_number_type, value: impl ::proto_scan::scan::GroupDelimited<ReadTypes=R>) -> Result<(), ::proto_scan::scan::ScanError<R::Error>> {
                     if self.proto_scan_last_set.is_some_and(|e| e != field) {
                         ::proto_scan::scan::ResettableScanner::reset(self);
                     }
@@ -271,7 +243,7 @@ impl<'a> OneofScanner<'a> {
                     &mut self,
                     field: #field_number_type,
                     value: impl ::proto_scan::scan::ScanLengthDelimited<ReadTypes=R>,
-                ) -> Result<Self::ScanEvent, ::proto_scan::scan::ScanError<R::Error>> {
+                ) -> Result<(), ::proto_scan::scan::ScanError<R::Error>> {
                     if self.proto_scan_last_set.is_some_and(|e| e != field) {
                         ::proto_scan::scan::ResettableScanner::reset(self);
                     }

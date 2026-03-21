@@ -1,5 +1,3 @@
-use core::convert::Infallible;
-
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
 use crate::scan::{
@@ -12,38 +10,27 @@ use crate::scan::{
 pub struct NoOp;
 
 impl<R: ReadTypes> OnScanField<R> for NoOp {
-    type ScanEvent = Infallible;
-
-    fn on_numeric(
-        &mut self,
-        _value: NumericField,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
-        Ok(None)
+    fn on_numeric(&mut self, _value: NumericField) -> Result<(), ScanError<R::Error>> {
+        Ok(())
     }
 
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
-        Ok(None)
+    ) -> Result<(), ScanError<<R>::Error>> {
+        Ok(())
     }
 
     fn on_length_delimited(
         &mut self,
         _delimited: impl ScanLengthDelimited,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
-        Ok(None)
+    ) -> Result<(), ScanError<R::Error>> {
+        Ok(())
     }
 }
 
 impl<R: ReadTypes, F> ScanCallbacks<R, F> for NoOp {
-    type ScanEvent = ();
-
-    fn on_numeric(
-        &mut self,
-        _field: F,
-        _value: NumericField,
-    ) -> Result<Self::ScanEvent, ScanError<R::Error>> {
+    fn on_numeric(&mut self, _field: F, _value: NumericField) -> Result<(), ScanError<R::Error>> {
         Ok(())
     }
 
@@ -51,7 +38,7 @@ impl<R: ReadTypes, F> ScanCallbacks<R, F> for NoOp {
         &mut self,
         _field: F,
         _group: impl GroupDelimited<ReadTypes = R>,
-    ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
+    ) -> Result<(), ScanError<<R>::Error>> {
         Ok(())
     }
 
@@ -59,7 +46,7 @@ impl<R: ReadTypes, F> ScanCallbacks<R, F> for NoOp {
         &mut self,
         _field: F,
         _delimited: impl ScanLengthDelimited<ReadTypes = R>,
-    ) -> Result<Self::ScanEvent, ScanError<R::Error>> {
+    ) -> Result<(), ScanError<R::Error>> {
         Ok(())
     }
 }

@@ -24,25 +24,20 @@ pub use write::{SaveFrom, Write};
 
 /// Implemented by a visitor for a fixed [`FieldNumber`].
 pub trait OnScanField<R: ReadTypes>: IntoScanOutput {
-    type ScanEvent;
-
     /// Called when a numeric tag is read.
-    fn on_numeric(
-        &mut self,
-        value: NumericField,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>>;
+    fn on_numeric(&mut self, value: NumericField) -> Result<(), ScanError<R::Error>>;
 
     /// Called when a SGROUP tag is read.
     fn on_group(
         &mut self,
         group: impl GroupDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>>;
+    ) -> Result<(), ScanError<R::Error>>;
 
     /// Called when a length-delimited tag is read.
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>>;
+    ) -> Result<(), ScanError<R::Error>>;
 }
 
 #[cfg(test)]

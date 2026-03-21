@@ -1,4 +1,3 @@
-use core::convert::Infallible;
 use core::marker::PhantomData;
 use core::ops::DerefMut;
 
@@ -96,27 +95,22 @@ impl<S, F: IntoScanOutput> IntoScanOutput for RepeatedScanner<S, F> {
 impl<R: ReadTypes, S: ScanCallbacks<R>, F: RepeatStrategyScanner<R, S>> OnScanField<R>
     for RepeatedScanner<S, F>
 {
-    type ScanEvent = Infallible;
-
-    fn on_numeric(
-        &mut self,
-        _value: NumericField,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+    fn on_numeric(&mut self, _value: NumericField) -> Result<(), ScanError<R::Error>> {
         Err(WrongWireType.into())
     }
 
     fn on_group(
         &mut self,
         delimited: impl GroupDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
-        self.1.on_message(&self.0, delimited).map(|()| None)
+    ) -> Result<(), ScanError<<R>::Error>> {
+        self.1.on_message(&self.0, delimited)
     }
 
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
-        self.1.on_message(&self.0, delimited).map(|()| None)
+    ) -> Result<(), ScanError<R::Error>> {
+        self.1.on_message(&self.0, delimited)
     }
 }
 

@@ -29,32 +29,27 @@ impl<S: IntoScanOutput> IntoScanOutput for SaveOptional<S> {
 }
 
 impl<S: OnScanField<R>, R: ReadTypes> OnScanField<R> for SaveOptional<S> {
-    type ScanEvent = S::ScanEvent;
-
-    fn on_numeric(
-        &mut self,
-        value: NumericField,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
-        let event = self.inner.on_numeric(value)?;
+    fn on_numeric(&mut self, value: NumericField) -> Result<(), ScanError<R::Error>> {
+        self.inner.on_numeric(value)?;
         self.present = true;
-        Ok(event)
+        Ok(())
     }
 
     fn on_group(
         &mut self,
         group: impl GroupDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
-        let event = self.inner.on_group(group)?;
+    ) -> Result<(), ScanError<R::Error>> {
+        self.inner.on_group(group)?;
         self.present = true;
-        Ok(event)
+        Ok(())
     }
 
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
-        let event = self.inner.on_length_delimited(delimited)?;
+    ) -> Result<(), ScanError<R::Error>> {
+        self.inner.on_length_delimited(delimited)?;
         self.present = true;
-        Ok(event)
+        Ok(())
     }
 }

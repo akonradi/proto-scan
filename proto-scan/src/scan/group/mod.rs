@@ -21,12 +21,11 @@ mod test {
     }
 
     impl<R: ReadTypes> ScanCallbacks<R> for ScannerImpl {
-        type ScanEvent = ();
         fn on_numeric(
             &mut self,
             field: FieldNumber,
             value: crate::wire::NumericField,
-        ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
+        ) -> Result<(), ScanError<<R>::Error>> {
             if field == 2 {
                 let value = assert_matches!(value, NumericField::Varint(v) => v);
                 self.field_2.push(value);
@@ -37,7 +36,7 @@ mod test {
             &mut self,
             _field: FieldNumber,
             _group: impl GroupDelimited<ReadTypes = R>,
-        ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
+        ) -> Result<(), ScanError<<R>::Error>> {
             Ok(())
         }
 
@@ -45,7 +44,7 @@ mod test {
             &mut self,
             _field: FieldNumber,
             _delimited: impl ScanLengthDelimited<ReadTypes = R>,
-        ) -> Result<Self::ScanEvent, ScanError<<R>::Error>> {
+        ) -> Result<(), ScanError<<R>::Error>> {
             Ok(())
         }
     }

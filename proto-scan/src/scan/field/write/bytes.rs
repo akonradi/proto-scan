@@ -1,6 +1,5 @@
 #![doc(hidden)]
 
-use core::convert::Infallible;
 use core::marker::PhantomData;
 use core::ops::DerefMut;
 
@@ -28,30 +27,25 @@ impl<E: ?Sized, D> WriteBytes<E, D> {
 impl<B: DecodeFromBytes + ?Sized, D: SaveFrom<B::Decoded<R>>, R: ReadTypes> OnScanField<R>
     for WriteBytes<B, D>
 {
-    type ScanEvent = Infallible;
-
-    fn on_numeric(
-        &mut self,
-        _value: NumericField,
-    ) -> Result<Option<Infallible>, ScanError<R::Error>> {
+    fn on_numeric(&mut self, _value: NumericField) -> Result<(), ScanError<R::Error>> {
         Err(WrongWireType.into())
     }
 
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
+    ) -> Result<(), ScanError<<R>::Error>> {
         Err(WrongWireType.into())
     }
 
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
-    ) -> Result<Option<Infallible>, ScanError<R::Error>> {
+    ) -> Result<(), ScanError<R::Error>> {
         let bytes = delimited.into_bytes()?;
         let decoded = B::decode(bytes).map_err(|_| ScanError::Utf8)?;
         self.0.save_from(decoded);
-        Ok(None)
+        Ok(())
     }
 }
 
@@ -92,29 +86,24 @@ impl<E: ?Sized, D> IntoScanOutput for WriteRepeatedBytes<E, D> {
 impl<B: DecodeFromBytes + ?Sized, D: DerefMut<Target: Extend<B::Decoded<R>>>, R: ReadTypes>
     OnScanField<R> for WriteRepeatedBytes<B, D>
 {
-    type ScanEvent = Infallible;
-
-    fn on_numeric(
-        &mut self,
-        _value: NumericField,
-    ) -> Result<Option<Infallible>, ScanError<R::Error>> {
+    fn on_numeric(&mut self, _value: NumericField) -> Result<(), ScanError<R::Error>> {
         Err(WrongWireType.into())
     }
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
+    ) -> Result<(), ScanError<<R>::Error>> {
         Err(WrongWireType.into())
     }
 
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
-    ) -> Result<Option<Infallible>, ScanError<R::Error>> {
+    ) -> Result<(), ScanError<R::Error>> {
         let bytes = delimited.into_bytes()?;
         let decoded = B::decode(bytes).map_err(|_| ScanError::Utf8)?;
         self.0.extend([decoded]);
-        Ok(None)
+        Ok(())
     }
 }
 

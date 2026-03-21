@@ -30,29 +30,23 @@ impl<E: Encoding> Default for SaveNumeric<E> {
 }
 
 impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveNumeric<E> {
-    type ScanEvent = E::Repr;
-
-    fn on_numeric(
-        &mut self,
-        value: NumericField,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+    fn on_numeric(&mut self, value: NumericField) -> Result<(), ScanError<R::Error>> {
         let value = <E::Wire as NumericWireType>::from_value(value)?;
-        let value = E::decode(value).map_err(Into::into)?;
-        self.0 = value;
-        Ok(Some(value))
+        self.0 = E::decode(value).map_err(Into::into)?;
+        Ok(())
     }
 
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
+    ) -> Result<(), ScanError<<R>::Error>> {
         Err(WrongWireType.into())
     }
 
     fn on_length_delimited(
         &mut self,
         _delimited: impl ScanLengthDelimited,
-    ) -> Result<Option<Self::ScanEvent>, ScanError<R::Error>> {
+    ) -> Result<(), ScanError<R::Error>> {
         Err(WrongWireType.into())
     }
 }

@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashSet;
 
 use prost::Message as _;
@@ -10,42 +11,50 @@ use super::*;
 use InputKind::*;
 
 #[derive(Copy, Clone, Debug)]
-struct EmitEvent<T>(T);
+struct EmitEvent<F>(F);
 
-impl<M, T> IntoScanner<M> for EmitEvent<T> {
+impl<M, F> IntoScanner<M> for EmitEvent<F> {
     type Scanner<R: ReadTypes> = Self;
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         self
     }
 }
 
-impl<T> IntoScanOutput for EmitEvent<T> {
-    type ScanOutput = T;
+impl<F> IntoScanOutput for EmitEvent<F> {
+    type ScanOutput = F;
     fn into_scan_output(self) -> Self::ScanOutput {
         self.0
     }
 }
 
-impl<R: ReadTypes, T: Clone> OnScanField<R> for EmitEvent<T> {
-    type ScanEvent = T;
+impl<R: ReadTypes, F: FnMut()> OnScanField<R> for EmitEvent<F> {
     fn on_numeric(
         &mut self,
         _value: proto_scan::wire::NumericField,
-    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::ScanError<R::Error>> {
-        Ok(Some(self.0.clone()))
+    ) -> Result<(), proto_scan::scan::ScanError<R::Error>> {
+        self.0();
+        Ok(())
     }
     fn on_group(
         &mut self,
         _group: impl proto_scan::scan::GroupDelimited,
-    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::ScanError<R::Error>> {
-        Ok(Some(self.0.clone()))
+    ) -> Result<(), proto_scan::scan::ScanError<R::Error>> {
+        self.0();
+        Ok(())
     }
     fn on_length_delimited(
         &mut self,
         _delimited: impl proto_scan::wire::LengthDelimited<ReadTypes = R>,
-    ) -> Result<Option<Self::ScanEvent>, proto_scan::scan::ScanError<R::Error>> {
-        Ok(Some(self.0.clone()))
+    ) -> Result<(), proto_scan::scan::ScanError<R::Error>> {
+        self.0();
+        Ok(())
     }
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+enum Event {
+    SingleBool,
+    SingleFixed64,
 }
 
 #[test_case(Empty)]
@@ -54,30 +63,31 @@ fn scan_message(input: InputKind) {
     let input = input.into_example_msg();
     let bytes = input.encode_to_vec();
 
+    let event_sink = RefCell::new(HashSet::new());
+    let push_event = |event| {
+        let event_sink = &event_sink;
+        move || {
+            event_sink.borrow_mut().insert(event);
+        }
+    };
+
     let scanner = proto::ScanExample::scanner()
-        .single_bool(EmitEvent("bool"))
-        .single_fixed64(EmitEvent(b"fixed64"));
+        .single_bool(EmitEvent(push_event(Event::SingleBool)))
+        .single_fixed64(EmitEvent(push_event(Event::SingleFixed64)));
 
     let mut expected_events = HashSet::new();
     if input.single_bool.is_some_and(|b| b) {
-        expected_events.insert(Some(proto::ScanScanExampleEvent::SingleBool("bool")));
+        expected_events.insert(Event::SingleBool);
     }
     if input.single_fixed64.is_some_and(|f| f != 0) {
-        expected_events.insert(Some(proto::ScanScanExampleEvent::SingleFixed64(b"fixed64")));
-    }
-    if !bytes.is_empty() {
-        expected_events.insert(None);
-    }
-    if input.oneof_group.is_some() {
-        expected_events.insert(Some(proto::ScanScanExampleEvent::OneofGroup(())));
+        expected_events.insert(Event::SingleFixed64);
     }
 
-    let events = scanner
+    let () = scanner
         .scan(bytes.as_slice())
         .into_iter()
-        .inspect(|e| println!("{e:?}"))
-        .collect::<Result<HashSet<_>, _>>()
+        .collect::<Result<(), _>>()
         .unwrap();
 
-    assert_eq!(events, expected_events);
+    assert_eq!(event_sink.into_inner(), expected_events);
 }

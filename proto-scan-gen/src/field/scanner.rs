@@ -1,6 +1,5 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Ident;
 
 use crate::field::{Field, MessageFieldType};
 use crate::scanner::{ScannerOutput as _, SwapSingleFieldFn, SwapSingleFieldInherentImpl};
@@ -27,14 +26,6 @@ impl<'m> MessageScannerField<'m> {
                 field,
             },
         }
-    }
-
-    pub fn generic(&self) -> &Ident {
-        &self.inner.field.generic
-    }
-
-    pub fn variant_name(&self) -> &Ident {
-        &self.inner.field.variant_name
     }
 
     pub fn impl_(&self) -> TokenStream {
