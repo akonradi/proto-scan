@@ -12,7 +12,7 @@
 //! To read a message in full, calling code must call `ParseEventReader::next`
 //! until it returns `None`, signaling the end of the input. At any point,
 //! calling code can drop the reader to avoid reading the rest of the input
-//! stream (though, given the merge semantics of protocol buffers, this isn't
+//! stream (though, given the [merge semantics] of protocol buffers, this isn't
 //! frequently useful).
 //!
 //! As an example, here is a method that scans for a protobuf int64 field and
@@ -55,6 +55,8 @@
 //! #     assert_eq!(read_int64(1, &mut &INPUT[..]), Ok(Some(150)))
 //! # }
 //! ```
+//! 
+//! [merge semantics]: https://protobuf.dev/programming-guides/encoding/#last-one-wins
 use crate::decode_error::DecodeVarintError;
 
 pub use field_number::{FieldNumber, InvalidFieldNumber};

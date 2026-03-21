@@ -6,7 +6,7 @@
 //! There are two ways of getting streaming access to the contents of a protobuf
 //! message stream. The [high-level] scan API uses generated code to enable
 //! reading an event stream with conventional protobuf message semantics, while the
-//! low-level parse event stream API provides typed access to the protobuf wire
+//! [low-level] parse event stream API provides typed access to the protobuf wire
 //! format.
 //!
 //! # High-level: generated scanner types
