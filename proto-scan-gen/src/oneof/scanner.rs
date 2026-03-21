@@ -219,7 +219,9 @@ impl<'a> OneofScanner<'a> {
             > ::proto_scan::scan::ScanCallbacks<R, #field_number_type> for #type_name< #(#generics),* > {
                 fn on_numeric(
                     &mut self,
+                    #[allow(unused)]
                     field: #field_number_type,
+                    #[allow(unused)]
                     value: ::proto_scan::wire::NumericField,
                 ) -> Result<(), ::proto_scan::scan::ScanError<R::Error>> {
                     if self.proto_scan_last_set.is_some_and(|e| e != field) {
@@ -230,7 +232,12 @@ impl<'a> OneofScanner<'a> {
                     })
                 }
 
-                fn on_group(&mut self, field: #field_number_type, value: impl ::proto_scan::scan::GroupDelimited<ReadTypes=R>) -> Result<(), ::proto_scan::scan::ScanError<R::Error>> {
+                fn on_group(&mut self,
+                    #[allow(unused)]
+                    field: #field_number_type,
+                    #[allow(unused)]
+                    value: impl ::proto_scan::scan::GroupDelimited<ReadTypes=R>
+                ) -> Result<(), ::proto_scan::scan::ScanError<R::Error>> {
                     if self.proto_scan_last_set.is_some_and(|e| e != field) {
                         ::proto_scan::scan::ResettableScanner::reset(self);
                     }
@@ -241,7 +248,9 @@ impl<'a> OneofScanner<'a> {
 
                 fn on_length_delimited(
                     &mut self,
+                    #[allow(unused)]
                     field: #field_number_type,
+                    #[allow(unused)]
                     value: impl ::proto_scan::scan::ScanLengthDelimited<ReadTypes=R>,
                 ) -> Result<(), ::proto_scan::scan::ScanError<R::Error>> {
                     if self.proto_scan_last_set.is_some_and(|e| e != field) {

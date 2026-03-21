@@ -176,7 +176,9 @@ impl<'m> MessageScanner<'m> {
             impl <#(#generics_on_scan_bounds,)* R: ::proto_scan::read::ReadTypes> ::proto_scan::scan::ScanCallbacks<R> for #scanner_name<#(#generics,)*> {
                 fn on_numeric(
                     &mut self,
+                    #[allow(unused)]
                     field: ::proto_scan::wire::FieldNumber,
+                    #[allow(unused)]
                     value: ::proto_scan::wire::NumericField,
                 ) -> Result<(), ::proto_scan::scan::ScanError<R::Error>> {
                     #[allow(clippy::match_single_binding)]
@@ -186,7 +188,12 @@ impl<'m> MessageScanner<'m> {
                     })
                 }
 
-                fn on_group(&mut self, field: ::proto_scan::wire::FieldNumber, value: impl ::proto_scan::scan::GroupDelimited<ReadTypes=R>) -> Result<(), ::proto_scan::scan::ScanError<R::Error>> {
+                fn on_group(&mut self,
+                    #[allow(unused)]
+                    field: ::proto_scan::wire::FieldNumber,
+                    #[allow(unused)]
+                    value: impl ::proto_scan::scan::GroupDelimited<ReadTypes=R>
+                ) -> Result<(), ::proto_scan::scan::ScanError<R::Error>> {
                     #[allow(clippy::match_single_binding)]
                     Ok(match u32::from(field) {
                         #(#on_group_arms)*
@@ -196,7 +203,9 @@ impl<'m> MessageScanner<'m> {
 
                 fn on_length_delimited(
                     &mut self,
+                    #[allow(unused)]
                     field: ::proto_scan::wire::FieldNumber,
+                    #[allow(unused)]
                     value: impl ::proto_scan::scan::ScanLengthDelimited<ReadTypes=R>,
                 ) -> Result<(), ::proto_scan::scan::ScanError<R::Error>> {
                     #[allow(clippy::match_single_binding)]
