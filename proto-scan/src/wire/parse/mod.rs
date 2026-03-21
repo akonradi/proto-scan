@@ -4,7 +4,7 @@ use core::num::NonZeroU32;
 use either::Either;
 
 use crate::DecodeError;
-use crate::read::{Read, ReadTypes};
+use crate::read::{Read, ReadBytesError, ReadTypes};
 use crate::wire::{FieldNumber, GroupOp, NumericField, NumericWireType};
 
 use event_reader::EventReader;
@@ -55,7 +55,7 @@ pub trait LengthDelimited: DelimitedTypes {
         self,
     ) -> Result<
         <Self::ReadTypes as ReadTypes>::Buffer,
-        DecodeError<<Self::ReadTypes as ReadTypes>::Error>,
+        ReadBytesError<<Self::ReadTypes as ReadTypes>::Error>,
     >;
 
     /// Consumes the contents of the field as a sequence of [`ParseEvent`]s in

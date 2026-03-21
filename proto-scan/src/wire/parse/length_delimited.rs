@@ -3,7 +3,6 @@ use core::num::NonZeroU32;
 use assert_matches::debug_assert_matches;
 use either::Either;
 
-use crate::DecodeError;
 use crate::decode_error::DecodeVarintError;
 use crate::read::{Read, ReadBytesError, ReadTypes};
 use crate::wire::parse::{DelimitedTypes, DoBeforeNext, EventReader, LimitReader, NumericIter};
@@ -67,13 +66,13 @@ impl<'a, R: Read> LengthDelimited for LengthDelimitedImpl<'a, R> {
         mut self,
     ) -> Result<
         <Self::ReadTypes as ReadTypes>::Buffer,
-        DecodeError<<Self::ReadTypes as ReadTypes>::Error>,
+        ReadBytesError<<Self::ReadTypes as ReadTypes>::Error>,
     > {
         let remaining = self.reader.remaining();
         let bytes = self.reader.read(remaining)?;
         if bytes.as_ref().len() != remaining as usize {
             *self.write_back_to = DoBeforeNext::Error;
-            return Err(DecodeError::UnexpectedEnd);
+            return Err(ReadBytesError::UnexpectedEnd);
         }
         Ok(bytes)
     }

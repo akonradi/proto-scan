@@ -44,7 +44,7 @@ impl<L: LengthDelimited, G> LengthDelimited for ScanDelimitedImpl<'_, L, G> {
         self,
     ) -> Result<
         <Self::ReadTypes as ReadTypes>::Buffer,
-        crate::DecodeError<<Self::ReadTypes as ReadTypes>::Error>,
+        crate::read::ReadBytesError<<Self::ReadTypes as ReadTypes>::Error>,
     > {
         self.length_delimited.into_bytes()
     }

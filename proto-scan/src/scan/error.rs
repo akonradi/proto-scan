@@ -1,12 +1,13 @@
 use core::convert::Infallible;
 
 use crate::DecodeError;
+use crate::read::ReadBytesError;
 use crate::scan::encoding::VarintOutOfBounds;
 use crate::wire::WrongWireType;
 
 #[derive(Clone, Debug, PartialEq, derive_more::From)]
 pub enum ScanError<R> {
-    #[from]
+    #[from(DecodeError<R>, ReadBytesError<R>)]
     Decode(DecodeError<R>),
     VarintOutOfBounds,
     WrongWireType,
