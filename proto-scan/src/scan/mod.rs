@@ -194,17 +194,15 @@ use crate::wire::{ParseEvent, ParseEventReader};
 mod builder;
 pub use builder::ScannerBuilder;
 mod delimited;
-pub use delimited::{ScanLengthDelimited, ScanDelimited};
+pub use delimited::{ScanDelimited, ScanLengthDelimited};
 pub mod encoding;
-pub mod error;
+mod error;
 pub use error::ScanError;
 pub mod field;
 mod group;
 pub use group::{GroupDelimited, GroupStack};
 mod resettable;
 pub use resettable::{IntoResettableScanner, ResettableScanner};
-mod save_from;
-pub use save_from::SaveFrom;
 
 /// A message that can be scanned.
 pub trait ScanMessage {
@@ -224,11 +222,19 @@ pub trait MessageScanner {
     type Message: ScanMessage;
 }
 
+/// A type that can be used to produce a protobuf scanner.
+///
+/// The scanner will need to implement one of [`ScanCallbacks`] or
+/// [`field::OnScanField`] to be useful.
 pub trait IntoScanner<T: ?Sized> {
     type Scanner<R: ReadTypes>: IntoScanOutput;
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R>;
 }
 
+/// A type that can produce its output on completion of a scan.
+///
+/// This is implemented by most types that implement [`ScanCallbacks`] or
+/// [`field::OnScanField`].
 pub trait IntoScanOutput {
     type ScanOutput;
     fn into_scan_output(self) -> Self::ScanOutput;

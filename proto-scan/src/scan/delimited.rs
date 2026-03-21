@@ -1,15 +1,24 @@
-use crate::read::ReadTypes;
+use crate::read::{Read, ReadTypes};
 use crate::scan::{GroupStack, ScanCallbacks, ScanError};
 use crate::wire::{DelimitedTypes, LengthDelimited, ParseEventReader};
 
+/// Allows scanning the contents of a delimited field.
 pub trait ScanDelimited: DelimitedTypes {
+    /// Scans the contents of the delimited field.
+    ///
+    /// The provided [`ScanCallbacks`] implementation will have its methods
+    /// invoked for each scan event.
     fn scan_with<S: ScanCallbacks<Self::ReadTypes>>(
         self,
         scanner: S,
     ) -> Result<(), ScanError<<Self::ReadTypes as ReadTypes>::Error>>;
 }
 
+/// Functionally an alias for [`LengthDelimited`] plus [`ScanDelimited`].
+///
+/// Blanket-implemented for all compatible types.
 pub trait ScanLengthDelimited: LengthDelimited + ScanDelimited {}
+impl<L: LengthDelimited + ScanDelimited> ScanLengthDelimited for L {}
 
 pub(super) struct ScanDelimitedImpl<'g, L, G> {
     length_delimited: L,
@@ -56,6 +65,10 @@ impl<L: LengthDelimited, G> LengthDelimited for ScanDelimitedImpl<'_, L, G> {
     fn into_events(self) -> impl ParseEventReader<ReadTypes = Self::ReadTypes> {
         self.length_delimited.into_events()
     }
+
+    fn is_empty(&self) -> bool {
+        self.length_delimited.is_empty()
+    }
 }
 
 impl<L: LengthDelimited, G: GroupStack> ScanDelimited for ScanDelimitedImpl<'_, L, G> {
@@ -75,5 +88,3 @@ impl<L: LengthDelimited, G: GroupStack> ScanDelimited for ScanDelimitedImpl<'_, 
         Ok(())
     }
 }
-
-impl<L: LengthDelimited, G: GroupStack> ScanLengthDelimited for ScanDelimitedImpl<'_, L, G> {}

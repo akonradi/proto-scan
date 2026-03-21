@@ -9,6 +9,8 @@ mod numeric;
 use numeric::{WriteNumeric, WriteRepeatedNumeric};
 mod restore;
 use restore::*;
+mod save_from;
+pub use save_from::SaveFrom;
 
 pub struct Write<T>(pub T);
 

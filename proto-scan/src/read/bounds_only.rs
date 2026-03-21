@@ -2,6 +2,7 @@ use core::convert::Infallible as Never;
 
 use crate::read::{ReadBuffer, ReadTypes};
 
+#[doc(hidden)]
 pub type BoundsOnlyReadTypes = [u8; 0];
 
 impl ReadBuffer for [u8; 0] {

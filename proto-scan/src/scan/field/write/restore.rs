@@ -4,7 +4,7 @@
 use core::ops::DerefMut;
 
 use crate::scan::ResettableScanner;
-use crate::scan::save_from::SaveFrom;
+use crate::scan::field::write::SaveFrom;
 
 /// Implements [`SaveFrom`] and [`Resettable`] to save and restore a previous value.
 pub struct RestoreOnReset<'t, D>(&'t mut D, Option<D>);

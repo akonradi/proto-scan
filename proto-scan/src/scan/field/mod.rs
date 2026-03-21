@@ -20,7 +20,7 @@ pub use repeated::{
     Fold, RepeatStrategy, RepeatStrategyScanner, Repeated, ScanRepeated, WriteCloned,
 };
 pub use save::{Save, SaveCloned};
-pub use write::Write;
+pub use write::{SaveFrom, Write};
 
 /// Implemented by a visitor for a fixed [`FieldNumber`].
 pub trait OnScanField<R: ReadTypes>: IntoScanOutput {

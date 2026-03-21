@@ -9,8 +9,7 @@ use crate::scan::field::OnScanField;
 use crate::scan::field::save::DecodeFromBytes;
 #[cfg(feature = "std")]
 use crate::scan::field::write::RestoreLenOnReset;
-use crate::scan::field::write::RestoreOnReset;
-use crate::scan::save_from::SaveFrom;
+use crate::scan::field::write::{RestoreOnReset, SaveFrom};
 use crate::scan::{
     GroupDelimited, IntoResettableScanner, IntoScanOutput, NumericField, ResettableScanner,
     ScanError, ScanLengthDelimited,

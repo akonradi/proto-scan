@@ -58,6 +58,7 @@ pub trait LengthDelimited: DelimitedTypes {
         ReadBytesError<<Self::ReadTypes as ReadTypes>::Error>,
     >;
 
+    /// Returns a [`Read`] implementation over the contents of the delimited field.
     fn into_reader(self) -> impl Read<ReadTypes = Self::ReadTypes>;
 
     /// Consumes the contents of the field as a sequence of [`ParseEvent`]s in

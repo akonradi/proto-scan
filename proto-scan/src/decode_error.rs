@@ -1,19 +1,28 @@
 use crate::read::ReadBytesError;
 
+/// Protobuf wire format decode error.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DecodeError<R> {
+    /// Underlying read source error.
     Read(R),
+    /// An invalid varint was found.
     InvalidVarint,
+    /// The stream ended prematurely.
     UnexpectedEnd,
+    /// An unknown wire type was encountered.
     InvalidWireType(u8),
+    /// A length-delimited field's purported size was too large.
     TooLargeLengthDelimited(u64),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, derive_more::From)]
 pub enum DecodeVarintError<R> {
+    /// Underlying read source error.
     #[from]
     Read(R),
+    /// An invalid varint was found.
     InvalidVarint,
+    /// The stream ended prematurely.
     UnexpectedEnd,
 }
 

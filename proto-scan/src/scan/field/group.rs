@@ -8,20 +8,15 @@ use crate::scan::{
 };
 use crate::wire::WrongWireType;
 
+/// Wrapper type for a proto2 group scanner.
 #[derive(Clone)]
 pub struct Group<F>(F);
-
-impl<F> Group<F> {
-    pub fn new(scanner: F) -> Self {
-        Self(scanner)
-    }
-}
 
 impl<M, S: MessageScanner<Message = M> + IntoScanner<M>> IntoScanner<Group<M>> for S {
     type Scanner<R: ReadTypes> = Group<S::Scanner<R>>;
 
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-        Group::new(S::into_scanner(self))
+        Group(S::into_scanner(self))
     }
 }
 

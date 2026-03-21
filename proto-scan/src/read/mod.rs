@@ -1,3 +1,7 @@
+//! Defines the [`Read`] trait and supporting types.
+//!
+//! `Read` abstracts over different types of byte streams that can be used as
+//! inputs for scanning.
 use core::convert::Infallible;
 use core::hash::Hash;
 use core::ops::Deref;
@@ -12,23 +16,52 @@ pub use bounds_only::BoundsOnlyReadTypes;
 use crate::decode_error::DecodeVarintError;
 use crate::wire::{parse_base128_varint, varint_bytes_chunk};
 
+/// Failure to read the requested bytes.
 #[derive(Debug, PartialEq, derive_more::From)]
 pub enum ReadBytesError<R> {
+    /// The underlying byte source had an error.
     #[from]
     Read(R),
+    /// The underlying byte source ran out of bytes before the requested number.
     UnexpectedEnd,
 }
 
+/// Package of associated types for [`Read`] and related traits.
 pub trait ReadTypes {
-    type Error: core::error::Error + 'static;
+    /// Buffer returned by [`Read::read`].
     type Buffer: ReadBuffer;
+
+    /// Error produced by the underlying byte source.
+    ///
+    /// Implementations that can't fail to read bytes (other than for
+    /// end-of-input, which is represented separately) can use [`Infallible`].
+    type Error: core::error::Error + 'static;
 }
 
+/// Buffer returned by [`Read::read`].
+///
+/// Implementing types must be "`&[u8]`-like" but can be owned or references.
 pub trait ReadBuffer: AsRef<[u8]> + Default + Eq + Hash {
+    /// The string form of the contents of the buffer.
+    ///
+    /// Like [`str`] is to `[u8]`, this is the UTF-8-validated version of `Self`.
     type String: Deref<Target = str> + Default + Eq + Hash;
+
+    /// Checks that `self` contains valid UTF-8.
+    ///
+    /// If it does, returns the witness type [`Self::String`]. Otherwise returns
+    /// an error.
     fn into_string(self) -> Result<Self::String, core::str::Utf8Error>;
 }
 
+/// A source of a stream of bytes.
+///
+/// Provides minimally-structured access to the contents of a byte stream.
+/// Implementations can be used as input to [`crate::wire::parse`].
+///
+/// This trait is implemented for `&[u8]` and `Vec<u8>` when the `std` feature
+/// is enabled. Consuming crates can provide implementations for their own
+/// types to allow them to be read as protobuf tag streams.
 pub trait Read {
     type ReadTypes: ReadTypes;
 

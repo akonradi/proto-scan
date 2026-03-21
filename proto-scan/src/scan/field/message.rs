@@ -8,6 +8,7 @@ use crate::scan::{
 };
 use crate::wire::WrongWireType;
 
+/// Wrapper type that scans an embedded message.
 #[derive(Clone)]
 pub struct Message<F>(F);
 
