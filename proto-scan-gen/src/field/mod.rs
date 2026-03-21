@@ -84,6 +84,14 @@ impl MessageField {
     pub fn type_name(&self) -> &syn::Ident {
         &self.type_path.path.segments.last().unwrap().ident
     }
+
+    fn as_into_scanner_type(&self) -> TokenStream {
+        let Self {
+            type_path,
+            number: _,
+        } = self;
+        quote! {::proto_scan::scan::field::Message < #type_path >}
+    }
 }
 
 #[derive(Debug)]
@@ -119,10 +127,7 @@ impl OneOfField {
         match self {
             OneOfField::Single(single_field) => single_field.ty.encoding_type().to_token_stream(),
             OneOfField::Bytes(bytes_field) => bytes_field.as_into_scanner_type(),
-            OneOfField::Message(message_field) => {
-                let m = &message_field.type_path;
-                quote! {::proto_scan::scan::field::Message < #m >}
-            }
+            OneOfField::Message(message_field) => message_field.as_into_scanner_type(),
         }
     }
 }
@@ -164,15 +169,16 @@ impl MessageFieldType {
                     parse_quote!(::proto_scan::scan::field::Repeated<#inner>)
                 }
                 RepeatedFieldType::Message { type_path } => {
-                    let m = type_path;
+                    let m = MessageField {
+                        type_path: type_path.clone(),
+                        number: 0,
+                    }
+                    .as_into_scanner_type();
                     parse_quote!(::proto_scan::scan::field::Repeated<#m>)
                 }
             },
             MessageFieldType::Bytes(bytes_field) => bytes_field.as_into_scanner_type(),
-            MessageFieldType::Message(message_field) => {
-                let m = &message_field.type_path;
-                parse_quote!(::proto_scan::scan::field::Message<#m>)
-            }
+            MessageFieldType::Message(message_field) => message_field.as_into_scanner_type(),
             MessageFieldType::OneOf {
                 type_name,
                 numbers: _,

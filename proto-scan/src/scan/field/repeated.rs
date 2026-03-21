@@ -65,7 +65,7 @@ impl<M: MessageScanner> ScanRepeated for M {}
 pub struct RepeatedScanner<S, R>(S, R);
 
 impl<S: MessageScanner + IntoScanner<S::Message>, F: RepeatStrategy<S>>
-    IntoScanner<Repeated<S::Message>> for RepeatedScanner<S, F>
+    IntoScanner<Repeated<Message<S::Message>>> for RepeatedScanner<S, F>
 {
     type Scanner<R: ReadTypes> = RepeatedScanner<S::Scanner<R>, F::Impl<R>>;
 
