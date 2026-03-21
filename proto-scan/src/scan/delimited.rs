@@ -49,6 +49,10 @@ impl<L: LengthDelimited, G> LengthDelimited for ScanDelimitedImpl<'_, L, G> {
         self.length_delimited.into_bytes()
     }
 
+    fn into_reader(self) -> impl Read<ReadTypes = Self::ReadTypes> {
+        self.length_delimited.into_reader()
+    }
+
     fn into_events(self) -> impl ParseEventReader<ReadTypes = Self::ReadTypes> {
         self.length_delimited.into_events()
     }

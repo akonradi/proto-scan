@@ -81,6 +81,10 @@ impl<'a, R: Read> LengthDelimited for LengthDelimitedImpl<'a, R> {
         NumericIter::<_, W>::new(self)
     }
 
+    fn into_reader(self) -> impl Read<ReadTypes = Self::ReadTypes> {
+        self
+    }
+
     fn into_events(self) -> impl ParseEventReader<ReadTypes = Self::ReadTypes> {
         EventReader {
             inner: Either::Right(self),
