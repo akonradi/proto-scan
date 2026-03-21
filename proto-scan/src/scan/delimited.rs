@@ -1,20 +1,22 @@
 use crate::read::{ReadError, ReadTypes};
 use crate::scan::{GroupStack, ScanCallbacks, ScanError};
-use crate::wire::{LengthDelimited, ParseEventReader};
+use crate::wire::{DelimitedTypes, LengthDelimited, ParseEventReader};
 
-pub trait ScanLengthDelimited: LengthDelimited {
+pub trait ScanDelimited: DelimitedTypes {
     fn scan_with<S: ScanCallbacks<Self::ReadTypes>>(
         self,
         scanner: S,
     ) -> Result<(), ScanError<<Self::ReadTypes as ReadError>::Error>>;
 }
 
-pub(super) struct ScanDelimited<'g, L, G> {
+pub trait ScanLengthDelimited: LengthDelimited + ScanDelimited {}
+
+pub(super) struct ScanDelimitedImpl<'g, L, G> {
     length_delimited: L,
     group_stack: &'g mut G,
 }
 
-impl<'g, L, G> ScanDelimited<'g, L, G> {
+impl<'g, L, G> ScanDelimitedImpl<'g, L, G> {
     pub(super) fn new(length_delimited: L, group_stack: &'g mut G) -> Self {
         Self {
             length_delimited,
@@ -23,9 +25,11 @@ impl<'g, L, G> ScanDelimited<'g, L, G> {
     }
 }
 
-impl<L: LengthDelimited, G> LengthDelimited for ScanDelimited<'_, L, G> {
+impl<L: LengthDelimited, G> DelimitedTypes for ScanDelimitedImpl<'_, L, G> {
     type ReadTypes = L::ReadTypes;
+}
 
+impl<L: LengthDelimited, G> LengthDelimited for ScanDelimitedImpl<'_, L, G> {
     fn len(&self) -> u32 {
         self.length_delimited.len()
     }
@@ -50,7 +54,7 @@ impl<L: LengthDelimited, G> LengthDelimited for ScanDelimited<'_, L, G> {
     }
 }
 
-impl<L: LengthDelimited, G: GroupStack> ScanLengthDelimited for ScanDelimited<'_, L, G> {
+impl<L: LengthDelimited, G: GroupStack> ScanDelimited for ScanDelimitedImpl<'_, L, G> {
     fn scan_with<S: ScanCallbacks<Self::ReadTypes>>(
         self,
         mut scanner: S,
@@ -67,3 +71,5 @@ impl<L: LengthDelimited, G: GroupStack> ScanLengthDelimited for ScanDelimited<'_
         Ok(())
     }
 }
+
+impl<L: LengthDelimited, G: GroupStack> ScanLengthDelimited for ScanDelimitedImpl<'_, L, G> {}

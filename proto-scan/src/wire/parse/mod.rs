@@ -17,6 +17,10 @@ mod length_delimited;
 mod limit_reader;
 mod numeric_iter;
 
+pub trait DelimitedTypes {
+    type ReadTypes: ReadTypes;
+}
+
 /// Accessor for the contents of a length-delimited field.
 ///
 /// Length-delimited fields are used to encode several different types of values
@@ -26,9 +30,7 @@ mod numeric_iter;
 ///
 /// This trait allows interpreting the contents of length-delimited field as at
 /// most one of those representations.
-pub trait LengthDelimited {
-    type ReadTypes: ReadTypes;
-
+pub trait LengthDelimited: DelimitedTypes {
     /// Returns the number of bytes in the field.
     fn len(&self) -> u32;
 

@@ -5,7 +5,7 @@ use either::Either;
 
 use crate::DecodeError;
 use crate::read::{Read, ReadError, ReadTypes};
-use crate::wire::parse::{DoBeforeNext, EventReader, LimitReader, NumericIter};
+use crate::wire::parse::{DelimitedTypes, DoBeforeNext, EventReader, LimitReader, NumericIter};
 use crate::wire::{LengthDelimited, NumericWireType, ParseEventReader};
 
 pub(super) struct LengthDelimitedImpl<'a, R> {
@@ -40,8 +40,11 @@ impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
     }
 }
 
-impl<'a, R: Read> LengthDelimited for LengthDelimitedImpl<'a, R> {
+impl<'a, R: Read> DelimitedTypes for LengthDelimitedImpl<'a, R> {
     type ReadTypes = R::ReadTypes;
+}
+
+impl<'a, R: Read> LengthDelimited for LengthDelimitedImpl<'a, R> {
     type PackedIter<W: NumericWireType> = NumericIter<'a, R, W>;
 
     fn len(&self) -> u32 {

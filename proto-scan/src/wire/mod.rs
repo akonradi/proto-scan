@@ -63,7 +63,7 @@ use crate::read::{Read, ReadError};
 pub use field_number::{FieldNumber, InvalidFieldNumber};
 pub use group_op::GroupOp;
 pub use numeric_field::NumericField;
-pub use parse::{LengthDelimited, ParseEvent, ParseEventReader, parse};
+pub use parse::{DelimitedTypes, LengthDelimited, ParseEvent, ParseEventReader, parse};
 pub(crate) use tag::{Tag, WireType};
 pub use wire_type::{I32, I64, NumericWireType, Varint, WrongWireType};
 

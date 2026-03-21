@@ -419,7 +419,7 @@ fn next_event<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>, G: GroupStack
         }
         ParseEvent::LengthDelimited(length_delimited) => scanner.on_length_delimited(
             field_number,
-            delimited::ScanDelimited::new(length_delimited, group_stack),
+            delimited::ScanDelimitedImpl::new(length_delimited, group_stack),
         ),
     })
 }

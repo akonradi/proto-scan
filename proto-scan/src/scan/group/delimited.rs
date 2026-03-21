@@ -1,24 +1,13 @@
 #![doc(hidden)]
 
-use crate::read::{ReadError, ReadTypes};
-use crate::scan::delimited::ScanDelimited;
+use crate::read::ReadError;
+use crate::scan::delimited::{ScanDelimited, ScanDelimitedImpl};
 use crate::scan::group::GroupStack;
 use crate::scan::{ParseEventReaderScanError, ScanCallbacks, ScanError};
-use crate::wire::{FieldNumber, GroupOp, ParseEvent, ParseEventReader};
+use crate::wire::{DelimitedTypes, FieldNumber, GroupOp, ParseEvent, ParseEventReader};
 
 /// An accessor for the contents of a proto2 group.
-pub trait GroupDelimited {
-    type ReadTypes: ReadTypes;
-
-    /// Scans the contents of the group through the provided [`ScanCallbacks`].
-    ///
-    /// Passes the contents of the group to the provided scanner until the end
-    /// tag for the group is read (the end tag is not passed to the scanner).
-    fn scan_with<S: ScanCallbacks<Self::ReadTypes>>(
-        self,
-        scanner: S,
-    ) -> Result<(), ScanError<<Self::ReadTypes as ReadError>::Error>>;
-}
+pub trait GroupDelimited: ScanDelimited {}
 
 pub(crate) struct GroupDelimitedImpl<'t, P, G> {
     pub(crate) parse: &'t mut P,
@@ -86,9 +75,12 @@ impl<'t, P: ParseEventReader, G: GroupStack> GroupDelimitedImpl<'t, P, G> {
     }
 }
 
-impl<'t, P: ParseEventReader, G: GroupStack> GroupDelimited for &mut GroupDelimitedImpl<'t, P, G> {
+impl<'t, P: ParseEventReader, G: GroupStack> DelimitedTypes for &mut GroupDelimitedImpl<'t, P, G> {
     type ReadTypes = P::ReadTypes;
+}
 
+impl<'t, P: ParseEventReader, G: GroupStack> GroupDelimited for &mut GroupDelimitedImpl<'t, P, G> {}
+impl<'t, P: ParseEventReader, G: GroupStack> ScanDelimited for &mut GroupDelimitedImpl<'t, P, G> {
     fn scan_with<S: ScanCallbacks<Self::ReadTypes>>(
         self,
         mut scanner: S,
@@ -118,7 +110,7 @@ impl<'t, P: ParseEventReader, G: GroupStack> GroupDelimited for &mut GroupDelimi
                 ParseEvent::LengthDelimited(delimited) => {
                     scanner.on_length_delimited(
                         field_number,
-                        ScanDelimited::new(delimited, &mut *self.group_stack),
+                        ScanDelimitedImpl::new(delimited, &mut *self.group_stack),
                     )?;
                 }
             }
