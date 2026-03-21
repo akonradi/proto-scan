@@ -3,9 +3,11 @@ use core::marker::PhantomData;
 use core::ops::DerefMut;
 
 use crate::read::ReadTypes;
-use crate::scan::field::{Message, OnScanField};
+use crate::scan::delimited::ScanDelimited;
+use crate::scan::field::{Group, Message, OnScanField};
 use crate::scan::{
-    IntoScanOutput, IntoScanner, MessageScanner, ScanCallbacks, ScanError, ScanLengthDelimited,
+    GroupDelimited, IntoScanOutput, IntoScanner, MessageScanner, ScanCallbacks, ScanError,
+    ScanLengthDelimited,
 };
 use crate::wire::{NumericField, WrongWireType};
 
@@ -38,7 +40,7 @@ pub trait RepeatStrategyScanner<R: ReadTypes, S: ScanCallbacks<R>>: IntoScanOutp
     fn on_message(
         &mut self,
         scanner: &S,
-        input: impl ScanLengthDelimited<ReadTypes = R>,
+        input: impl ScanDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>>;
 }
 
@@ -74,6 +76,16 @@ impl<S: MessageScanner + IntoScanner<S::Message>, F: RepeatStrategy<S>>
     }
 }
 
+impl<S: MessageScanner + IntoScanner<S::Message>, F: RepeatStrategy<S>>
+    IntoScanner<Repeated<Group<S::Message>>> for RepeatedScanner<S, F>
+{
+    type Scanner<R: ReadTypes> = RepeatedScanner<S::Scanner<R>, F::Impl<R>>;
+
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+        RepeatedScanner(self.0.into_scanner(), self.1.into_impl())
+    }
+}
+
 impl<S, F: IntoScanOutput> IntoScanOutput for RepeatedScanner<S, F> {
     type ScanOutput = F::ScanOutput;
     fn into_scan_output(self) -> Self::ScanOutput {
@@ -95,9 +107,9 @@ impl<R: ReadTypes, S: ScanCallbacks<R>, F: RepeatStrategyScanner<R, S>> OnScanFi
 
     fn on_group(
         &mut self,
-        _group: impl crate::scan::GroupDelimited<ReadTypes = R>,
+        delimited: impl GroupDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
-        Err(WrongWireType.into())
+        self.1.on_message(&self.0, delimited).map(|()| None)
     }
 
     fn on_length_delimited(
@@ -141,10 +153,10 @@ impl<
     fn on_message(
         &mut self,
         scanner: &S,
-        input: impl ScanLengthDelimited<ReadTypes = R>,
+        input: impl ScanDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>> {
-        let mut scanner = Message::new(scanner.clone());
-        let _event = scanner.on_length_delimited(input)?;
+        let mut scanner = scanner.clone();
+        input.scan_with(&mut scanner)?;
         if let Some(prev) = self.0.as_mut() {
             self.1(prev, scanner.into_scan_output());
         } else {
@@ -178,10 +190,10 @@ impl<
     fn on_message(
         &mut self,
         scanner: &S,
-        input: impl ScanLengthDelimited<ReadTypes = R>,
+        input: impl ScanDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>> {
-        let mut scanner = Message::new(scanner.clone());
-        let _event = scanner.on_length_delimited(input);
+        let mut scanner = scanner.clone();
+        input.scan_with(&mut scanner)?;
         let output = scanner.into_scan_output();
         self.0.extend([output]);
         Ok(())

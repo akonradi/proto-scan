@@ -4,6 +4,7 @@ use crate::scan::{GroupDelimited, IntoScanOutput, ScanError, ScanLengthDelimited
 use crate::wire::FieldNumber;
 use crate::wire::NumericField;
 
+mod group;
 mod map;
 mod message;
 mod no_op;
@@ -11,6 +12,7 @@ mod repeated;
 mod save;
 mod write;
 
+pub use group::Group;
 pub use map::{Map, MapKey};
 pub use message::Message;
 pub use no_op::NoOp;

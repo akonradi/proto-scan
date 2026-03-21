@@ -11,17 +11,11 @@ use crate::wire::WrongWireType;
 #[derive(Clone)]
 pub struct Message<F>(F);
 
-impl<F> Message<F> {
-    pub fn new(scanner: F) -> Self {
-        Self(scanner)
-    }
-}
-
 impl<M, S: MessageScanner<Message = M> + IntoScanner<M>> IntoScanner<Message<M>> for S {
     type Scanner<R: ReadTypes> = Message<S::Scanner<R>>;
 
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-        Message::new(S::into_scanner(self))
+        Message(S::into_scanner(self))
     }
 }
 
@@ -37,9 +31,10 @@ impl<F: ScanCallbacks<R> + IntoScanOutput, R: ReadTypes> OnScanField<R> for Mess
 
     fn on_group(
         &mut self,
-        _group: impl GroupDelimited<ReadTypes = R>,
+        delimited: impl GroupDelimited<ReadTypes = R>,
     ) -> Result<Option<Self::ScanEvent>, ScanError<<R>::Error>> {
-        Err(WrongWireType.into())
+        delimited.scan_with(&mut self.0)?;
+        Ok(None)
     }
 
     fn on_length_delimited(
@@ -146,7 +141,7 @@ mod test {
 
         let scanner = Scanner(
             3,
-            Message::new(Scanner(
+            Message(Scanner(
                 1,
                 <Save as IntoScanner<Varint<i32>>>::into_scanner::<&[u8]>(Save),
             )),
@@ -181,7 +176,7 @@ mod test {
             let mut saved_to = vec![1, 2, 3];
             let scanner = Scanner(
                 3,
-                Message::new(Scanner(
+                Message(Scanner(
                     1,
                     <Write<_> as IntoScanner<Repeated<Varint<i32>>>>::into_scanner::<&[u8]>(Write(
                         &mut saved_to,

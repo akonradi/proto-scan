@@ -53,6 +53,7 @@ impl<'a> FieldGeneric<'a, MessageFieldType> {
             | MessageFieldType::Repeated { .. }
             | MessageFieldType::Bytes(_)
             | MessageFieldType::Message(_)
+            | MessageFieldType::Group(_)
             | MessageFieldType::Map(_)
             | MessageFieldType::Unsupported => {
                 parse_quote!(::proto_scan::scan::field::OnScanField<R>)
@@ -113,6 +114,7 @@ pub enum OneOfField {
     Single(SingleField),
     Bytes(BytesField),
     Message(MessageField),
+    Group(GroupField),
 }
 impl OneOfField {
     pub(crate) fn number(&self) -> u32 {
@@ -120,6 +122,7 @@ impl OneOfField {
             OneOfField::Single(single_field) => single_field.number,
             OneOfField::Bytes(bytes_field) => bytes_field.number,
             OneOfField::Message(message_field) => message_field.number,
+            OneOfField::Group(group_field) => group_field.number,
         }
     }
 
@@ -127,6 +130,7 @@ impl OneOfField {
         match self {
             OneOfField::Single(single_field) => single_field.ty.encoding_type().to_token_stream(),
             OneOfField::Bytes(bytes_field) => bytes_field.as_into_scanner_type(),
+            OneOfField::Group(group_field) => group_field.as_into_scanner_type(),
             OneOfField::Message(message_field) => message_field.as_into_scanner_type(),
         }
     }
@@ -136,6 +140,21 @@ pub struct MapField {
     pub number: u32,
     pub key: MapKeyType,
     pub value: MapValueType<syn::TypePath>,
+}
+
+#[derive(Debug)]
+pub struct GroupField {
+    pub number: u32,
+    pub type_path: syn::TypePath,
+}
+impl GroupField {
+    fn as_into_scanner_type(&self) -> TokenStream {
+        let Self {
+            type_path,
+            number: _,
+        } = self;
+        quote! {::proto_scan::scan::field::Group < #type_path >}
+    }
 }
 
 #[derive(Debug)]
@@ -150,6 +169,7 @@ pub enum MessageFieldType {
     },
     Map(MapField),
     Unsupported,
+    Group(GroupField),
 }
 
 impl MessageFieldType {
@@ -176,9 +196,18 @@ impl MessageFieldType {
                     .as_into_scanner_type();
                     parse_quote!(::proto_scan::scan::field::Repeated<#m>)
                 }
+                RepeatedFieldType::Group { type_path } => {
+                    let m = GroupField {
+                        type_path: type_path.clone(),
+                        number: 0,
+                    }
+                    .as_into_scanner_type();
+                    parse_quote!(::proto_scan::scan::field::Repeated<#m>)
+                }
             },
             MessageFieldType::Bytes(bytes_field) => bytes_field.as_into_scanner_type(),
             MessageFieldType::Message(message_field) => message_field.as_into_scanner_type(),
+            MessageFieldType::Group(group_field) => group_field.as_into_scanner_type(),
             MessageFieldType::OneOf {
                 type_name,
                 numbers: _,
@@ -208,6 +237,9 @@ pub enum RepeatedFieldType {
     #[from]
     Single(SingleFieldType),
     Message {
+        type_path: syn::TypePath,
+    },
+    Group {
         type_path: syn::TypePath,
     },
 }
@@ -268,6 +300,7 @@ pub enum ParsedFieldType {
         ty: syn::Path,
     },
     Map(MapFieldType),
+    Group,
 }
 
 #[derive(Copy, Clone, Debug)]

@@ -1,6 +1,8 @@
 #![doc(hidden)]
 
 #[cfg(feature = "std")]
+use crate::scan::delimited::ScanDelimited;
+#[cfg(feature = "std")]
 use crate::scan::field::save::DecodeFromBytes;
 #[cfg(feature = "std")]
 use crate::scan::field::save::bytes::SaveBytesScanner;
@@ -12,7 +14,7 @@ use {
     crate::read::ReadTypes,
     crate::scan::encoding::Encoding,
     crate::scan::field::OnScanField,
-    crate::scan::field::{Message, RepeatStrategy, RepeatStrategyScanner},
+    crate::scan::field::{RepeatStrategy, RepeatStrategyScanner},
     crate::scan::{
         IntoResettableScanner, IntoScanOutput, IntoScanner, MessageScanner, ResettableScanner,
         ScanCallbacks, ScanError,
@@ -128,10 +130,10 @@ impl<R: ReadTypes, S: ScanCallbacks<R> + IntoScanOutput + Clone> RepeatStrategyS
     fn on_message(
         &mut self,
         scanner: &S,
-        input: impl ScanLengthDelimited<ReadTypes = R>,
+        input: impl ScanDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>> {
-        let mut scanner = Message::new(scanner.clone());
-        let _event = scanner.on_length_delimited(input)?;
+        let mut scanner = scanner.clone();
+        let _event = input.scan_with(&mut scanner)?;
         self.0.push(scanner.into_scan_output());
         Ok(())
     }

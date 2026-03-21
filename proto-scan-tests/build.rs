@@ -8,6 +8,7 @@ fn main() -> Result<()> {
         "src/proto/oneof.proto",
         "src/proto/testing.proto",
         "src/proto/empty_message.proto",
+        "src/proto/groups.proto",
     ];
     let mut config = prost_build::Config::new();
     config.protoc_arg("--experimental_allow_proto3_optional");

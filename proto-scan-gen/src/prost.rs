@@ -7,9 +7,9 @@ use syn::spanned::Spanned as _;
 use syn::{Attribute, DataEnum, DataStruct, DeriveInput, Expr, Ident, LitStr, Meta, Result, Token};
 
 use crate::field::{
-    BytesField, Field, FixedFieldType, MapField, MapFieldType, MapKeyType, MapValueType,
-    MessageField, MessageFieldType, OneOfField, ParsedFieldType, RepeatedField, RepeatedFieldType,
-    SingleField, VarintFieldType,
+    BytesField, Field, FixedFieldType, GroupField, MapField, MapFieldType, MapKeyType,
+    MapValueType, MessageField, MessageFieldType, OneOfField, ParsedFieldType, RepeatedField,
+    RepeatedFieldType, SingleField, VarintFieldType,
 };
 use crate::message::ScannableMessage;
 use crate::oneof::ScannableOneof;
@@ -87,6 +87,7 @@ fn enum_impl(name: Ident, data_enum: DataEnum) -> Result<TokenStream> {
                 MessageFieldType::Single(single_field) => OneOfField::Single(single_field),
                 MessageFieldType::Bytes(bytes_field) => OneOfField::Bytes(bytes_field),
                 MessageFieldType::Message(message_field) => OneOfField::Message(message_field),
+                MessageFieldType::Group(group_field) => OneOfField::Group(group_field),
                 MessageFieldType::Repeated { .. }
                 | MessageFieldType::Map(_)
                 | MessageFieldType::OneOf { .. }
@@ -264,6 +265,10 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                 };
                 set_field_type(ParsedFieldType::Map(parse_map_type(value)?))?;
             }
+            if attr.path().is_ident("group") {
+                let _ = attr.require_path_only()?;
+                set_field_type(ParsedFieldType::Group)?;
+            }
             if attr.path().is_ident("repeated") {
                 let _ = attr.require_path_only();
                 presence = Some(Presence::Repeated);
@@ -360,6 +365,25 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                 })
             }
             (
+                Some(ParsedFieldType::Group),
+                Some(FieldNumber::Single(number)),
+                Some(Presence::Repeated),
+            ) => {
+                let type_path = strip_outer_path(&rust_field_type)?;
+                MessageFieldType::Repeated(RepeatedField {
+                    number,
+                    ty: RepeatedFieldType::Group { type_path },
+                })
+            }
+            (
+                Some(ParsedFieldType::Group),
+                Some(FieldNumber::Single(number)),
+                None | Some(Presence::Optional),
+            ) => {
+                let type_path = strip_outer_path(&rust_field_type)?;
+                MessageFieldType::Group(GroupField { number, type_path })
+            }
+            (
                 Some(ParsedFieldType::Bytes { utf8 }),
                 Some(FieldNumber::Single(number)),
                 None | Some(Presence::Optional),
@@ -382,6 +406,7 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                 Some(
                     ParsedFieldType::Single(_)
                     | ParsedFieldType::Message
+                    | ParsedFieldType::Group
                     | ParsedFieldType::Bytes { .. }
                     | ParsedFieldType::Map(_),
                 ),
@@ -427,6 +452,7 @@ impl TryFrom<(Vec<Attribute>, syn::Type)> for ProstAttrs {
                 Some(
                     ft @ (ParsedFieldType::Single(_)
                     | ParsedFieldType::Message
+                    | ParsedFieldType::Group
                     | ParsedFieldType::Bytes { .. }
                     | ParsedFieldType::OneOf { .. }
                     | ParsedFieldType::Map(_)),

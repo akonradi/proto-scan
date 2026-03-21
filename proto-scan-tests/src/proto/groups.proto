@@ -1,0 +1,9 @@
+syntax = "proto2";
+package groups;
+
+message WithGroup {
+  repeated group GroupField = 1 {
+    optional string field_1 = 1;
+    optional string field_2 = 2;
+  }
+}

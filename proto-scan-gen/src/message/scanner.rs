@@ -6,8 +6,8 @@ use syn::Ident;
 
 use crate::field::scanner::MessageScannerField;
 use crate::field::{
-    BytesField, Field, FieldGeneric, MapField, MessageField, MessageFieldType, RepeatedField,
-    SingleField,
+    BytesField, Field, FieldGeneric, GroupField, MapField, MessageField, MessageFieldType,
+    RepeatedField, SingleField,
 };
 use crate::message::ScannableMessage;
 use crate::scanner::{Scanner as _, ScannerOutput as _};
@@ -157,6 +157,10 @@ impl<'m> MessageScanner<'m> {
                         match field_type {
                             MessageFieldType::Single(SingleField { ty: _, number, optional: _ })
                             | MessageFieldType::Repeated(RepeatedField {ty: _, number})
+                            | MessageFieldType::Group(GroupField {
+                                number,
+                                type_path: _,
+                            })
                             | MessageFieldType::Message(MessageField {
                                 number,
                                 type_path: _,

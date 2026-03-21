@@ -223,6 +223,7 @@ impl<'a> OneofScanner<'a> {
                 match field_type {
                     OneOfField::Single(_)
                     | OneOfField::Message(_)
+                    | OneOfField::Group(_)
                     | OneOfField::Bytes(_) => quote! {
                         #field_number_type::#variant_name => {
                             let event = self.#field_name.#fn_name(value)?;
