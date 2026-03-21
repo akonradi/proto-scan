@@ -55,10 +55,7 @@
 //! #     assert_eq!(read_int64(1, &mut &INPUT[..]), Ok(Some(150)))
 //! # }
 //! ```
-use core::ops::{BitAnd, BitOrAssign, Shl, Shr, ShrAssign};
-
-use crate::DecodeError;
-use crate::read::{Read, ReadError};
+use crate::decode_error::DecodeVarintError;
 
 pub use field_number::{FieldNumber, InvalidFieldNumber};
 pub use group_op::GroupOp;
@@ -74,54 +71,70 @@ mod parse;
 mod tag;
 mod wire_type;
 
-pub(crate) trait ParseVarint:
-    num_traits::Unsigned
-    + num_traits::Zero
-    + BitOrAssign
-    + Shl<Output = Self>
-    + From<u8>
-    + Shr<Output = Self>
-    + ShrAssign
-    + BitAnd
-    + PartialEq
-{
-    const MAX_BYTES: u8;
+pub const VARINT_MAX_BYTES: u8 = 10;
 
-    #[cfg(test)]
+pub fn parse_base128_varint<R>(
+    bytes: impl IntoIterator<Item = Result<u8, R>>,
+) -> Result<(u64, u8), DecodeVarintError<R>> {
+    let mut value = 0u64;
+    let mut bytes = bytes.into_iter();
+    for i in 0..VARINT_MAX_BYTES {
+        let byte = bytes.next().ok_or(DecodeVarintError::UnexpectedEnd)??;
+        let (byte, continue_flag) = (byte & !0x80, byte & 0x80 != 0);
+
+        if i != 0 && !continue_flag && byte == 0 {
+            // Reject varints that were encoded with more than the necessary
+            // number of bytes.
+            return Err(DecodeVarintError::InvalidVarint);
+        }
+
+        value |= u64::from(byte) << (i * 7);
+        if !continue_flag {
+            return Ok((value, i + 1));
+        }
+    }
+
+    Err(DecodeVarintError::InvalidVarint)
+}
+
+pub fn varint_bytes_chunk<E>(
+    bytes: &[u8; VARINT_MAX_BYTES as usize],
+) -> impl IntoIterator<Item = Result<u8, E>> {
+    bytes.iter().cloned().map(Ok)
+}
+
+pub fn varint_encoded_length(value: u64) -> u8 {
+    if value < 128 {
+        return 1;
+    }
+    1 + varint_encoded_length(value >> 7)
+}
+
+#[cfg(test)]
+pub(crate) trait ParseVarint:
+    num_traits::Num
+    + core::ops::BitOrAssign
+    + core::ops::Shl<Output = Self>
+    + From<u8>
+    + core::ops::Shr<Output = Self>
+    + core::ops::ShrAssign
+    + core::ops::BitAnd
+{
     fn low_byte(&self) -> u8;
 }
 
+#[cfg(test)]
 impl ParseVarint for u64 {
-    const MAX_BYTES: u8 = 10;
-    #[cfg(test)]
     fn low_byte(&self) -> u8 {
         *self as u8
     }
 }
 
+#[cfg(test)]
 impl ParseVarint for u32 {
-    const MAX_BYTES: u8 = 5;
-    #[cfg(test)]
     fn low_byte(&self) -> u8 {
         *self as u8
     }
-}
-
-fn parse_base128_varint<R: Read, V: ParseVarint>(
-    r: &mut R,
-) -> Result<V, DecodeError<<R::ReadTypes as ReadError>::Error>> {
-    let mut value = V::zero();
-    for i in 0..V::MAX_BYTES {
-        let byte = r.read(1).map_err(DecodeError::Read)?;
-        let byte = *byte.as_ref().first().ok_or(DecodeError::UnexpectedEnd)?;
-        let (byte, continue_flag) = (V::from(byte & !0x80), (byte & 0x80));
-
-        value |= byte << (i * 7).into();
-        if continue_flag == 0 {
-            return Ok(value);
-        }
-    }
-    Err(DecodeError::UnterminatedVarint)
 }
 
 #[cfg(test)]
@@ -152,11 +165,14 @@ mod test {
     #[test]
     #[cfg(feature = "std")]
     fn u32_inverse() {
-        const VALUES: [u32; 9] = [0, 1, 8, 127, 128, 255, 256, 1848593, u32::MAX];
+        const VALUES: [u64; 9] = [0, 1, 8, 127, 128, 255, 256, 1848593, u32::MAX as u64];
 
         for value in VALUES {
+            use std::convert::Infallible;
+
             let serialized = serialize_base128_varint(value);
-            let deserialized = parse_base128_varint::<_, u32>(&mut &serialized[..]);
+            let deserialized =
+                parse_base128_varint::<Infallible>(serialized.iter().cloned().map(Ok)).map(|v| v.0);
             assert_eq!(
                 deserialized,
                 Ok(value),

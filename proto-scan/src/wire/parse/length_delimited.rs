@@ -4,7 +4,8 @@ use assert_matches::debug_assert_matches;
 use either::Either;
 
 use crate::DecodeError;
-use crate::read::{Read, ReadError, ReadTypes};
+use crate::decode_error::DecodeVarintError;
+use crate::read::{Read, ReadBytesError, ReadError, ReadTypes};
 use crate::wire::parse::{DelimitedTypes, DoBeforeNext, EventReader, LimitReader, NumericIter};
 use crate::wire::{LengthDelimited, NumericWireType, ParseEventReader};
 
@@ -15,11 +16,19 @@ pub(super) struct LengthDelimitedImpl<'a, R> {
 
 impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
     type ReadTypes = R::ReadTypes;
+    fn read_varint(
+        &mut self,
+    ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadError>::Error>> {
+        self.reader.read_varint()
+    }
 
     fn read(
         &mut self,
         bytes: u32,
-    ) -> Result<<Self::ReadTypes as ReadTypes>::Buffer, <Self::ReadTypes as ReadError>::Error> {
+    ) -> Result<
+        <Self::ReadTypes as ReadTypes>::Buffer,
+        ReadBytesError<<Self::ReadTypes as ReadError>::Error>,
+    > {
         match self.reader.read(bytes) {
             Ok(b) => Ok(b),
             Err(e) => {
@@ -29,7 +38,10 @@ impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
         }
     }
 
-    fn skip(&mut self, bytes: u32) -> Result<u32, <Self::ReadTypes as ReadError>::Error> {
+    fn skip(
+        &mut self,
+        bytes: u32,
+    ) -> Result<u32, ReadBytesError<<Self::ReadTypes as ReadError>::Error>> {
         match self.reader.skip(bytes) {
             Ok(b) => Ok(b),
             Err(e) => {
@@ -58,7 +70,7 @@ impl<'a, R: Read> LengthDelimited for LengthDelimitedImpl<'a, R> {
         DecodeError<<Self::ReadTypes as ReadError>::Error>,
     > {
         let remaining = self.reader.remaining();
-        let bytes = self.reader.read(remaining).map_err(DecodeError::Read)?;
+        let bytes = self.reader.read(remaining)?;
         if bytes.as_ref().len() != remaining as usize {
             *self.write_back_to = DoBeforeNext::Error;
             return Err(DecodeError::UnexpectedEnd);

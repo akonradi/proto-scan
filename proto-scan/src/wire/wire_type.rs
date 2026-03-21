@@ -38,7 +38,7 @@ impl NumericWireType for Varint {
     fn read_from<R: Read>(
         r: &mut R,
     ) -> Result<Self::Repr, DecodeError<<R::ReadTypes as ReadError>::Error>> {
-        super::parse_base128_varint(r)
+        r.read_varint().map_err(Into::into)
     }
 
     fn from_value(s: NumericField) -> Result<u64, WrongWireType> {
@@ -55,7 +55,7 @@ pub(crate) fn read_fixed_from<const N: usize, R: Read, V>(
 where
     V: num_traits::FromBytes<Bytes = [u8; N]>,
 {
-    let bytes = r.read(N as u32).map_err(DecodeError::Read)?;
+    let bytes = r.read(N as u32)?;
 
     let bytes = <&V::Bytes>::try_from(bytes.as_ref())
         .map_err(|_| DecodeError::<<R::ReadTypes as ReadError>::Error>::UnexpectedEnd)?;

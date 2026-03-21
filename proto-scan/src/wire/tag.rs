@@ -24,7 +24,10 @@ impl Tag {
     pub(crate) fn read_from<R: Read>(
         r: &mut R,
     ) -> Result<Self, DecodeError<<R::ReadTypes as ReadError>::Error>> {
-        let value: u32 = super::parse_base128_varint(r)?;
+        let value: u32 = r
+            .read_varint()?
+            .try_into()
+            .map_err(|_| DecodeError::InvalidVarint)?;
         let (field_number, wire_type) = (value >> 3, (value & 0b111) as u8);
         let wire_type = wire_type.try_into().map_err(|_| {
             DecodeError::<<R::ReadTypes as ReadError>::Error>::InvalidWireType(wire_type)

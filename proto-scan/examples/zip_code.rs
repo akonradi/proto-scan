@@ -38,7 +38,7 @@ fn main() {
         .next()
         .expect("no filename provided");
 
-    let reader = IoRead::new(std::fs::File::open(filename).unwrap());
+    let reader = IoRead::new_buffered(std::fs::File::open(filename).unwrap());
     let output = scanner.scan(reader).read_all().unwrap();
     let proto::ScanContactOutput {
         address: proto::ScanAddressOutput { zip_code, .. },

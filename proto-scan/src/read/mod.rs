@@ -1,4 +1,4 @@
-use core::convert::Infallible as Never;
+use core::convert::Infallible;
 use core::hash::Hash;
 use core::ops::Deref;
 use core::str::Utf8Error;
@@ -8,6 +8,16 @@ use either::Either;
 mod bounds_only;
 pub(crate) mod count_reader;
 pub use bounds_only::BoundsOnlyReadTypes;
+
+use crate::decode_error::DecodeVarintError;
+use crate::wire::{parse_base128_varint, varint_bytes_chunk};
+
+#[derive(Debug, PartialEq, derive_more::From)]
+pub enum ReadBytesError<R> {
+    #[from]
+    Read(R),
+    UnexpectedEnd,
+}
 
 pub trait ReadError {
     type Error: core::error::Error + 'static;
@@ -24,25 +34,37 @@ pub trait ReadBuffer: AsRef<[u8]> + Default + Eq + Hash {
 
 pub trait Read {
     type ReadTypes: ReadTypes;
+
+    /// Reads the next protobuf varint from the stream.
+    fn read_varint(
+        &mut self,
+    ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadError>::Error>>;
+
     /// Reads the given number of bytes.
     ///
-    /// If fewer than the requested number of bytes are available before the stream ends,
-    /// the remaining bytes should be returned. Otherwise, the full number of
-    /// requested bytes must be returned.
+    /// If fewer than the requested number of bytes are available before the
+    /// stream ends, an error should be returned. Otherwise, the returned buffer
+    /// must contain the requested number of bytes.
     fn read(
         &mut self,
         bytes: u32,
-    ) -> Result<<Self::ReadTypes as ReadTypes>::Buffer, <Self::ReadTypes as ReadError>::Error>;
+    ) -> Result<
+        <Self::ReadTypes as ReadTypes>::Buffer,
+        ReadBytesError<<Self::ReadTypes as ReadError>::Error>,
+    >;
 
     /// Returns the number of bytes skipped.
     ///
-    /// Implementations must only skip fewer than the number of bytes requested
-    /// if the end of the stream is reached.
-    fn skip(&mut self, bytes: u32) -> Result<u32, <Self::ReadTypes as ReadError>::Error>;
+    /// If fewer than the requested number of bytes is available to be skipped,
+    /// this method must return an error.
+    fn skip(
+        &mut self,
+        bytes: u32,
+    ) -> Result<u32, ReadBytesError<<Self::ReadTypes as ReadError>::Error>>;
 }
 
 impl ReadError for &[u8] {
-    type Error = Never;
+    type Error = Infallible;
 }
 
 impl ReadTypes for &[u8] {
@@ -61,25 +83,43 @@ impl<'a> ReadBuffer for &'a [u8] {
 
 impl Read for &[u8] {
     type ReadTypes = Self;
+
+    fn read_varint(
+        &mut self,
+    ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadError>::Error>> {
+        let (value, consumed) = if let Some(bytes) = self.first_chunk() {
+            parse_base128_varint(varint_bytes_chunk(bytes))
+        } else {
+            parse_base128_varint(self.iter().cloned().map(Ok))
+        }?;
+        *self = &self[consumed.into()..];
+        Ok(value)
+    }
+
     fn read(
         &mut self,
         bytes: u32,
-    ) -> Result<<Self::ReadTypes as ReadTypes>::Buffer, <Self::ReadTypes as ReadError>::Error> {
+    ) -> Result<
+        <Self::ReadTypes as ReadTypes>::Buffer,
+        ReadBytesError<<Self::ReadTypes as ReadError>::Error>,
+    > {
         let (bytes, after) = match self.split_at_checked(bytes as usize) {
             Some(split) => split,
-            None => return Ok(core::mem::take(self)),
+            None => return Err(ReadBytesError::UnexpectedEnd),
         };
 
         *self = after;
         Ok(bytes)
     }
 
-    fn skip(&mut self, bytes: u32) -> Result<u32, <Self::ReadTypes as ReadError>::Error> {
+    fn skip(
+        &mut self,
+        bytes: u32,
+    ) -> Result<u32, ReadBytesError<<Self::ReadTypes as ReadError>::Error>> {
         self.read(bytes)
             .map(|bytes| bytes.len().try_into().unwrap_or(u32::MAX))
     }
 }
-
 impl<R: ReadError> ReadError for &mut R {
     type Error = R::Error;
 }
@@ -90,14 +130,26 @@ impl<R: ReadTypes> ReadTypes for &mut R {
 
 impl<R: Read> Read for &mut R {
     type ReadTypes = R::ReadTypes;
+    fn read_varint(
+        &mut self,
+    ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadError>::Error>> {
+        (*self).read_varint()
+    }
+
     fn read(
         &mut self,
         bytes: u32,
-    ) -> Result<<Self::ReadTypes as ReadTypes>::Buffer, <Self::ReadTypes as ReadError>::Error> {
+    ) -> Result<
+        <Self::ReadTypes as ReadTypes>::Buffer,
+        ReadBytesError<<Self::ReadTypes as ReadError>::Error>,
+    > {
         (*self).read(bytes)
     }
 
-    fn skip(&mut self, bytes: u32) -> Result<u32, <Self::ReadTypes as ReadError>::Error> {
+    fn skip(
+        &mut self,
+        bytes: u32,
+    ) -> Result<u32, ReadBytesError<<Self::ReadTypes as ReadError>::Error>> {
         (*self).skip(bytes)
     }
 }
@@ -113,16 +165,30 @@ impl ReadBuffer for ::bytes::Bytes {
 
 impl<R: Read, L: Read<ReadTypes = R::ReadTypes>> Read for Either<L, R> {
     type ReadTypes = R::ReadTypes;
+    fn read_varint(
+        &mut self,
+    ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadError>::Error>> {
+        self.as_mut()
+            .map_either(|r| r.read_varint(), |r| r.read_varint())
+            .into_inner()
+    }
+
     fn read(
         &mut self,
         bytes: u32,
-    ) -> Result<<Self::ReadTypes as ReadTypes>::Buffer, <Self::ReadTypes as ReadError>::Error> {
+    ) -> Result<
+        <Self::ReadTypes as ReadTypes>::Buffer,
+        ReadBytesError<<Self::ReadTypes as ReadError>::Error>,
+    > {
         self.as_mut()
             .map_either(|r| r.read(bytes), |r| r.read(bytes))
             .into_inner()
     }
 
-    fn skip(&mut self, bytes: u32) -> Result<u32, <Self::ReadTypes as ReadError>::Error> {
+    fn skip(
+        &mut self,
+        bytes: u32,
+    ) -> Result<u32, ReadBytesError<<Self::ReadTypes as ReadError>::Error>> {
         self.as_mut()
             .map_either(|r| r.skip(bytes), |r| r.skip(bytes))
             .into_inner()
@@ -141,6 +207,13 @@ impl<R> IoRead<R> {
 }
 
 #[cfg(feature = "std")]
+impl<R: std::io::Read> IoRead<std::io::BufReader<R>> {
+    pub fn new_buffered(read: R) -> Self {
+        Self(std::io::BufReader::new(read))
+    }
+}
+
+#[cfg(feature = "std")]
 impl<R: std::io::Read> ReadError for IoRead<R> {
     type Error = std::io::Error;
 }
@@ -151,19 +224,45 @@ impl<R: std::io::Read> ReadTypes for IoRead<R> {
 }
 
 #[cfg(feature = "std")]
-impl<R: std::io::Read + std::io::Seek> Read for IoRead<R> {
+impl<R: std::io::BufRead + std::io::Seek> Read for IoRead<R> {
     type ReadTypes = Self;
 
-    fn read(&mut self, bytes: u32) -> Result<Vec<u8>, std::io::Error> {
+    fn read_varint(
+        &mut self,
+    ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadError>::Error>> {
+        let buf = self.0.fill_buf()?;
+        if let Some(bytes) = buf.first_chunk() {
+            let (value, consumed) = parse_base128_varint(varint_bytes_chunk(bytes))?;
+            self.0.consume(consumed.into());
+            return Ok(value);
+        }
+
+        parse_base128_varint(std::iter::from_fn(|| {
+            let mut buf = [0];
+            Some(self.0.read_exact(&mut buf).map(|()| buf[0]))
+        }))
+        .map(|(value, _consumed)| value)
+    }
+
+    fn read(
+        &mut self,
+        bytes: u32,
+    ) -> Result<
+        <Self::ReadTypes as ReadTypes>::Buffer,
+        ReadBytesError<<Self::ReadTypes as ReadError>::Error>,
+    > {
         let mut buffer = Vec::with_capacity(bytes.try_into().unwrap_or(usize::MAX));
         self.0.read_exact(&mut buffer)?;
         Ok(buffer)
     }
 
-    fn skip(&mut self, bytes: u32) -> Result<u32, std::io::Error> {
+    fn skip(
+        &mut self,
+        bytes: u32,
+    ) -> Result<u32, ReadBytesError<<Self::ReadTypes as ReadError>::Error>> {
         let skipped = self.0.seek(std::io::SeekFrom::Current(bytes.into()))?;
         if skipped != bytes.into() {
-            return Err(std::io::Error::other("seek skipped too few bytes"));
+            return Err(ReadBytesError::UnexpectedEnd);
         }
         Ok(bytes)
     }

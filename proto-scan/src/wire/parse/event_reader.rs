@@ -34,7 +34,7 @@ impl<'a, R: Read> ParseEventReader for EventReader<'a, R> {
         match core::mem::take(do_before) {
             DoBeforeNext::Skip(to_skip) => {
                 if let Err(e) = reader.skip(to_skip.get()) {
-                    return Some(Err(DecodeError::Read(e)));
+                    return Some(Err(e.into()));
                 }
             }
             DoBeforeNext::Error => return Some(Err(DecodeError::UnexpectedEnd)),

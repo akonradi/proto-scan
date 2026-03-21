@@ -133,7 +133,7 @@ impl<R: ReadTypes, S: ScanCallbacks<R> + IntoScanOutput + Clone> RepeatStrategyS
         input: impl ScanDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>> {
         let mut scanner = scanner.clone();
-        let _event = input.scan_with(&mut scanner)?;
+        input.scan_with(&mut scanner)?;
         self.0.push(scanner.into_scan_output());
         Ok(())
     }
