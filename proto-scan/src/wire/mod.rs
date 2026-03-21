@@ -23,7 +23,7 @@
 //! fn read_int64<R: read::Read>(
 //!     field_number: u32,
 //!     r: R,
-//! ) -> Result<Option<i64>, DecodeError<<R::ReadTypes as read::ReadError>::Error>> {
+//! ) -> Result<Option<i64>, DecodeError<<R::ReadTypes as read::ReadTypes>::Error>> {
 //!     let mut reader = wire::parse(r);
 //!     let mut found = None;
 //!     while let Some((number, event)) = reader.next().transpose()? {
@@ -55,7 +55,7 @@
 //! #     assert_eq!(read_int64(1, &mut &INPUT[..]), Ok(Some(150)))
 //! # }
 //! ```
-//! 
+//!
 //! [merge semantics]: https://protobuf.dev/programming-guides/encoding/#last-one-wins
 use crate::decode_error::DecodeVarintError;
 

@@ -1,4 +1,4 @@
-use crate::read::{ReadError, ReadTypes};
+use crate::read::ReadTypes;
 use crate::scan::{GroupStack, ScanCallbacks, ScanError};
 use crate::wire::{DelimitedTypes, LengthDelimited, ParseEventReader};
 
@@ -6,7 +6,7 @@ pub trait ScanDelimited: DelimitedTypes {
     fn scan_with<S: ScanCallbacks<Self::ReadTypes>>(
         self,
         scanner: S,
-    ) -> Result<(), ScanError<<Self::ReadTypes as ReadError>::Error>>;
+    ) -> Result<(), ScanError<<Self::ReadTypes as ReadTypes>::Error>>;
 }
 
 pub trait ScanLengthDelimited: LengthDelimited + ScanDelimited {}
@@ -44,7 +44,7 @@ impl<L: LengthDelimited, G> LengthDelimited for ScanDelimitedImpl<'_, L, G> {
         self,
     ) -> Result<
         <Self::ReadTypes as ReadTypes>::Buffer,
-        crate::DecodeError<<Self::ReadTypes as ReadError>::Error>,
+        crate::DecodeError<<Self::ReadTypes as ReadTypes>::Error>,
     > {
         self.length_delimited.into_bytes()
     }
@@ -58,7 +58,7 @@ impl<L: LengthDelimited, G: GroupStack> ScanDelimited for ScanDelimitedImpl<'_, 
     fn scan_with<S: ScanCallbacks<Self::ReadTypes>>(
         self,
         mut scanner: S,
-    ) -> Result<(), ScanError<<Self::ReadTypes as ReadError>::Error>> {
+    ) -> Result<(), ScanError<<Self::ReadTypes as ReadTypes>::Error>> {
         let Self {
             group_stack,
             length_delimited,

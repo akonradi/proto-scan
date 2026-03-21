@@ -5,7 +5,7 @@ use either::Either;
 
 use crate::DecodeError;
 use crate::decode_error::DecodeVarintError;
-use crate::read::{Read, ReadBytesError, ReadError, ReadTypes};
+use crate::read::{Read, ReadBytesError, ReadTypes};
 use crate::wire::parse::{DelimitedTypes, DoBeforeNext, EventReader, LimitReader, NumericIter};
 use crate::wire::{LengthDelimited, NumericWireType, ParseEventReader};
 
@@ -18,7 +18,7 @@ impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
     type ReadTypes = R::ReadTypes;
     fn read_varint(
         &mut self,
-    ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadError>::Error>> {
+    ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
         self.reader.read_varint()
     }
 
@@ -27,7 +27,7 @@ impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
         bytes: u32,
     ) -> Result<
         <Self::ReadTypes as ReadTypes>::Buffer,
-        ReadBytesError<<Self::ReadTypes as ReadError>::Error>,
+        ReadBytesError<<Self::ReadTypes as ReadTypes>::Error>,
     > {
         match self.reader.read(bytes) {
             Ok(b) => Ok(b),
@@ -41,7 +41,7 @@ impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
     fn skip(
         &mut self,
         bytes: u32,
-    ) -> Result<u32, ReadBytesError<<Self::ReadTypes as ReadError>::Error>> {
+    ) -> Result<u32, ReadBytesError<<Self::ReadTypes as ReadTypes>::Error>> {
         match self.reader.skip(bytes) {
             Ok(b) => Ok(b),
             Err(e) => {
@@ -67,7 +67,7 @@ impl<'a, R: Read> LengthDelimited for LengthDelimitedImpl<'a, R> {
         mut self,
     ) -> Result<
         <Self::ReadTypes as ReadTypes>::Buffer,
-        DecodeError<<Self::ReadTypes as ReadError>::Error>,
+        DecodeError<<Self::ReadTypes as ReadTypes>::Error>,
     > {
         let remaining = self.reader.remaining();
         let bytes = self.reader.read(remaining)?;

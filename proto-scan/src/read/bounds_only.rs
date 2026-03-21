@@ -1,6 +1,6 @@
 use core::convert::Infallible as Never;
 
-use crate::read::{ReadBuffer, ReadError, ReadTypes};
+use crate::read::{ReadBuffer, ReadTypes};
 
 pub type BoundsOnlyReadTypes = [u8; 0];
 
@@ -12,10 +12,7 @@ impl ReadBuffer for [u8; 0] {
     }
 }
 
-impl ReadError for [u8; 0] {
-    type Error = Never;
-}
-
 impl ReadTypes for [u8; 0] {
+    type Error = Never;
     type Buffer = [u8; 0];
 }

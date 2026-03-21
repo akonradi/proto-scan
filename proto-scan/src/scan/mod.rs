@@ -22,7 +22,7 @@
 //!
 //! fn read_a<R: read::Read>(
 //!     r: R,
-//! ) -> Result<i64, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
+//! ) -> Result<i64, scan::ScanError<<R::ReadTypes as read::ReadTypes>::Error>> {
 //!     let scanner = Test1::scanner().a(scan::field::Save);
 //!     let ScanTest1Output { a } = scanner.scan(r).read_all()?;
 //!     Ok(a)
@@ -75,7 +75,7 @@
 //!
 //! fn read_a_from_c<R: read::Read>(
 //!     r: R,
-//! ) -> Result<i64, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
+//! ) -> Result<i64, scan::ScanError<<R::ReadTypes as read::ReadTypes>::Error>> {
 //!     let scanner = Test3::scanner().c(Test1::scanner().a(scan::field::Save));
 //!     let ScanTest3Output {
 //!         c: ScanTest1Output { a },
@@ -134,7 +134,7 @@
 //!     r: R,
 //! ) -> Result<
 //!     Option<<<R::ReadTypes as read::ReadTypes>::Buffer as read::ReadBuffer>::String>,
-//!     scan::ScanError<<R::ReadTypes as read::ReadError>::Error>,
+//!     scan::ScanError<<R::ReadTypes as read::ReadTypes>::Error>,
 //! > {
 //!     let scanner = SampleMessage::scanner()
 //!         .test_oneof(sample_message::TestOneof::scanner().name(scan::field::Save));
@@ -177,7 +177,7 @@
 //!
 //! fn read_map<R: read::Read>(
 //!     r: R,
-//! ) -> Result<HashMap<i32, i32>, scan::ScanError<<R::ReadTypes as read::ReadError>::Error>> {
+//! ) -> Result<HashMap<i32, i32>, scan::ScanError<<R::ReadTypes as read::ReadTypes>::Error>> {
 //!     let scanner = WithMap::scanner().i32_to_i32(scan::field::Save);
 //!     let ScanWithMapOutput { i32_to_i32 } = scanner.scan(r).read_all()?;
 //!     Ok(i32_to_i32)
@@ -187,7 +187,7 @@
 //! Library support for scanners of maps is limited, but reading code can always
 //! supply its own implementations of [`IntoScanner`] and
 //! [`field::OnScanField`].
-use crate::read::{ReadError, ReadTypes};
+use crate::read::ReadTypes;
 use crate::wire::{FieldNumber, GroupOp, I32, I64, NumericField, Varint};
 use crate::wire::{ParseEvent, ParseEventReader};
 
@@ -350,7 +350,7 @@ pub struct IntoIter<P, S, G> {
 }
 
 type ParseEventReaderScanError<P> =
-    ScanError<<<P as ParseEventReader>::ReadTypes as ReadError>::Error>;
+    ScanError<<<P as ParseEventReader>::ReadTypes as ReadTypes>::Error>;
 
 impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>, G: GroupStack> IntoIterator
     for Scan<P, S, G>
@@ -378,7 +378,7 @@ impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>, G: GroupStack> Iterato
     type Item = Result<S::ScanEvent, ParseEventReaderScanError<P>>;
     fn next(
         &mut self,
-    ) -> Option<Result<S::ScanEvent, ScanError<<P::ReadTypes as ReadError>::Error>>> {
+    ) -> Option<Result<S::ScanEvent, ScanError<<P::ReadTypes as ReadTypes>::Error>>> {
         let Self {
             parse,
             scanner,
@@ -391,7 +391,7 @@ impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>, G: GroupStack> Iterato
 
 #[allow(type_alias_bounds)]
 type ScanEvent<S: ScanCallbacks<P::ReadTypes>, P: ParseEventReader> =
-    Result<S::ScanEvent, ScanError<<P::ReadTypes as ReadError>::Error>>;
+    Result<S::ScanEvent, ScanError<<P::ReadTypes as ReadTypes>::Error>>;
 
 #[inline]
 fn next_event<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>, G: GroupStack>(

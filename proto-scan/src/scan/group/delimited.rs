@@ -1,6 +1,6 @@
 #![doc(hidden)]
 
-use crate::read::ReadError;
+use crate::read::ReadTypes;
 use crate::scan::delimited::{ScanDelimited, ScanDelimitedImpl};
 use crate::scan::group::GroupStack;
 use crate::scan::{ParseEventReaderScanError, ScanCallbacks, ScanError};
@@ -28,7 +28,7 @@ impl<'t, P: ParseEventReader, G: GroupStack> GroupDelimitedImpl<'t, P, G> {
         mut self,
         scanner: &mut S,
         field_number: FieldNumber,
-    ) -> Result<S::ScanEvent, ScanError<<P::ReadTypes as ReadError>::Error>> {
+    ) -> Result<S::ScanEvent, ScanError<<P::ReadTypes as ReadTypes>::Error>> {
         self.scan_through_mut(scanner, field_number)
     }
 
@@ -39,7 +39,7 @@ impl<'t, P: ParseEventReader, G: GroupStack> GroupDelimitedImpl<'t, P, G> {
         &mut self,
         scanner: &mut S,
         field_number: FieldNumber,
-    ) -> Result<S::ScanEvent, ScanError<<P::ReadTypes as ReadError>::Error>> {
+    ) -> Result<S::ScanEvent, ScanError<<P::ReadTypes as ReadTypes>::Error>> {
         self.group_stack.push(field_number.into())?;
         self.open_count += 1;
         let event = scanner.on_group(field_number, &mut *self)?;
@@ -84,7 +84,7 @@ impl<'t, P: ParseEventReader, G: GroupStack> ScanDelimited for &mut GroupDelimit
     fn scan_with<S: ScanCallbacks<Self::ReadTypes>>(
         self,
         mut scanner: S,
-    ) -> Result<(), ScanError<<Self::ReadTypes as ReadError>::Error>> {
+    ) -> Result<(), ScanError<<Self::ReadTypes as ReadTypes>::Error>> {
         while self.open_count != 0 {
             let (field_number, event) = self
                 .parse

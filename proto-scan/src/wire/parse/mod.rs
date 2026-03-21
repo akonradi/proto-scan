@@ -4,7 +4,7 @@ use core::num::NonZeroU32;
 use either::Either;
 
 use crate::DecodeError;
-use crate::read::{Read, ReadError, ReadTypes};
+use crate::read::{Read, ReadTypes};
 use crate::wire::{FieldNumber, GroupOp, NumericField, NumericWireType};
 
 use event_reader::EventReader;
@@ -39,7 +39,7 @@ pub trait LengthDelimited: DelimitedTypes {
     }
 
     type PackedIter<W: NumericWireType>: Iterator<
-        Item = Result<W::Repr, DecodeError<<Self::ReadTypes as ReadError>::Error>>,
+        Item = Result<W::Repr, DecodeError<<Self::ReadTypes as ReadTypes>::Error>>,
     >;
 
     /// Interprets the contents of a field as packed values.
@@ -55,7 +55,7 @@ pub trait LengthDelimited: DelimitedTypes {
         self,
     ) -> Result<
         <Self::ReadTypes as ReadTypes>::Buffer,
-        DecodeError<<Self::ReadTypes as ReadError>::Error>,
+        DecodeError<<Self::ReadTypes as ReadTypes>::Error>,
     >;
 
     /// Consumes the contents of the field as a sequence of [`ParseEvent`]s in
@@ -79,7 +79,7 @@ pub trait ParseEventReader {
 }
 
 pub(crate) type ParseEventReaderOutput<RT, LD> =
-    Result<(FieldNumber, ParseEvent<LD>), DecodeError<<RT as ReadError>::Error>>;
+    Result<(FieldNumber, ParseEvent<LD>), DecodeError<<RT as ReadTypes>::Error>>;
 
 /// A tag and value parsed from a protobuf stream.
 ///

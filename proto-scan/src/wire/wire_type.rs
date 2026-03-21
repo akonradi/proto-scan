@@ -1,7 +1,7 @@
 use core::convert::Infallible as Never;
 
 use crate::DecodeError;
-use crate::read::{Read, ReadError};
+use crate::read::{Read, ReadTypes};
 use crate::wire::NumericField;
 
 pub trait NumericWireType: sealed::Sealed {
@@ -10,7 +10,7 @@ pub trait NumericWireType: sealed::Sealed {
 
     fn read_from<R: Read>(
         r: &mut R,
-    ) -> Result<Self::Repr, DecodeError<<R::ReadTypes as ReadError>::Error>>;
+    ) -> Result<Self::Repr, DecodeError<<R::ReadTypes as ReadTypes>::Error>>;
 
     fn from_value(s: NumericField) -> Result<Self::Repr, WrongWireType>;
 }
@@ -37,7 +37,7 @@ impl NumericWireType for Varint {
 
     fn read_from<R: Read>(
         r: &mut R,
-    ) -> Result<Self::Repr, DecodeError<<R::ReadTypes as ReadError>::Error>> {
+    ) -> Result<Self::Repr, DecodeError<<R::ReadTypes as ReadTypes>::Error>> {
         r.read_varint().map_err(Into::into)
     }
 
@@ -51,14 +51,14 @@ impl NumericWireType for Varint {
 
 pub(crate) fn read_fixed_from<const N: usize, R: Read, V>(
     r: &mut R,
-) -> Result<V, DecodeError<<R::ReadTypes as ReadError>::Error>>
+) -> Result<V, DecodeError<<R::ReadTypes as ReadTypes>::Error>>
 where
     V: num_traits::FromBytes<Bytes = [u8; N]>,
 {
     let bytes = r.read(N as u32)?;
 
     let bytes = <&V::Bytes>::try_from(bytes.as_ref())
-        .map_err(|_| DecodeError::<<R::ReadTypes as ReadError>::Error>::UnexpectedEnd)?;
+        .map_err(|_| DecodeError::<<R::ReadTypes as ReadTypes>::Error>::UnexpectedEnd)?;
 
     Ok(num_traits::FromBytes::from_le_bytes(bytes))
 }
@@ -69,7 +69,7 @@ impl NumericWireType for I64 {
 
     fn read_from<R: Read>(
         r: &mut R,
-    ) -> Result<Self::Repr, DecodeError<<R::ReadTypes as ReadError>::Error>> {
+    ) -> Result<Self::Repr, DecodeError<<R::ReadTypes as ReadTypes>::Error>> {
         read_fixed_from(r)
     }
 
@@ -87,7 +87,7 @@ impl NumericWireType for I32 {
 
     fn read_from<R: Read>(
         r: &mut R,
-    ) -> Result<Self::Repr, DecodeError<<R::ReadTypes as ReadError>::Error>> {
+    ) -> Result<Self::Repr, DecodeError<<R::ReadTypes as ReadTypes>::Error>> {
         read_fixed_from(r)
     }
 

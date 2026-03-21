@@ -1,5 +1,5 @@
 use crate::decode_error::DecodeVarintError;
-use crate::read::{Read, ReadBytesError, ReadError, ReadTypes};
+use crate::read::{Read, ReadBytesError, ReadTypes};
 use crate::wire::{VARINT_MAX_BYTES, parse_base128_varint, varint_encoded_length};
 
 pub(super) struct LimitReader<R> {
@@ -22,7 +22,7 @@ impl<R: Read> Read for LimitReader<R> {
 
     fn read_varint(
         &mut self,
-    ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadError>::Error>> {
+    ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
         let Self { inner, remaining } = self;
         if *remaining >= VARINT_MAX_BYTES.into() {
             let value = inner.read_varint()?;
@@ -55,7 +55,7 @@ impl<R: Read> Read for LimitReader<R> {
         bytes: u32,
     ) -> Result<
         <Self::ReadTypes as ReadTypes>::Buffer,
-        ReadBytesError<<Self::ReadTypes as ReadError>::Error>,
+        ReadBytesError<<Self::ReadTypes as ReadTypes>::Error>,
     > {
         let Self { inner, remaining } = self;
         if bytes > *remaining {
@@ -70,7 +70,7 @@ impl<R: Read> Read for LimitReader<R> {
     fn skip(
         &mut self,
         bytes: u32,
-    ) -> Result<u32, ReadBytesError<<Self::ReadTypes as ReadError>::Error>> {
+    ) -> Result<u32, ReadBytesError<<Self::ReadTypes as ReadTypes>::Error>> {
         let skipped = self.inner.skip(bytes)?;
         self.remaining -= skipped;
         Ok(skipped)

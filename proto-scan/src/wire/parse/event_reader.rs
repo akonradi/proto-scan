@@ -2,7 +2,7 @@ use either::Either;
 
 use crate::DecodeError;
 use crate::read::count_reader::CountReader;
-use crate::read::{Read, ReadError};
+use crate::read::{Read, ReadTypes};
 use crate::wire::parse::{DoBeforeNext, LengthDelimitedImpl, LimitReader};
 use crate::wire::{
     FieldNumber, GroupOp, I32, I64, LengthDelimited, NumericField, NumericWireType, ParseEvent,
@@ -24,7 +24,7 @@ impl<'a, R: Read> ParseEventReader for EventReader<'a, R> {
                 FieldNumber,
                 ParseEvent<impl LengthDelimited<ReadTypes = Self::ReadTypes>>,
             ),
-            DecodeError<<R::ReadTypes as ReadError>::Error>,
+            DecodeError<<R::ReadTypes as ReadTypes>::Error>,
         >,
     > {
         let Self { inner, do_before } = self;
