@@ -194,7 +194,7 @@ use crate::wire::{ParseEvent, ParseEventReader};
 mod builder;
 pub use builder::ScannerBuilder;
 mod delimited;
-pub use delimited::ScanLengthDelimited;
+pub use delimited::{ScanLengthDelimited, ScanDelimited};
 pub mod encoding;
 pub mod error;
 pub use error::ScanError;

@@ -94,7 +94,7 @@ pub mod scan;
 pub mod wire;
 
 mod decode_error;
-pub use decode_error::DecodeError;
+pub use decode_error::{DecodeError, DecodeVarintError};
 
 #[cfg(feature = "derive")]
 pub use proto_scan_derive::ScanMessage;
