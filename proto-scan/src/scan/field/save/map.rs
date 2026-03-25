@@ -5,13 +5,18 @@ use std::collections::HashMap;
 #[cfg(feature = "std")]
 use {core::hash::Hash, core::marker::PhantomData};
 
+#[cfg(feature = "std")]
 use crate::read::ReadTypes;
-use crate::scan::field::OnScanField;
 #[cfg(feature = "std")]
-use crate::scan::field::{Map, MapKey, Save};
-use crate::scan::{GroupDelimited, IntoScanOutput, ScanCallbacks, ScanError, ScanLengthDelimited};
+use crate::scan::field::map::MapEntryScanner;
 #[cfg(feature = "std")]
-use crate::scan::{IntoResettableScanner, IntoScanner, ResettableScanner};
+use crate::scan::field::{Map, MapKey, OnScanField, Save};
+#[cfg(feature = "std")]
+use crate::scan::{
+    GroupDelimited, IntoResettableScanner, IntoScanOutput, IntoScanner, ResettableScanner,
+    ScanError, ScanLengthDelimited,
+};
+#[cfg(feature = "std")]
 use crate::wire::NumericField;
 
 /// Saves map keys and the output of a provided value scanner.
@@ -31,25 +36,31 @@ impl<K: MapKey + ?Sized, V: ?Sized, SV: IntoScanner<V>> IntoScanner<Map<K, V>> f
 where
     Save: IntoScanner<K>,
 {
-    type Scanner<R: ReadTypes> = SaveMapScanner<K, SV::Scanner<R>, R>;
+    type Scanner<R: ReadTypes> = SaveMapScanner<K, V, SV::Scanner<R>, R>;
 
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-        SaveMapScanner(HashMap::new(), self.0.into_scanner(), PhantomData)
+        SaveMapScanner(
+            HashMap::new(),
+            self.0.into_scanner(),
+            PhantomData,
+            PhantomData,
+        )
     }
 }
 
 #[cfg(feature = "std")]
-pub struct SaveMapScanner<K: MapKey + ?Sized, SV: IntoScanOutput, R: ReadTypes>(
+pub struct SaveMapScanner<K: MapKey + ?Sized, V: ?Sized, SV: IntoScanOutput, R: ReadTypes>(
     HashMap<<<Save as IntoScanner<K>>::Scanner<R> as IntoScanOutput>::ScanOutput, SV::ScanOutput>,
     SV,
     PhantomData<R>,
+    PhantomData<V>,
 )
 where
     Save: IntoScanner<K>;
 
 #[cfg(feature = "std")]
-impl<K: MapKey + ?Sized, SV: IntoScanOutput, R: ReadTypes> IntoScanOutput
-    for SaveMapScanner<K, SV, R>
+impl<K: MapKey + ?Sized, V: ?Sized, SV: IntoScanOutput, R: ReadTypes> IntoScanOutput
+    for SaveMapScanner<K, V, SV, R>
 where
     Save: IntoScanner<K>,
 {
@@ -64,8 +75,8 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<K: MapKey + ?Sized, SV: OnScanField<R> + Clone, R: ReadTypes> OnScanField<R>
-    for SaveMapScanner<K, SV, R>
+impl<K: MapKey + ?Sized, V: ?Sized, SV: OnScanField<R> + Clone, R: ReadTypes> OnScanField<R>
+    for SaveMapScanner<K, V, SV, R>
 where
     Save: IntoScanner<K, Scanner<R>: OnScanField<R> + IntoScanOutput<ScanOutput: Hash + Eq>>,
 {
@@ -84,11 +95,14 @@ where
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<<R>::Error>> {
-        let Self(map, value_scanner, PhantomData) = self;
-        let mut scanner = MapEntry(IntoScanner::<K>::into_scanner(Save), value_scanner.clone());
+        let Self(map, value_scanner, PhantomData, PhantomData) = self;
+        let mut scanner = MapEntryScanner::<K, V, _, _>::new(
+            IntoScanner::<K>::into_scanner(Save),
+            value_scanner.clone(),
+        );
         delimited.scan_with(&mut scanner)?;
-        let MapEntry(key, value) = scanner;
-        map.insert(key.into_scan_output(), value.into_scan_output());
+        let (key, value) = scanner.into_scan_output();
+        map.insert(key, value);
         Ok(())
     }
 }
@@ -96,80 +110,32 @@ where
 #[cfg(feature = "std")]
 impl<
     K: MapKey + ?Sized,
+    V: ?Sized,
     SV: OnScanField<R> + IntoResettableScanner<Resettable: IntoScanOutput>,
     R: ReadTypes,
-> IntoResettableScanner for SaveMapScanner<K, SV, R>
+> IntoResettableScanner for SaveMapScanner<K, V, SV, R>
 where
     Save: IntoScanner<K, Scanner<R>: OnScanField<R> + IntoScanOutput<ScanOutput: Hash + Eq>>,
 {
-    type Resettable = SaveMapScanner<K, SV::Resettable, R>;
+    type Resettable = SaveMapScanner<K, V, SV::Resettable, R>;
     fn into_resettable(self) -> Self::Resettable {
-        let Self(_map, sv, PhantomData) = self;
-        SaveMapScanner(HashMap::new(), sv.into_resettable(), PhantomData)
+        let Self(_map, sv, PhantomData, PhantomData) = self;
+        SaveMapScanner(
+            HashMap::new(),
+            sv.into_resettable(),
+            PhantomData,
+            PhantomData,
+        )
     }
 }
 
 #[cfg(feature = "std")]
-impl<K: MapKey + ?Sized, SV: IntoScanOutput, R: ReadTypes> ResettableScanner
-    for SaveMapScanner<K, SV, R>
+impl<K: MapKey + ?Sized, V: ?Sized, SV: IntoScanOutput, R: ReadTypes> ResettableScanner
+    for SaveMapScanner<K, V, SV, R>
 where
     Save: IntoScanner<K>,
 {
     fn reset(&mut self) {
         self.0.clear();
-    }
-}
-
-/// Synthetic scanner for the wire representation of a protobuf map entry.
-///
-/// Field 1 is the key, field 2 is the value. This exists to be used with the
-/// existing scan machinery, but could otherwise be inlined above.
-struct MapEntry<SK, SV>(SK, SV);
-
-impl<SK: IntoScanOutput, SV: IntoScanOutput> IntoScanOutput for MapEntry<SK, SV> {
-    type ScanOutput = (SK::ScanOutput, SV::ScanOutput);
-    fn into_scan_output(self) -> Self::ScanOutput {
-        (self.0.into_scan_output(), self.1.into_scan_output())
-    }
-}
-
-impl<SK: OnScanField<R>, SV: OnScanField<R>, R: ReadTypes> ScanCallbacks<R> for MapEntry<SK, SV> {
-    fn on_numeric(
-        &mut self,
-        field: crate::wire::FieldNumber,
-        value: NumericField,
-    ) -> Result<(), ScanError<<R>::Error>> {
-        let _: () = match u32::from(field) {
-            1 => self.0.on_numeric(value)?,
-            2 => self.1.on_numeric(value)?,
-            _ => (),
-        };
-        Ok(())
-    }
-
-    fn on_group(
-        &mut self,
-        field: crate::wire::FieldNumber,
-        group: impl GroupDelimited<ReadTypes = R>,
-    ) -> Result<(), ScanError<<R>::Error>> {
-        let _: () = match u32::from(field) {
-            1 => self.0.on_group(group)?,
-            2 => self.1.on_group(group)?,
-            _ => (),
-        };
-        Ok(())
-    }
-
-    fn on_length_delimited(
-        &mut self,
-        field: crate::wire::FieldNumber,
-        delimited: impl ScanLengthDelimited<ReadTypes = R>,
-    ) -> Result<(), ScanError<<R>::Error>> {
-        let _: () = match u32::from(field) {
-            1 => self.0.on_length_delimited(delimited)?,
-            2 => self.1.on_length_delimited(delimited)?,
-            _ => (),
-        };
-        Ok(())
     }
 }

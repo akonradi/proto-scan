@@ -5,7 +5,7 @@ use crate::wire::FieldNumber;
 use crate::wire::NumericField;
 
 mod group;
-mod map;
+pub mod map;
 mod message;
 mod no_op;
 mod repeated;

@@ -129,7 +129,7 @@ where
     Save: IntoScanner<K>,
     Save: IntoScanner<V>,
 {
-    type Scanner<R: ReadTypes> = SaveMapScanner<K, <Save as IntoScanner<V>>::Scanner<R>, R>;
+    type Scanner<R: ReadTypes> = SaveMapScanner<K, V, <Save as IntoScanner<V>>::Scanner<R>, R>;
 
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         IntoScanner::<Map<K, V>>::into_scanner(Save::with_value(Save))
