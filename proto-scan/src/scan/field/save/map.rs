@@ -7,6 +7,8 @@ use {core::hash::Hash, core::marker::PhantomData};
 
 #[cfg(feature = "std")]
 use crate::read::ReadTypes;
+use crate::scan::ScanMessage;
+use crate::scan::field::map::MapEntry;
 #[cfg(feature = "std")]
 use crate::scan::field::map::MapEntryScanner;
 #[cfg(feature = "std")]
@@ -28,6 +30,22 @@ pub struct SaveMap<V>(V);
 impl<V> SaveMap<V> {
     pub fn with_value(value_scanner: V) -> Self {
         Self(value_scanner)
+    }
+}
+
+/// Saves a single value from a map.
+///
+/// Implements [`IntoScanner`]; the provided scanner saves only the scanned
+/// value for the provided key from the map (if present).
+pub struct SaveMapValue<K, SV>(K, SV);
+
+impl super::Save {
+    /// Saves a single value from a map.
+    ///
+    /// Returns an [`IntoScanner`] impl thatl saves only the scanned value for
+    /// the given key from the map.
+    pub fn map_value<K, SV>(key: K, value_scanner: SV) -> SaveMapValue<K, SV> {
+        SaveMapValue(key, value_scanner)
     }
 }
 
@@ -137,5 +155,77 @@ where
 {
     fn reset(&mut self) {
         self.0.clear();
+    }
+}
+
+pub struct SaveMapValueScanner<K: ?Sized, V: ?Sized, Q, KV, SV: IntoScanOutput>(
+    Q,
+    MapEntryScanner<K, V, KV, SV>,
+    Option<SV::ScanOutput>,
+);
+
+impl<K: MapKey + ?Sized, V: ?Sized, Q, SV: IntoScanner<V>> IntoScanner<Map<K, V>>
+    for SaveMapValue<Q, SV>
+where
+    Save: IntoScanner<K>,
+{
+    type Scanner<R: ReadTypes> =
+        SaveMapValueScanner<K, V, Q, <Save as IntoScanner<K>>::Scanner<R>, SV::Scanner<R>>;
+
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+        SaveMapValueScanner(
+            self.0,
+            IntoScanner::<MapEntry<K, V>>::into_scanner(
+                MapEntry::scanner().key(Save).value(self.1),
+            ),
+            None,
+        )
+    }
+}
+
+impl<
+    R: ReadTypes,
+    K: ?Sized,
+    V: ?Sized,
+    Q,
+    SK: OnScanField<R> + IntoScanOutput<ScanOutput: PartialEq<Q>> + Clone,
+    SV: OnScanField<R> + IntoScanOutput + Clone,
+> OnScanField<R> for SaveMapValueScanner<K, V, Q, SK, SV>
+{
+    fn on_numeric(
+        &mut self,
+        _value: NumericField,
+    ) -> Result<(), ScanError<<R as ReadTypes>::Error>> {
+        Err(ScanError::WrongWireType)
+    }
+
+    fn on_group(
+        &mut self,
+        _group: impl GroupDelimited<ReadTypes = R>,
+    ) -> Result<(), ScanError<<R as ReadTypes>::Error>> {
+        Err(ScanError::WrongWireType)
+    }
+
+    fn on_length_delimited(
+        &mut self,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
+    ) -> Result<(), ScanError<<R as ReadTypes>::Error>> {
+        let mut scanner = self.1.clone();
+        delimited.scan_with(&mut scanner)?;
+        let (key, value) = scanner.into_scan_output();
+
+        if key == self.0 {
+            self.2 = Some(value);
+        }
+        Ok(())
+    }
+}
+
+impl<K: ?Sized, V: ?Sized, Q, SK, SV: IntoScanOutput> IntoScanOutput
+    for SaveMapValueScanner<K, V, Q, SK, SV>
+{
+    type ScanOutput = Option<SV::ScanOutput>;
+    fn into_scan_output(self) -> Self::ScanOutput {
+        self.2
     }
 }

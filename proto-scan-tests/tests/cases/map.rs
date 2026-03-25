@@ -48,6 +48,40 @@ fn scan_message(input: InputKind) {
 
 #[test_case(Empty)]
 #[test_case(Full)]
+fn save_single_key(input: InputKind) {
+    const STR_KEY: &str = "message";
+    const FIXED64_KEY: u64 = 2;
+    assert_ne!(Full.into_map_message().string_to_message.get(STR_KEY), None);
+    assert_ne!(
+        Full.into_map_message().fixed64_to_i32.get(&FIXED64_KEY),
+        None
+    );
+
+    let input = input.into_map_message();
+    let bytes = input.encode_to_vec();
+
+    let scanner = proto::WithMap::scanner()
+        .string_to_message(Save::map_value(
+            STR_KEY,
+            proto::MapValue::scanner().id(Save),
+        ))
+        .fixed64_to_i32(Save::map_value(FIXED64_KEY, Save));
+
+    let output = scanner.scan(&mut bytes.as_slice()).read_all().unwrap();
+    let expected = proto::ScanWithMapOutput {
+        string_to_message: input
+            .string_to_message
+            .get(STR_KEY)
+            .map(|v| proto::ScanMapValueOutput { id: v.id }),
+        fixed64_to_i32: input.fixed64_to_i32.get(&FIXED64_KEY).copied(),
+        ..Default::default()
+    };
+
+    assert_eq!(output, expected);
+}
+
+#[test_case(Empty)]
+#[test_case(Full)]
 fn scan_as_repeated(input: InputKind) {
     const STR_KEY: &str = "message";
     const FIXED64_KEY: u64 = 2;
