@@ -1,7 +1,8 @@
 use core::convert::Infallible;
-use core::fmt::Debug;
 use core::hash::Hash;
 use core::marker::PhantomData;
+
+use derive_where::derive_where;
 
 use crate::read::ReadTypes;
 use crate::scan::encoding::{Encoding, Fixed, Varint, ZigZag};
@@ -50,6 +51,7 @@ impl MapKey for str {}
 pub struct MapEntry<K: ?Sized, V: ?Sized>(Infallible, PhantomData<K>, PhantomData<V>);
 
 /// Scanner for [`MapEntry`].
+#[derive_where(Clone, Debug; SK, SV)]
 pub struct MapEntryScanner<K: ?Sized, V: ?Sized, SK, SV>(SK, SV, PhantomData<K>, PhantomData<V>);
 
 impl<K: ?Sized + MapKey, V: ?Sized> ScanMessage for MapEntry<K, V> {
@@ -155,22 +157,5 @@ impl<
 
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         IntoScanner::<Repeated<Message<MapEntry<K, V>>>>::into_scanner(self)
-    }
-}
-
-impl<K: ?Sized, V: ?Sized, SK: Clone, SV: Clone> Clone for MapEntryScanner<K, V, SK, SV> {
-    fn clone(&self) -> Self {
-        Self::new(self.0.clone(), self.1.clone())
-    }
-}
-
-impl<K: ?Sized, V: ?Sized, SK: Debug, SV: Debug> Debug for MapEntryScanner<K, V, SK, SV> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("MapEntryScanner")
-            .field(&self.0)
-            .field(&self.1)
-            .field(&self.2)
-            .field(&self.3)
-            .finish()
     }
 }

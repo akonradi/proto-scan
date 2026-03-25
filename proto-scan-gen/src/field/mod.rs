@@ -1,3 +1,4 @@
+use derive_where::derive_where;
 use proc_macro2::TokenStream;
 use quote::{ToTokens as _, quote};
 use syn::{Ident, parse_quote};
@@ -19,14 +20,8 @@ impl<F> Field<F> {
 }
 
 /// The generic type for a message field.
+#[derive_where(Clone, Copy;)]
 pub(crate) struct FieldGeneric<'a, F>(&'a Field<F>);
-
-impl<F> Clone for FieldGeneric<'_, F> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-impl<F> Copy for FieldGeneric<'_, F> {}
 
 impl<'a, F> FieldGeneric<'a, F> {
     pub(crate) fn ident(self) -> &'a Ident {

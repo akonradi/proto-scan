@@ -1,6 +1,9 @@
 #![doc(hidden)]
 
 #[cfg(feature = "std")]
+use derive_where::derive_where;
+
+#[cfg(feature = "std")]
 use crate::scan::delimited::ScanDelimited;
 #[cfg(feature = "std")]
 use crate::scan::field::save::DecodeFromBytes;
@@ -26,14 +29,8 @@ use {
 ///
 /// Deserializes according to the [`Encoding`] type parameter.
 #[cfg(feature = "std")]
+#[derive_where(Default;)]
 pub struct SaveRepeated<E: Encoding>(Vec<E::Repr>);
-
-#[cfg(feature = "std")]
-impl<E: Encoding> SaveRepeated<E> {
-    pub(super) fn new() -> Self {
-        Self(Vec::new())
-    }
-}
 
 #[cfg(feature = "std")]
 impl<E: Encoding> IntoScanOutput for SaveRepeated<E> {

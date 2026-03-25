@@ -51,7 +51,7 @@ macro_rules! impl_into_scanner {
             type Scanner<R: ReadTypes> = SaveNumeric<$p>;
 
             fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-                SaveNumeric::new()
+                SaveNumeric::default()
             }
         }
         #[cfg(feature = "std")]
@@ -59,7 +59,7 @@ macro_rules! impl_into_scanner {
             type Scanner<R: ReadTypes> = SaveRepeated<$p>;
 
             fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-                SaveRepeated::new()
+                SaveRepeated::default()
             }
         }
     };

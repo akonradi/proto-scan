@@ -1,6 +1,8 @@
 #![doc(hidden)]
 use core::convert::Infallible;
 
+use derive_where::derive_where;
+
 use crate::read::{ReadBuffer, ReadTypes};
 use crate::scan::field::OnScanField;
 use crate::scan::{
@@ -10,25 +12,11 @@ use crate::scan::{
 use crate::wire::{NumericField, WrongWireType};
 
 /// [`OnScanField`] impl that produces the read value as the event output.
+#[derive_where(Debug, Clone, Default; E::Decoded<R>)]
 pub struct SaveBytesScanner<E: DecodeFromBytes + ?Sized, R: ReadTypes>(E::Decoded<R>);
 
 impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> SaveBytesScanner<E, R> {
     pub(crate) fn new() -> Self {
-        Self(Default::default())
-    }
-}
-
-impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> Clone for SaveBytesScanner<E, R>
-where
-    E::Decoded<R>: Clone,
-{
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
-impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> Default for SaveBytesScanner<E, R> {
-    fn default() -> Self {
         Self(Default::default())
     }
 }

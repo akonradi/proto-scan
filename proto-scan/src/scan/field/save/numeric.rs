@@ -1,5 +1,7 @@
 #![doc(hidden)]
 
+use derive_where::derive_where;
+
 use crate::read::ReadTypes;
 use crate::scan::encoding::Encoding;
 use crate::scan::field::OnScanField;
@@ -9,25 +11,8 @@ use crate::scan::{
 };
 use crate::wire::{NumericField, NumericWireType, WrongWireType};
 
+#[derive_where(Default, Clone; E::Repr)]
 pub struct SaveNumeric<E: Encoding>(E::Repr);
-
-impl<E: Encoding> SaveNumeric<E> {
-    pub(super) fn new() -> Self {
-        Self(Default::default())
-    }
-}
-
-impl<E: Encoding> Clone for SaveNumeric<E> {
-    fn clone(&self) -> Self {
-        Self(self.0)
-    }
-}
-
-impl<E: Encoding> Default for SaveNumeric<E> {
-    fn default() -> Self {
-        Self(Default::default())
-    }
-}
 
 impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveNumeric<E> {
     fn on_numeric(&mut self, value: NumericField) -> Result<(), ScanError<R::Error>> {
