@@ -62,7 +62,6 @@ impl OneofScannerField<'_> {
 
         let into_scanner_type = field_type.as_into_scanner_type();
         let custom_fn = SwapSingleFieldFn {
-            fn_verb: "",
             docs: &[
                 &format!("Sets the field scanner for oneof field `{field_name}`."),
                 "",

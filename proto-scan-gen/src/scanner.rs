@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::quote;
 use syn::Ident;
 
 use crate::field::{Field, FieldGeneric};
@@ -30,7 +30,6 @@ pub(crate) trait ScannerOutput {
 
 #[derive(Default)]
 pub(crate) struct SwapSingleFieldFn<'a> {
-    pub(crate) fn_verb: &'static str,
     pub(crate) docs: &'a [&'a str],
     pub(crate) generics: &'a [TokenStream],
     pub(crate) args: &'a [TokenStream],
@@ -61,19 +60,16 @@ impl<'m, P: Parent, F> SwapSingleFieldInherentImpl<'m, P, F> {
 
         let impl_fns = impl_fns.into_iter().map(
             |SwapSingleFieldFn {
-                 fn_verb,
                  docs,
                  generics,
                  args,
                  output_type,
                  construct_field,
              }| {
-                let sep = if fn_verb.is_empty() { "" } else { "_" };
-                let fn_name = format_ident!("{fn_verb}{sep}{field_name}");
                 quote! {
                     #( #[doc = #docs] )*
                     #[allow(clippy::type_complexity)]
-                    pub fn #fn_name <#(#generics),*>(
+                    pub fn #field_name <#(#generics),*>(
                         self,
                         #(#args),*
                     ) -> #scanner_name<
