@@ -1,5 +1,5 @@
 use proto_scan::read::IoRead;
-use proto_scan::scan::field::Save;
+use proto_scan::scan::field::{Save, ScanOptionalMessage};
 use proto_scan::scan::{ScanMessage, ScannerBuilder};
 
 mod proto {
@@ -31,7 +31,11 @@ mod proto {
 /// Reads a [proto::Contact] message from the file name argument, extracts
 /// the zip code from the [`proto::Address`], and prints it to stdout.
 fn main() {
-    let scanner = proto::Contact::scanner().address(proto::Address::scanner().zip_code(Save));
+    let scanner = proto::Contact::scanner().address(
+        proto::Address::scanner()
+            .zip_code(Save)
+            .empty_if_not_present(),
+    );
 
     let filename = std::env::args()
         .skip(1)

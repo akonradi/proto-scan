@@ -66,9 +66,10 @@
 //! ) -> Result<i32, scan::ScanError<<R::ReadTypes as read::ReadTypes>::Error>> {
 //!    let scanner = proto::Contact::scanner().address(proto::Address::scanner().zip_code(Save));
 //!    let proto::ScanContactOutput {
-//!        address: proto::ScanAddressOutput { zip_code, .. },
+//!        address,
 //!        ..
 //!    } = scanner.scan(reader).read_all()?;
+//!    let zip_code = address.map(|proto::ScanAddressOutput { zip_code, .. }| zip_code).unwrap_or_default();
 //!
 //!    Ok(zip_code)
 //! }

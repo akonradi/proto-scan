@@ -1,3 +1,6 @@
+use std::convert::Infallible;
+use std::marker::PhantomData;
+
 use crate::read::ReadTypes;
 use crate::scan::field::{NoOutput, OnScanField};
 use crate::scan::{
@@ -6,19 +9,95 @@ use crate::scan::{
 };
 use crate::wire::WrongWireType;
 
-/// Wrapper type that scans an embedded message.
+/// Marker type for a message field.
 #[derive(Clone)]
-pub struct Message<F>(F);
+pub struct Message<F>(PhantomData<F>, Infallible);
 
-impl<M, S: MessageScanner<Message = M> + IntoScanner<M>> IntoScanner<Message<M>> for S {
-    type Scanner<R: ReadTypes> = Message<S::Scanner<R>>;
+impl<M, S: MessageScanner<Message = M> + IntoScanner<M>> IntoScanner<Option<Message<M>>> for S {
+    type Scanner<R: ReadTypes> = Scanner<S::Scanner<R>, Option<Present>>;
 
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-        Message(S::into_scanner(self))
+        Scanner {
+            scanner: S::into_scanner(self),
+            presence: None,
+        }
     }
 }
 
-impl<F: ScanCallbacks<R> + IntoScanOutput, R: ReadTypes> OnScanField<R> for Message<F> {
+impl<M, S: MessageScanner<Message = M> + IntoScanner<M>> IntoScanner<Message<M>> for S {
+    type Scanner<R: ReadTypes> = Scanner<S::Scanner<R>, Present>;
+
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+        Scanner {
+            scanner: S::into_scanner(self),
+            presence: Present,
+        }
+    }
+}
+
+/// [`IntoScanner`] wrapper for an embedded message field that should be treated
+/// as empty if not present.
+#[derive(Clone, Debug)]
+pub struct EmptyIfMissing<S>(S);
+
+impl<M, S: MessageScanner<Message = M> + IntoScanner<M>> IntoScanner<Option<Message<M>>>
+    for EmptyIfMissing<S>
+{
+    type Scanner<R: ReadTypes> = Scanner<S::Scanner<R>, Present>;
+
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+        Scanner {
+            scanner: S::into_scanner(self.0),
+            presence: Present,
+        }
+    }
+}
+
+/// Extension trait for [`MessageScanner`] for scanning embedded message fields.
+///
+/// This trait is blanket-implemented for all `MessageScanner`s.
+pub trait ScanOptionalMessage: MessageScanner + Sized {
+    /// Transforms a message scanner into one that treats a message field as empty if it is not seen.
+    ///
+    /// Embedded message fields in protobuf messages are implicitly optional.
+    /// That means that the wire format (and serializer and deserializer APIs)
+    /// differentiate between an embedded message field that is not present and
+    /// one present with an empty embedded message value.
+    ///
+    /// Embedded message fields require a [`IntoScanner<Option<Message<M>>>`].
+    /// The blanket impl for [`MessageScanner`]s tracks whether the message was
+    /// seen at all, which requires additional overhead. In return, it produces
+    /// as its [`IntoScanOutput::ScanOutput`] an `Option`.
+    ///
+    /// In cases where the fidelity (and overhead) are not needed, this method
+    /// can be used to avoid it. The [`EmptyIfMissing`] wrapper retured by this
+    /// method implements `IntoScanner<Option<Message<M>>>` by assuming the
+    /// message was seen at least once. This lets its
+    /// `IntoScanOutput::ScanOutput` be non-optional.
+    fn empty_if_not_present(self) -> EmptyIfMissing<Self> {
+        EmptyIfMissing(self)
+    }
+}
+impl<M: MessageScanner + Sized> ScanOptionalMessage for M {}
+
+#[derive(Debug, Clone)]
+pub struct Scanner<S, P> {
+    scanner: S,
+    presence: P,
+}
+
+#[derive(Copy, Clone, Default, PartialEq)]
+pub struct Present;
+
+pub trait Presence: PartialEq<Present> + From<Present> + Default {
+    type Output<T>;
+
+    fn then<R>(self, f: impl FnOnce() -> R) -> Self::Output<R>;
+}
+
+impl<F: ScanCallbacks<R> + IntoScanOutput, R: ReadTypes, P: Presence> OnScanField<R>
+    for Scanner<F, P>
+{
     fn on_numeric(&mut self, _value: crate::scan::NumericField) -> Result<(), ScanError<R::Error>> {
         Err(WrongWireType.into())
     }
@@ -27,7 +106,9 @@ impl<F: ScanCallbacks<R> + IntoScanOutput, R: ReadTypes> OnScanField<R> for Mess
         &mut self,
         delimited: impl GroupDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<<R>::Error>> {
-        delimited.scan_with(NoOutput(&mut self.0))?;
+        let Self { scanner, presence } = self;
+        delimited.scan_with(NoOutput(scanner))?;
+        *presence = Present.into();
         Ok(())
     }
 
@@ -35,22 +116,50 @@ impl<F: ScanCallbacks<R> + IntoScanOutput, R: ReadTypes> OnScanField<R> for Mess
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>> {
-        delimited.scan_with(NoOutput(&mut self.0))?;
+        let Self { scanner, presence } = self;
+        delimited.scan_with(NoOutput(scanner))?;
+        *presence = Present.into();
         Ok(())
     }
 }
 
-impl<F: IntoScanOutput> IntoScanOutput for Message<F> {
-    type ScanOutput = F::ScanOutput;
+impl<F: IntoScanOutput, P: Presence> IntoScanOutput for Scanner<F, P> {
+    type ScanOutput = P::Output<F::ScanOutput>;
 
     fn into_scan_output(self) -> Self::ScanOutput {
-        self.0.into_scan_output()
+        let Self { presence, scanner } = self;
+        presence.then(|| scanner.into_scan_output())
     }
 }
 
-impl<F: ResettableScanner> ResettableScanner for Message<F> {
+impl<F: ResettableScanner, P: Presence> ResettableScanner for Scanner<F, P> {
     fn reset(&mut self) {
-        self.0.reset()
+        let Self { presence, scanner } = self;
+        *presence = P::default();
+        scanner.reset();
+    }
+}
+
+impl PartialEq<Present> for Option<Present> {
+    fn eq(&self, _: &Present) -> bool {
+        match self {
+            None => false,
+            Some(Present) => true,
+        }
+    }
+}
+
+impl Presence for Option<Present> {
+    type Output<T> = Option<T>;
+    fn then<R>(self, f: impl FnOnce() -> R) -> Self::Output<R> {
+        self.map(|Present| f())
+    }
+}
+
+impl Presence for Present {
+    type Output<T> = T;
+    fn then<R>(self, f: impl FnOnce() -> R) -> Self::Output<R> {
+        f()
     }
 }
 
@@ -131,10 +240,13 @@ mod test {
 
         let scanner = Scanner(
             3,
-            Message(Scanner(
-                1,
-                <Save as IntoScanner<Varint<i32>>>::into_scanner::<&[u8]>(Save),
-            )),
+            super::Scanner {
+                scanner: Scanner(
+                    1,
+                    <Save as IntoScanner<Varint<i32>>>::into_scanner::<&[u8]>(Save),
+                ),
+                presence: Present,
+            },
         );
 
         let mut input = &INPUT[..];
@@ -166,12 +278,15 @@ mod test {
             let mut saved_to = vec![1, 2, 3];
             let scanner = Scanner(
                 3,
-                Message(Scanner(
-                    1,
-                    <Write<_> as IntoScanner<Repeated<Varint<i32>>>>::into_scanner::<&[u8]>(Write(
-                        &mut saved_to,
+                super::Scanner {
+                    scanner: (Scanner(
+                        1,
+                        <Write<_> as IntoScanner<Repeated<Varint<i32>>>>::into_scanner::<&[u8]>(
+                            Write(&mut saved_to),
+                        ),
                     )),
-                )),
+                    presence: Present,
+                },
             );
 
             let mut input = &input[..];

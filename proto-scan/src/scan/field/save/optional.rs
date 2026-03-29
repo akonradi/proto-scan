@@ -2,7 +2,9 @@
 
 use crate::read::ReadTypes;
 use crate::scan::field::OnScanField;
-use crate::scan::{GroupDelimited, IntoScanOutput, ScanError, ScanLengthDelimited};
+use crate::scan::{
+    GroupDelimited, IntoScanOutput, ResettableScanner, ScanError, ScanLengthDelimited,
+};
 use crate::wire::NumericField;
 
 #[derive(Clone, Default)]
@@ -51,5 +53,12 @@ impl<S: OnScanField<R>, R: ReadTypes> OnScanField<R> for SaveOptional<S> {
         self.inner.on_length_delimited(delimited)?;
         self.present = true;
         Ok(())
+    }
+}
+
+impl<S: ResettableScanner> ResettableScanner for SaveOptional<S> {
+    fn reset(&mut self) {
+        self.inner.reset();
+        self.present = false;
     }
 }

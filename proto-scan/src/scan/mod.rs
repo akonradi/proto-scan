@@ -77,9 +77,8 @@
 //!     r: R,
 //! ) -> Result<i64, scan::ScanError<<R::ReadTypes as read::ReadTypes>::Error>> {
 //!     let scanner = Test3::scanner().c(Test1::scanner().a(scan::field::Save));
-//!     let ScanTest3Output {
-//!         c: ScanTest1Output { a },
-//!     } = scanner.scan(r).read_all()?;
+//!     let ScanTest3Output { c } = scanner.scan(r).read_all()?;
+//!     let a = c.map(|ScanTest1Output { a }| a).unwrap_or_default();
 //!     Ok(a)
 //! }
 //!

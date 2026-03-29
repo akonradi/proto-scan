@@ -1,0 +1,16 @@
+syntax = "proto3";
+package testing;
+
+message OptionalBoolWrapper {
+    optional bool value = 1;
+}
+
+message WithOptionals {
+    optional bool optional_bool = 1;
+    OptionalBoolWrapper bool_wrapper = 2;
+    oneof Oneof {
+        bool bool_field = 3;
+        OptionalBoolWrapper message_field = 4;
+    }
+    OptionalBoolWrapper other_bool_wrapper = 5;
+}

@@ -14,7 +14,7 @@ mod write;
 
 pub use group::Group;
 pub use map::{Map, MapKey};
-pub use message::Message;
+pub use message::{Message, ScanOptionalMessage};
 pub use no_op::NoOp;
 pub use repeated::{
     Fold, RepeatStrategy, RepeatStrategyScanner, Repeated, ScanRepeated, WriteCloned,

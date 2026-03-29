@@ -81,12 +81,17 @@ impl MessageField {
         &self.type_path.path.segments.last().unwrap().ident
     }
 
-    fn as_into_scanner_type(&self) -> TokenStream {
+    fn as_into_scanner_type(&self, optional: bool) -> TokenStream {
         let Self {
             type_path,
             number: _,
         } = self;
-        quote! {::proto_scan::scan::field::Message < #type_path >}
+        let m = quote!(::proto_scan::scan::field::Message < #type_path >);
+        if optional {
+            quote! {::core::option::Option<#m>}
+        } else {
+            m
+        }
     }
 }
 
@@ -126,7 +131,7 @@ impl OneOfField {
             OneOfField::Single(single_field) => single_field.ty.encoding_type().to_token_stream(),
             OneOfField::Bytes(bytes_field) => bytes_field.as_into_scanner_type(),
             OneOfField::Group(group_field) => group_field.as_into_scanner_type(),
-            OneOfField::Message(message_field) => message_field.as_into_scanner_type(),
+            OneOfField::Message(message_field) => message_field.as_into_scanner_type(false),
         }
     }
 }
@@ -188,7 +193,7 @@ impl MessageFieldType {
                         type_path: type_path.clone(),
                         number: 0,
                     }
-                    .as_into_scanner_type();
+                    .as_into_scanner_type(false);
                     parse_quote!(::proto_scan::scan::field::Repeated<#m>)
                 }
                 RepeatedFieldType::Group { type_path } => {
@@ -201,7 +206,7 @@ impl MessageFieldType {
                 }
             },
             MessageFieldType::Bytes(bytes_field) => bytes_field.as_into_scanner_type(),
-            MessageFieldType::Message(message_field) => message_field.as_into_scanner_type(),
+            MessageFieldType::Message(message_field) => message_field.as_into_scanner_type(true),
             MessageFieldType::Group(group_field) => group_field.as_into_scanner_type(),
             MessageFieldType::OneOf {
                 type_name,
