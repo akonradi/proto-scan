@@ -44,13 +44,16 @@ pub struct MessageScanOutput<'m>(scanner::MessageScanner<'m>);
 impl MessageScanOutput<'_> {
     pub fn scan_output_definition(&self) -> TokenStream {
         let name = self.type_name();
+        let scan_type_name = self.0.scanner().type_name();
         let scan_types = self
             .0
             .generic_types()
             .map(|f| f.ident())
             .collect::<Vec<_>>();
         let scan_fields = self.0.field_names();
+        let summary = format!("Output of a scan with a [`{scan_type_name}`].");
         quote! {
+            #[doc = #summary]
             #[derive(Copy, Clone, Debug, Default, PartialEq, Hash)]
             pub struct #name <#(#scan_types),*> {
                 #(pub #scan_fields: #scan_types ),*

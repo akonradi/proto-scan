@@ -30,6 +30,7 @@ impl<'m> MessageScanner<'m> {
     }
 
     pub fn type_definition(&self) -> TokenStream {
+        let message_type = &self.0.name;
         let scanner_name = self.type_name();
         let scan_types = self.generic_types().map(|f| f.ident());
         let scan_fields = self.0.fields.iter().map(
@@ -39,7 +40,37 @@ impl<'m> MessageScanner<'m> {
                  ..
              }| quote!(#field_name: #generic),
         );
+        let field_name_count = self.0.fields.len();
+        let field_doc_refs = self
+            .0
+            .fields
+            .iter()
+            .enumerate()
+            .map(|(i, field)| {
+                let field_name = &field.field_name;
+                let suffix = match field_name_count {
+                    n if i == n - 1 => "",
+                    0 | 1 => "",
+                    2 => " or ",
+                    n if i < n - 2 => ", ",
+                    _ => ", or ",
+                };
+                format!("[`{field_name}`]({scanner_name}::{field_name}){suffix}")
+            })
+            .collect::<Vec<_>>();
+
+        let field_ref_list = field_doc_refs.join("");
+        let summary = format!("Scanner builder for [`{message_type}`].");
+        let message_type_str = message_type.to_string();
+
         quote! {
+            #[doc = #summary]
+            #[doc = ""]
+            #[doc = "Builds a scanner for the message type `"]
+            #[doc = #message_type_str ]
+            #[doc = "`. Override the default [`NoOp`](::proto_scan::scan::field::NoOp) policy for a field by calling "]
+            #[doc = #field_ref_list]
+            #[doc = " to set the scan policy for the respective field."]
             #[derive(Clone, Default)]
             pub struct #scanner_name <#(#scan_types),*> {
                 #(#scan_fields, )*

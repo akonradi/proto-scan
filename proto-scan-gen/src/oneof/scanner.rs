@@ -40,8 +40,39 @@ impl<'a> OneofScanner<'a> {
                 #name: #generic,
             }
         });
+        let oneof_type = &self.0.name;
+        let field_name_count = self.0.fields.len();
+        let field_doc_refs = self
+            .0
+            .fields
+            .iter()
+            .enumerate()
+            .map(|(i, field)| {
+                let field_name = &field.field_name;
+                let suffix = match field_name_count {
+                    n if i == n - 1 => "",
+                    0 | 1 => "",
+                    2 => " or ",
+                    n if i < n - 2 => ", ",
+                    _ => ", or ",
+                };
+                format!("[`{field_name}`]({type_name}::{field_name}){suffix}")
+            })
+            .collect::<Vec<_>>();
+
+        let field_ref_list = field_doc_refs.join("");
+        let summary = format!("Scanner builder for [`{oneof_type}`].");
+        let oneof_type = oneof_type.to_string();
+
         let last_set_type = self.field_number_type_name();
         quote! {
+            #[doc = #summary]
+            #[doc = ""]
+            #[doc = "Builds a scanner for the oneof group type `"]
+            #[doc = #oneof_type ]
+            #[doc = "`. Override the default [`NoOp`](::proto_scan::scan::field::NoOp) policy for a field by calling "]
+            #[doc = #field_ref_list]
+            #[doc = " to set the scan policy for the respective field."]
             #[derive(Debug, Default)]
             pub struct #type_name<#(#generics),*> {
                 #(#fields)*
@@ -60,12 +91,14 @@ impl<'a> OneofScanner<'a> {
                 #variant(#generic)
             }
         });
+        let scan_type_name = self.type_name();
+        let summary = format!("Part of the output of a scan with a [`{scan_type_name}`].");
         quote! {
+            #[doc = #summary]
             #[derive(Copy, Clone, Debug, Hash, PartialEq)]
             pub enum #type_name<#(#generics),*> {
                 #(#fields),*
             }
-
         }
     }
 
