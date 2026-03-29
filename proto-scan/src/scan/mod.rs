@@ -422,3 +422,36 @@ impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes> + IntoScanOutput, G: Gr
         Ok(it.scanner.into_scan_output())
     }
 }
+
+impl<T: IntoScanOutput> IntoScanOutput for Box<T> {
+    type ScanOutput = T::ScanOutput;
+    fn into_scan_output(self) -> Self::ScanOutput {
+        (*self).into_scan_output()
+    }
+}
+
+impl<S: ScanCallbacks<R>, R: ReadTypes> ScanCallbacks<R> for Box<S> {
+    fn on_numeric(
+        &mut self,
+        field: FieldNumber,
+        value: NumericField,
+    ) -> Result<(), ScanError<<R as ReadTypes>::Error>> {
+        S::on_numeric(&mut *self, field, value)
+    }
+
+    fn on_group(
+        &mut self,
+        field: FieldNumber,
+        group: impl GroupDelimited<ReadTypes = R>,
+    ) -> Result<(), ScanError<<R as ReadTypes>::Error>> {
+        S::on_group(&mut *self, field, group)
+    }
+
+    fn on_length_delimited(
+        &mut self,
+        field: FieldNumber,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
+    ) -> Result<(), ScanError<<R as ReadTypes>::Error>> {
+        S::on_length_delimited(&mut *self, field, delimited)
+    }
+}

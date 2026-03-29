@@ -40,6 +40,29 @@ pub trait OnScanField<R: ReadTypes>: IntoScanOutput {
     ) -> Result<(), ScanError<R::Error>>;
 }
 
+impl<S: OnScanField<R>, R: ReadTypes> OnScanField<R> for Box<S> {
+    fn on_numeric(
+        &mut self,
+        value: NumericField,
+    ) -> Result<(), ScanError<<R as ReadTypes>::Error>> {
+        S::on_numeric(&mut *self, value)
+    }
+
+    fn on_group(
+        &mut self,
+        group: impl GroupDelimited<ReadTypes = R>,
+    ) -> Result<(), ScanError<<R as ReadTypes>::Error>> {
+        S::on_group(&mut *self, group)
+    }
+
+    fn on_length_delimited(
+        &mut self,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
+    ) -> Result<(), ScanError<<R as ReadTypes>::Error>> {
+        S::on_length_delimited(&mut *self, delimited)
+    }
+}
+
 #[cfg(test)]
 mod test {
     macro_rules! assert_impl_into_scanner {
