@@ -73,7 +73,7 @@ impl<'a> OneofScanner<'a> {
             #[doc = "`. Override the default [`NoOp`](::proto_scan::scan::field::NoOp) policy for a field by calling "]
             #[doc = #field_ref_list]
             #[doc = " to set the scan policy for the respective field."]
-            #[derive(Debug, Default)]
+            #[derive(Clone, Debug, Default)]
             pub struct #type_name<#(#generics),*> {
                 #(#fields)*
                 proto_scan_last_set: ::core::option::Option<#last_set_type>,
@@ -95,7 +95,7 @@ impl<'a> OneofScanner<'a> {
         let summary = format!("Part of the output of a scan with a [`{scan_type_name}`].");
         quote! {
             #[doc = #summary]
-            #[derive(Copy, Clone, Debug, Hash, PartialEq)]
+            #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
             pub enum #type_name<#(#generics),*> {
                 #(#fields),*
             }

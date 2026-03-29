@@ -54,7 +54,7 @@ impl MessageScanOutput<'_> {
         let summary = format!("Output of a scan with a [`{scan_type_name}`].");
         quote! {
             #[doc = #summary]
-            #[derive(Copy, Clone, Debug, Default, PartialEq, Hash)]
+            #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
             pub struct #name <#(#scan_types),*> {
                 #(pub #scan_fields: #scan_types ),*
             }

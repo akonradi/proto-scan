@@ -71,7 +71,7 @@ impl<'m> MessageScanner<'m> {
             #[doc = "`. Override the default [`NoOp`](::proto_scan::scan::field::NoOp) policy for a field by calling "]
             #[doc = #field_ref_list]
             #[doc = " to set the scan policy for the respective field."]
-            #[derive(Clone, Default)]
+            #[derive(Clone, Debug, Default)]
             pub struct #scanner_name <#(#scan_types),*> {
                 #(#scan_fields, )*
             }
