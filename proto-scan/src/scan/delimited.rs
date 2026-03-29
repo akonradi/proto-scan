@@ -1,5 +1,5 @@
 use crate::read::{Read, ReadTypes};
-use crate::scan::{GroupStack, ScanCallbacks, ScanError};
+use crate::scan::{GroupStack, IntoScanOutput, ScanCallbacks, ScanError};
 use crate::wire::{DelimitedTypes, LengthDelimited, ParseEventReader};
 
 /// Allows scanning the contents of a delimited field.
@@ -8,10 +8,10 @@ pub trait ScanDelimited: DelimitedTypes {
     ///
     /// The provided [`ScanCallbacks`] implementation will have its methods
     /// invoked for each scan event.
-    fn scan_with<S: ScanCallbacks<Self::ReadTypes>>(
+    fn scan_with<S: ScanCallbacks<Self::ReadTypes> + IntoScanOutput>(
         self,
         scanner: S,
-    ) -> Result<(), ScanError<<Self::ReadTypes as ReadTypes>::Error>>;
+    ) -> Result<S::ScanOutput, ScanError<<Self::ReadTypes as ReadTypes>::Error>>;
 }
 
 /// Functionally an alias for [`LengthDelimited`] plus [`ScanDelimited`].
@@ -72,10 +72,10 @@ impl<L: LengthDelimited, G> LengthDelimited for ScanDelimitedImpl<'_, L, G> {
 }
 
 impl<L: LengthDelimited, G: GroupStack> ScanDelimited for ScanDelimitedImpl<'_, L, G> {
-    fn scan_with<S: ScanCallbacks<Self::ReadTypes>>(
+    fn scan_with<S: ScanCallbacks<Self::ReadTypes> + IntoScanOutput>(
         self,
         mut scanner: S,
-    ) -> Result<(), ScanError<<Self::ReadTypes as ReadTypes>::Error>> {
+    ) -> Result<S::ScanOutput, ScanError<<Self::ReadTypes as ReadTypes>::Error>> {
         let Self {
             group_stack,
             length_delimited,
@@ -85,6 +85,6 @@ impl<L: LengthDelimited, G: GroupStack> ScanDelimited for ScanDelimitedImpl<'_, 
         while let Some(r) = super::next_event(&mut parse, &mut scanner, group_stack) {
             r?;
         }
-        Ok(())
+        Ok(scanner.into_scan_output())
     }
 }

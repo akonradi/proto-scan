@@ -149,12 +149,12 @@ impl<
         scanner: &S,
         input: impl ScanDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>> {
-        let mut scanner = scanner.clone();
-        input.scan_with(&mut scanner)?;
+        let scanner = scanner.clone();
+        let output = input.scan_with(scanner)?;
         if let Some(prev) = self.0.as_mut() {
-            self.1(prev, scanner.into_scan_output());
+            self.1(prev, output);
         } else {
-            self.0 = Some(scanner.into_scan_output())
+            self.0 = Some(output)
         }
         Ok(())
     }
@@ -186,9 +186,8 @@ impl<
         scanner: &S,
         input: impl ScanDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>> {
-        let mut scanner = scanner.clone();
-        input.scan_with(&mut scanner)?;
-        let output = scanner.into_scan_output();
+        let scanner = scanner.clone();
+        let output = input.scan_with(scanner)?;
         self.0.extend([output]);
         Ok(())
     }

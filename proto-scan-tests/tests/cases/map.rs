@@ -150,9 +150,8 @@ impl<
         scanner: &S,
         input: impl ScanDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<<R as ReadTypes>::Error>> {
-        let mut scanner = scanner.clone();
-        input.scan_with(&mut scanner)?;
-        let (k, v) = scanner.into_scan_output();
+        let scanner = scanner.clone();
+        let (k, v) = input.scan_with(scanner)?;
         if k == self.0 {
             self.1 = Some(v)
         }

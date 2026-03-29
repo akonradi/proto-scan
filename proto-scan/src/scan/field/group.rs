@@ -1,5 +1,5 @@
 use crate::read::ReadTypes;
-use crate::scan::field::OnScanField;
+use crate::scan::field::{NoOutput, OnScanField};
 use crate::scan::{
     GroupDelimited, IntoScanOutput, IntoScanner, MessageScanner, ResettableScanner, ScanCallbacks,
     ScanError, ScanLengthDelimited,
@@ -27,7 +27,7 @@ impl<F: ScanCallbacks<R> + IntoScanOutput, R: ReadTypes> OnScanField<R> for Grou
         &mut self,
         delimited: impl GroupDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<<R>::Error>> {
-        delimited.scan_with(&mut self.0)?;
+        delimited.scan_with(NoOutput(&mut self.0))?;
         Ok(())
     }
 

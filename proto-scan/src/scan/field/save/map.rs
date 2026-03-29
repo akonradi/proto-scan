@@ -114,12 +114,11 @@ where
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<<R>::Error>> {
         let Self(map, value_scanner, PhantomData, PhantomData) = self;
-        let mut scanner = MapEntryScanner::<K, V, _, _>::new(
+        let scanner = MapEntryScanner::<K, V, _, _>::new(
             IntoScanner::<K>::into_scanner(Save),
             value_scanner.clone(),
         );
-        delimited.scan_with(&mut scanner)?;
-        let (key, value) = scanner.into_scan_output();
+        let (key, value) = delimited.scan_with(scanner)?;
         map.insert(key, value);
         Ok(())
     }
@@ -210,9 +209,8 @@ impl<
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<<R as ReadTypes>::Error>> {
-        let mut scanner = self.1.clone();
-        delimited.scan_with(&mut scanner)?;
-        let (key, value) = scanner.into_scan_output();
+        let scanner = self.1.clone();
+        let (key, value) = delimited.scan_with(scanner)?;
 
         if key == self.0 {
             self.2 = Some(value);

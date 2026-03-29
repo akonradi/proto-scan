@@ -3,7 +3,7 @@
 use crate::read::ReadTypes;
 use crate::scan::delimited::{ScanDelimited, ScanDelimitedImpl};
 use crate::scan::group::GroupStack;
-use crate::scan::{ParseEventReaderScanError, ScanCallbacks, ScanError};
+use crate::scan::{IntoScanOutput, ParseEventReaderScanError, ScanCallbacks, ScanError};
 use crate::wire::{DelimitedTypes, FieldNumber, GroupOp, ParseEvent, ParseEventReader};
 
 /// An accessor for the contents of a proto2 group.
@@ -81,10 +81,10 @@ impl<'t, P: ParseEventReader, G: GroupStack> DelimitedTypes for &mut GroupDelimi
 
 impl<'t, P: ParseEventReader, G: GroupStack> GroupDelimited for &mut GroupDelimitedImpl<'t, P, G> {}
 impl<'t, P: ParseEventReader, G: GroupStack> ScanDelimited for &mut GroupDelimitedImpl<'t, P, G> {
-    fn scan_with<S: ScanCallbacks<Self::ReadTypes>>(
+    fn scan_with<S: ScanCallbacks<Self::ReadTypes> + IntoScanOutput>(
         self,
         mut scanner: S,
-    ) -> Result<(), ScanError<<Self::ReadTypes as ReadTypes>::Error>> {
+    ) -> Result<S::ScanOutput, ScanError<<Self::ReadTypes as ReadTypes>::Error>> {
         while self.open_count != 0 {
             let (field_number, event) = self
                 .parse
@@ -115,6 +115,6 @@ impl<'t, P: ParseEventReader, G: GroupStack> ScanDelimited for &mut GroupDelimit
                 }
             }
         }
-        Ok(())
+        Ok(scanner.into_scan_output())
     }
 }

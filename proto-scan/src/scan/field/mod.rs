@@ -1,5 +1,5 @@
 use crate::read::ReadTypes;
-use crate::scan::{GroupDelimited, IntoScanOutput, ScanError, ScanLengthDelimited};
+use crate::scan::{GroupDelimited, IntoScanOutput, ScanCallbacks, ScanError, ScanLengthDelimited};
 #[cfg(doc)]
 use crate::wire::FieldNumber;
 use crate::wire::NumericField;
@@ -60,6 +60,40 @@ impl<S: OnScanField<R>, R: ReadTypes> OnScanField<R> for Box<S> {
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<<R as ReadTypes>::Error>> {
         S::on_length_delimited(&mut *self, delimited)
+    }
+}
+
+/// Utility type for wrapping a [`ScanCallbacks`] impl into an [`IntoScanOutput<ScanOutput=()>`]
+struct NoOutput<S>(S);
+
+impl<S> IntoScanOutput for NoOutput<S> {
+    type ScanOutput = ();
+    fn into_scan_output(self) -> Self::ScanOutput {}
+}
+
+impl<R: ReadTypes, S: ScanCallbacks<R>> ScanCallbacks<R> for NoOutput<S> {
+    fn on_numeric(
+        &mut self,
+        field: crate::wire::FieldNumber,
+        value: crate::wire::NumericField,
+    ) -> Result<(), ScanError<<R as ReadTypes>::Error>> {
+        S::on_numeric(&mut self.0, field, value)
+    }
+
+    fn on_group(
+        &mut self,
+        field: crate::wire::FieldNumber,
+        group: impl GroupDelimited<ReadTypes = R>,
+    ) -> Result<(), ScanError<<R as ReadTypes>::Error>> {
+        S::on_group(&mut self.0, field, group)
+    }
+
+    fn on_length_delimited(
+        &mut self,
+        field: crate::wire::FieldNumber,
+        delimited: impl ScanLengthDelimited<ReadTypes = R>,
+    ) -> Result<(), ScanError<<R as ReadTypes>::Error>> {
+        S::on_length_delimited(&mut self.0, field, delimited)
     }
 }
 
