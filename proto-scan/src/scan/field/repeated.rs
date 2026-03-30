@@ -38,7 +38,7 @@ pub trait RepeatStrategy<M: MessageScanner> {
 pub trait RepeatStrategyScanner<R: ReadTypes, S: ScanCallbacks<R>>: IntoScanOutput {
     fn on_message(
         &mut self,
-        scanner: &S,
+        scanner: S,
         input: impl ScanDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>>;
 }
@@ -59,41 +59,46 @@ pub trait ScanRepeated: MessageScanner {
 }
 impl<M: MessageScanner> ScanRepeated for M {}
 
-/// Implementation of [`RepeatStrategyScanner`].
+/// [`IntoScanner`] for [`RepeatStrategyScanner`].
 ///
 /// This holds a [`MessageScanner`] and a [`RepeatStrategy`] and delegates to
 /// them to implement [`OnScanField`] for repeated message fields.
 pub struct RepeatedScanner<S, R>(S, R);
 
+pub struct RepeatedScannerImpl<R, S, F>(S, F, PhantomData<R>);
+
 impl<S: MessageScanner + IntoScanner<S::Message>, F: RepeatStrategy<S>>
     IntoScanner<Repeated<Message<S::Message>>> for RepeatedScanner<S, F>
 {
-    type Scanner<R: ReadTypes> = RepeatedScanner<S::Scanner<R>, F::Impl<R>>;
+    type Scanner<R: ReadTypes> = RepeatedScannerImpl<R, S, F::Impl<R>>;
 
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-        RepeatedScanner(self.0.into_scanner(), self.1.into_impl())
+        RepeatedScannerImpl(self.0, self.1.into_impl(), PhantomData)
     }
 }
 
 impl<S: MessageScanner + IntoScanner<S::Message>, F: RepeatStrategy<S>>
     IntoScanner<Repeated<Group<S::Message>>> for RepeatedScanner<S, F>
 {
-    type Scanner<R: ReadTypes> = RepeatedScanner<S::Scanner<R>, F::Impl<R>>;
+    type Scanner<R: ReadTypes> = RepeatedScannerImpl<R, S, F::Impl<R>>;
 
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-        RepeatedScanner(self.0.into_scanner(), self.1.into_impl())
+        RepeatedScannerImpl(self.0, self.1.into_impl(), PhantomData)
     }
 }
 
-impl<S, F: IntoScanOutput> IntoScanOutput for RepeatedScanner<S, F> {
+impl<R, S, F: IntoScanOutput> IntoScanOutput for RepeatedScannerImpl<R, S, F> {
     type ScanOutput = F::ScanOutput;
     fn into_scan_output(self) -> Self::ScanOutput {
         self.1.into_scan_output()
     }
 }
 
-impl<R: ReadTypes, S: ScanCallbacks<R>, F: RepeatStrategyScanner<R, S>> OnScanField<R>
-    for RepeatedScanner<S, F>
+impl<
+    R: ReadTypes,
+    S: MessageScanner + Clone + IntoScanner<S::Message, Scanner<R>: ScanCallbacks<R>>,
+    F: RepeatStrategyScanner<R, S::Scanner<R>>,
+> OnScanField<R> for RepeatedScannerImpl<R, S, F>
 {
     fn on_numeric(&mut self, _value: NumericField) -> Result<(), ScanError<R::Error>> {
         Err(WrongWireType.into())
@@ -103,14 +108,14 @@ impl<R: ReadTypes, S: ScanCallbacks<R>, F: RepeatStrategyScanner<R, S>> OnScanFi
         &mut self,
         delimited: impl GroupDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<<R>::Error>> {
-        self.1.on_message(&self.0, delimited)
+        self.1.on_message(self.0.clone().into_scanner(), delimited)
     }
 
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>> {
-        self.1.on_message(&self.0, delimited)
+        self.1.on_message(self.0.clone().into_scanner(), delimited)
     }
 }
 
@@ -140,16 +145,15 @@ impl<S: IntoScanOutput, F> IntoScanOutput for RepeatedFold<S, F> {
 
 impl<
     R: ReadTypes,
-    S: ScanCallbacks<R> + IntoScanOutput + Clone,
+    S: ScanCallbacks<R> + IntoScanOutput,
     F: Fn(&mut S::ScanOutput, S::ScanOutput),
 > RepeatStrategyScanner<R, S> for RepeatedFold<S, F>
 {
     fn on_message(
         &mut self,
-        scanner: &S,
+        scanner: S,
         input: impl ScanDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>> {
-        let scanner = scanner.clone();
         let output = input.scan_with(scanner)?;
         if let Some(prev) = self.0.as_mut() {
             self.1(prev, output);
@@ -177,16 +181,15 @@ impl<D> IntoScanOutput for RepeatedWriteCloned<D> {
 
 impl<
     R: ReadTypes,
-    S: ScanCallbacks<R> + IntoScanOutput + Clone,
+    S: ScanCallbacks<R> + IntoScanOutput,
     D: DerefMut<Target: Extend<S::ScanOutput>>,
 > RepeatStrategyScanner<R, S> for RepeatedWriteCloned<D>
 {
     fn on_message(
         &mut self,
-        scanner: &S,
+        scanner: S,
         input: impl ScanDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>> {
-        let scanner = scanner.clone();
         let output = input.scan_with(scanner)?;
         self.0.extend([output]);
         Ok(())

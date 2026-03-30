@@ -33,6 +33,7 @@ use repeated::SaveRepeated;
 /// protobuf message semantics (last-one wins for scalar and oneof fields,
 /// merging messages). See the [`scan`](super::super) documentation for usage
 /// examples.
+#[derive(Clone)]
 pub struct Save;
 
 impl Save {
@@ -129,7 +130,7 @@ where
     Save: IntoScanner<K>,
     Save: IntoScanner<V>,
 {
-    type Scanner<R: ReadTypes> = SaveMapScanner<K, V, <Save as IntoScanner<V>>::Scanner<R>, R>;
+    type Scanner<R: ReadTypes> = SaveMapScanner<K, V, R, Save>;
 
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         IntoScanner::<Map<K, V>>::into_scanner(Save::with_value(Save))

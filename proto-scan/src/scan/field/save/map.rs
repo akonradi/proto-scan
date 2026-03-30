@@ -1,9 +1,9 @@
 #![doc(hidden)]
 
+#[cfg(feature = "std")]
+use core::hash::Hash;
 #[cfg(any(feature = "std", doc))]
 use std::collections::HashMap;
-#[cfg(feature = "std")]
-use {core::hash::Hash, core::marker::PhantomData};
 
 #[cfg(feature = "std")]
 use crate::read::ReadTypes;
@@ -54,47 +54,56 @@ impl<K: MapKey + ?Sized, V: ?Sized, SV: IntoScanner<V>> IntoScanner<Map<K, V>> f
 where
     Save: IntoScanner<K>,
 {
-    type Scanner<R: ReadTypes> = SaveMapScanner<K, V, SV::Scanner<R>, R>;
+    type Scanner<R: ReadTypes> = SaveMapScanner<K, V, R, SV>;
 
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-        SaveMapScanner(
-            HashMap::new(),
-            self.0.into_scanner(),
-            PhantomData,
-            PhantomData,
-        )
+        SaveMapScanner {
+            output: HashMap::new(),
+            value_scanner: self.0,
+        }
     }
 }
 
-#[cfg(feature = "std")]
-pub struct SaveMapScanner<K: MapKey + ?Sized, V: ?Sized, SV: IntoScanOutput, R: ReadTypes>(
-    HashMap<<<Save as IntoScanner<K>>::Scanner<R> as IntoScanOutput>::ScanOutput, SV::ScanOutput>,
-    SV,
-    PhantomData<R>,
-    PhantomData<V>,
-)
-where
-    Save: IntoScanner<K>;
+#[allow(type_alias_bounds)]
+type ScannerOutput<S: IntoScanner<M, Scanner<R>: IntoScanOutput>, M, R> =
+    <<S as IntoScanner<M>>::Scanner<R> as IntoScanOutput>::ScanOutput;
 
 #[cfg(feature = "std")]
-impl<K: MapKey + ?Sized, V: ?Sized, SV: IntoScanOutput, R: ReadTypes> IntoScanOutput
-    for SaveMapScanner<K, V, SV, R>
+pub struct SaveMapScanner<
+    K: MapKey + ?Sized,
+    V: ?Sized,
+    R: ReadTypes,
+    SV: IntoScanner<V, Scanner<R>: IntoScanOutput>,
+> where
+    Save: IntoScanner<K>,
+{
+    output: HashMap<ScannerOutput<Save, K, R>, ScannerOutput<SV, V, R>>,
+    value_scanner: SV,
+}
+
+#[cfg(feature = "std")]
+impl<K: MapKey + ?Sized, V: ?Sized, SV: IntoScanner<V>, R: ReadTypes> IntoScanOutput
+    for SaveMapScanner<K, V, R, SV>
 where
     Save: IntoScanner<K>,
 {
     type ScanOutput = HashMap<
         <<Save as IntoScanner<K>>::Scanner<R> as IntoScanOutput>::ScanOutput,
-        SV::ScanOutput,
+        <<SV as IntoScanner<V>>::Scanner<R> as IntoScanOutput>::ScanOutput,
     >;
 
     fn into_scan_output(self) -> Self::ScanOutput {
-        self.0
+        self.output
     }
 }
 
 #[cfg(feature = "std")]
-impl<K: MapKey + ?Sized, V: ?Sized, SV: OnScanField<R> + Clone, R: ReadTypes> OnScanField<R>
-    for SaveMapScanner<K, V, SV, R>
+impl<
+    K: MapKey + ?Sized,
+    V: ?Sized,
+    SV: Clone + IntoScanner<V, Scanner<R>: OnScanField<R>>,
+    R: ReadTypes,
+> OnScanField<R> for SaveMapScanner<K, V, R, SV>
 where
     Save: IntoScanner<K, Scanner<R>: OnScanField<R> + IntoScanOutput<ScanOutput: Hash + Eq>>,
 {
@@ -113,10 +122,12 @@ where
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<<R>::Error>> {
-        let Self(map, value_scanner, PhantomData, PhantomData) = self;
-        let scanner = MapEntryScanner::<K, V, _, _>::new(
-            IntoScanner::<K>::into_scanner(Save),
-            value_scanner.clone(),
+        let Self {
+            output: map,
+            value_scanner,
+        } = self;
+        let scanner = IntoScanner::<MapEntry<K, V>>::into_scanner(
+            MapEntry::scanner().key(Save).value(value_scanner.clone()),
         );
         let (key, value) = delimited.scan_with(scanner)?;
         map.insert(key, value);
@@ -128,68 +139,74 @@ where
 impl<
     K: MapKey + ?Sized,
     V: ?Sized,
-    SV: OnScanField<R> + IntoResettableScanner<Resettable: IntoScanOutput>,
+    SV: IntoScanner<V> + IntoResettableScanner<Resettable: IntoScanner<V>>,
     R: ReadTypes,
-> IntoResettableScanner for SaveMapScanner<K, V, SV, R>
+> IntoResettableScanner for SaveMapScanner<K, V, R, SV>
 where
     Save: IntoScanner<K, Scanner<R>: OnScanField<R> + IntoScanOutput<ScanOutput: Hash + Eq>>,
 {
-    type Resettable = SaveMapScanner<K, V, SV::Resettable, R>;
+    type Resettable = SaveMapScanner<K, V, R, SV::Resettable>;
     fn into_resettable(self) -> Self::Resettable {
-        let Self(_map, sv, PhantomData, PhantomData) = self;
-        SaveMapScanner(
-            HashMap::new(),
-            sv.into_resettable(),
-            PhantomData,
-            PhantomData,
-        )
+        let Self {
+            output: _map,
+            value_scanner: sv,
+        } = self;
+        SaveMapScanner {
+            output: HashMap::new(),
+            value_scanner: sv.into_resettable(),
+        }
     }
 }
 
 #[cfg(feature = "std")]
-impl<K: MapKey + ?Sized, V: ?Sized, SV: IntoScanOutput, R: ReadTypes> ResettableScanner
-    for SaveMapScanner<K, V, SV, R>
+impl<K: MapKey + ?Sized, V: ?Sized, SV: IntoScanner<V>, R: ReadTypes> ResettableScanner
+    for SaveMapScanner<K, V, R, SV>
 where
     Save: IntoScanner<K>,
 {
     fn reset(&mut self) {
-        self.0.clear();
+        self.output.clear();
     }
 }
 
-pub struct SaveMapValueScanner<K: ?Sized, V: ?Sized, Q, KV, SV: IntoScanOutput>(
+pub struct SaveMapValueScanner<
+    K: ?Sized,
+    V: ?Sized,
+    R: ReadTypes,
     Q,
-    MapEntryScanner<K, V, KV, SV>,
-    Option<SV::ScanOutput>,
-);
+    SV: IntoScanner<V, Scanner<R>: IntoScanOutput>,
+> {
+    needle: Q,
+    scanner: MapEntryScanner<K, V, Save, SV>,
+    found: Option<<SV::Scanner<R> as IntoScanOutput>::ScanOutput>,
+}
 
 impl<K: MapKey + ?Sized, V: ?Sized, Q, SV: IntoScanner<V>> IntoScanner<Map<K, V>>
     for SaveMapValue<Q, SV>
 where
     Save: IntoScanner<K>,
 {
-    type Scanner<R: ReadTypes> =
-        SaveMapValueScanner<K, V, Q, <Save as IntoScanner<K>>::Scanner<R>, SV::Scanner<R>>;
+    type Scanner<R: ReadTypes> = SaveMapValueScanner<K, V, R, Q, SV>;
 
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
-        SaveMapValueScanner(
-            self.0,
-            IntoScanner::<MapEntry<K, V>>::into_scanner(
-                MapEntry::scanner().key(Save).value(self.1),
-            ),
-            None,
-        )
+        SaveMapValueScanner {
+            needle: self.0,
+            scanner: MapEntry::scanner().key(Save).value(self.1),
+            found: None,
+        }
     }
 }
 
 impl<
     R: ReadTypes,
-    K: ?Sized,
+    K: MapKey + ?Sized,
     V: ?Sized,
     Q,
-    SK: OnScanField<R> + IntoScanOutput<ScanOutput: PartialEq<Q>> + Clone,
-    SV: OnScanField<R> + IntoScanOutput + Clone,
-> OnScanField<R> for SaveMapValueScanner<K, V, Q, SK, SV>
+    O,
+    SV: IntoScanner<V, Scanner<R>: OnScanField<R> + IntoScanOutput<ScanOutput = O>> + Clone,
+> OnScanField<R> for SaveMapValueScanner<K, V, R, Q, SV>
+where
+    Save: IntoScanner<K, Scanner<R>: OnScanField<R> + IntoScanOutput<ScanOutput: PartialEq<Q>>>,
 {
     fn on_numeric(
         &mut self,
@@ -209,21 +226,22 @@ impl<
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<<R as ReadTypes>::Error>> {
-        let scanner = self.1.clone();
-        let (key, value) = delimited.scan_with(scanner)?;
+        let scanner = self.scanner.clone();
+        let (key, value) =
+            delimited.scan_with(IntoScanner::<MapEntry<K, V>>::into_scanner(scanner))?;
 
-        if key == self.0 {
-            self.2 = Some(value);
+        if key == self.needle {
+            self.found = Some(value);
         }
         Ok(())
     }
 }
 
-impl<K: ?Sized, V: ?Sized, Q, SK, SV: IntoScanOutput> IntoScanOutput
-    for SaveMapValueScanner<K, V, Q, SK, SV>
+impl<K: ?Sized, V: ?Sized, R: ReadTypes, Q, SV: IntoScanner<V>> IntoScanOutput
+    for SaveMapValueScanner<K, V, R, Q, SV>
 {
-    type ScanOutput = Option<SV::ScanOutput>;
+    type ScanOutput = Option<<SV::Scanner<R> as IntoScanOutput>::ScanOutput>;
     fn into_scan_output(self) -> Self::ScanOutput {
-        self.2
+        self.found
     }
 }

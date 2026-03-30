@@ -120,10 +120,9 @@ impl<R: ReadTypes, S: ScanCallbacks<R> + IntoScanOutput + Clone> RepeatStrategyS
 {
     fn on_message(
         &mut self,
-        scanner: &S,
+        scanner: S,
         input: impl ScanDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>> {
-        let scanner = scanner.clone();
         let output = input.scan_with(scanner)?;
         self.0.push(output);
         Ok(())
