@@ -14,14 +14,14 @@ use crate::wire::{NumericField, WrongWireType};
 pub struct Repeated<T: ?Sized>(PhantomData<T>);
 
 /// [`RepeatStrategy`] that folds message scanner outputs together.
-pub struct Fold<F>(F);
+pub struct Fold<T, F>(T, F);
 
-impl<F> Fold<F> {
-    pub fn new<T, R>(f: F) -> Self
+impl<T, F> Fold<T, F> {
+    pub fn new<S>(initial: T, f: F) -> Self
     where
-        F: Fn(&mut T, T) -> R,
+        F: FnMut(&mut T, S),
     {
-        Self(f)
+        Self(initial, f)
     }
 }
 
@@ -127,27 +127,24 @@ impl<
 /// output.  Otherwise it uses the provided closure to fold the new scanner
 /// output together with the previous output. The folded output is produced as
 /// this type's [`IntoScanOutput::ScanOutput`].
-pub struct RepeatedFold<S: IntoScanOutput, F>(Option<S::ScanOutput>, F);
+pub struct RepeatedFold<T, F>(T, F);
 
-impl<F, S: MessageScanner + IntoScanner<S::Message>> RepeatStrategy<S> for Fold<F> {
-    type Impl<R: ReadTypes> = RepeatedFold<S::Scanner<R>, F>;
+impl<F, T, S: MessageScanner + IntoScanner<S::Message>> RepeatStrategy<S> for Fold<T, F> {
+    type Impl<R: ReadTypes> = RepeatedFold<T, F>;
     fn into_impl<R: ReadTypes>(self) -> Self::Impl<R> {
-        RepeatedFold(None, self.0)
+        RepeatedFold(self.0, self.1)
     }
 }
 
-impl<S: IntoScanOutput, F> IntoScanOutput for RepeatedFold<S, F> {
-    type ScanOutput = Option<S::ScanOutput>;
+impl<T, F> IntoScanOutput for RepeatedFold<T, F> {
+    type ScanOutput = T;
     fn into_scan_output(self) -> Self::ScanOutput {
         self.0
     }
 }
 
-impl<
-    R: ReadTypes,
-    S: ScanCallbacks<R> + IntoScanOutput,
-    F: Fn(&mut S::ScanOutput, S::ScanOutput),
-> RepeatStrategyScanner<R, S> for RepeatedFold<S, F>
+impl<T, R: ReadTypes, S: ScanCallbacks<R> + IntoScanOutput, F: FnMut(&mut T, S::ScanOutput)>
+    RepeatStrategyScanner<R, S> for RepeatedFold<T, F>
 {
     fn on_message(
         &mut self,
@@ -155,11 +152,7 @@ impl<
         input: impl ScanDelimited<ReadTypes = R>,
     ) -> Result<(), ScanError<R::Error>> {
         let output = input.scan_with(scanner)?;
-        if let Some(prev) = self.0.as_mut() {
-            self.1(prev, output);
-        } else {
-            self.0 = Some(output)
-        }
+        self.1(&mut self.0, output);
         Ok(())
     }
 }
@@ -179,11 +172,8 @@ impl<D> IntoScanOutput for RepeatedWriteCloned<D> {
     fn into_scan_output(self) -> Self::ScanOutput {}
 }
 
-impl<
-    R: ReadTypes,
-    S: ScanCallbacks<R> + IntoScanOutput,
-    D: DerefMut<Target: Extend<S::ScanOutput>>,
-> RepeatStrategyScanner<R, S> for RepeatedWriteCloned<D>
+impl<R: ReadTypes, S: ScanCallbacks<R> + IntoScanOutput, D: DerefMut<Target: Extend<S::ScanOutput>>>
+    RepeatStrategyScanner<R, S> for RepeatedWriteCloned<D>
 {
     fn on_message(
         &mut self,

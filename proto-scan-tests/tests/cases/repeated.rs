@@ -76,7 +76,8 @@ fn fold_repeated_message() {
         proto::MultiFieldMessage::scanner()
             .id(Save)
             .repeat_by(Fold::new(
-                |prev, input: proto::ScanMultiFieldMessageOutput<_, i32, _>| prev.id += input.id,
+                0,
+                |acc, input: proto::ScanMultiFieldMessageOutput<_, i32, _>| *acc += input.id,
             )),
     );
 
@@ -92,7 +93,7 @@ fn fold_repeated_message() {
         oneof_group: (),
     } = scanner.scan(input.as_slice()).read_all().unwrap();
 
-    assert_eq!(repeated_msg.unwrap().id, expected);
+    assert_eq!(repeated_msg, expected);
 }
 
 #[test]
