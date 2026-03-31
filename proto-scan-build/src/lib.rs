@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::io::{Error, Result};
+use std::path::Path;
 
 use itertools::Itertools;
 use proc_macro2::TokenStream;
@@ -12,6 +13,14 @@ use syn::{Token, parse_quote};
 
 mod config;
 pub use config::Config;
+
+pub fn compile_protos(protos: &[impl AsRef<Path>], includes: &[impl AsRef<Path>]) -> Result<()> {
+    Config::default().compile_protos(protos, includes)
+}
+
+pub fn compile_fds(fds: FileDescriptorSet) -> Result<()> {
+    Config::default().compile_fds(fds)
+}
 
 fn generate_prost(prost_gen: HashMap<Module, String>) -> Result<HashMap<Module, TokenStream>> {
     let mut output = HashMap::default();
