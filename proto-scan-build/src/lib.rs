@@ -7,27 +7,28 @@ use std::{env, fs};
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use prost_build::Module;
+pub use prost_types::FileDescriptorSet;
 use quote::{ToTokens, quote};
 use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::{Token, parse_quote};
 
-pub trait CompileScan {
-    fn compile_scan(
-        &mut self,
-        inputs: &[impl AsRef<Path>],
-        includes: &[impl AsRef<Path>],
-    ) -> Result<()>;
-}
+#[derive(Debug, Default, derive_more::From)]
+pub struct Config(prost_build::Config);
 
-impl CompileScan for prost_build::Config {
-    fn compile_scan(
+impl Config {
+    /// Compile the set of input .proto files with the given include directories.
+    pub fn compile_protos(
         &mut self,
         inputs: &[impl AsRef<Path>],
         includes: &[impl AsRef<Path>],
     ) -> Result<()> {
-        let fds = self.load_fds(inputs, includes)?;
+        let fds = self.0.load_fds(inputs, includes)?;
+        self.compile_fds(fds)
+    }
 
+    /// Compile the protos in a [`FileDescriptorSet`].
+    pub fn compile_fds(&mut self, fds: FileDescriptorSet) -> Result<()> {
         let mut target_is_env = false;
         let target: PathBuf = env::var_os("OUT_DIR")
             .ok_or_else(|| Error::other("OUT_DIR environment variable is not set"))
@@ -47,7 +48,7 @@ impl CompileScan for prost_build::Config {
             })
             .collect();
 
-        let prost_gen = self.generate(requests)?;
+        let prost_gen = self.0.generate(requests)?;
 
         let modules = generate_prost(prost_gen)?;
         let cargo_cmd = std::env::var_os("CARGO");
