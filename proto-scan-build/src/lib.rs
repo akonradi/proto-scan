@@ -72,6 +72,27 @@ impl Config {
     }
 }
 
+/// Convenience methods for configuring compilation.
+impl Config {
+    /// See [`prost_build::Config::out_dir`].
+    pub fn out_dir(&mut self, path: impl Into<PathBuf>) -> &mut Self {
+        self.0.out_dir(path);
+        self
+    }
+
+    /// See [`prost_build::Config::protoc_arg`].
+    pub fn protoc_arg(&mut self, arg: impl AsRef<OsStr>) -> &mut Self {
+        self.0.protoc_arg(arg);
+        self
+    }
+
+    /// See [`prost_build::Config::compile_well_known_types`].
+    pub fn compile_well_known_types(&mut self) -> &mut Self {
+        self.0.compile_well_known_types();
+        self
+    }
+}
+
 fn generate_prost(prost_gen: HashMap<Module, String>) -> Result<HashMap<Module, TokenStream>> {
     let mut output = HashMap::default();
     for (module, prost_gen) in prost_gen {
