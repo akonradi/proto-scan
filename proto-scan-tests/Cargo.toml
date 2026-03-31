@@ -10,7 +10,6 @@ publish = false
 [dependencies]
 either = { workspace = true }
 prost = { workspace = true }
-prost-types = { workspace = true }
 proto-scan = { workspace = true, features = ["derive"]}
 test-case = { workspace = true }
 

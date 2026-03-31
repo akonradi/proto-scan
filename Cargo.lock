@@ -392,7 +392,6 @@ dependencies = [
  "either",
  "prost",
  "prost-build",
- "prost-types",
  "proto-scan",
  "proto-scan-build",
  "test-case",
