@@ -13,6 +13,13 @@ prost = { workspace = true }
 proto-scan = { workspace = true, features = ["derive"]}
 test-case = { workspace = true }
 
+[dev-dependencies]
+gungraun = { workspace = true }
+
 [build-dependencies]
 prost-build = { workspace = true }
 proto-scan-build = { workspace = true }
+
+[[bench]]
+name = "basic"
+harness = false
