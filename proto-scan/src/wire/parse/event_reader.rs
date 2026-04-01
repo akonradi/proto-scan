@@ -1,5 +1,3 @@
-use either::Either;
-
 use crate::DecodeError;
 use crate::read::count_reader::CountReader;
 use crate::read::{Read, ReadTypes};
@@ -9,12 +7,21 @@ use crate::wire::{
     ParseEventReader, Tag, Varint, WireType,
 };
 
-pub(super) struct EventReader<'a, R> {
-    pub(super) inner: Either<R, LengthDelimitedImpl<'a, R>>,
-    pub(super) do_before: DoBeforeNext,
+pub(super) struct EventReader<R> {
+    inner: R,
+    do_before: DoBeforeNext,
 }
 
-impl<'a, R: Read> ParseEventReader for EventReader<'a, R> {
+impl<R> EventReader<R> {
+    pub(super) fn new(reader: R) -> Self {
+        Self {
+            inner: reader,
+            do_before: DoBeforeNext::DoNothing,
+        }
+    }
+}
+
+impl<R: Read> ParseEventReader for EventReader<R> {
     type ReadTypes = R::ReadTypes;
     fn next(
         &mut self,

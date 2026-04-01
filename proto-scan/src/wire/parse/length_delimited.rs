@@ -1,7 +1,6 @@
 use core::num::NonZeroU32;
 
 use assert_matches::debug_assert_matches;
-use either::Either;
 
 use crate::decode_error::DecodeVarintError;
 use crate::read::{Read, ReadBytesError, ReadTypes};
@@ -86,10 +85,7 @@ impl<'a, R: Read> LengthDelimited for LengthDelimitedImpl<'a, R> {
     }
 
     fn into_events(self) -> impl ParseEventReader<ReadTypes = Self::ReadTypes> {
-        EventReader {
-            inner: Either::Right(self),
-            do_before: DoBeforeNext::DoNothing,
-        }
+        EventReader::new(self)
     }
 }
 

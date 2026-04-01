@@ -1,8 +1,6 @@
 use core::fmt::Debug;
 use core::num::NonZeroU32;
 
-use either::Either;
-
 use crate::DecodeError;
 use crate::read::{Read, ReadBytesError, ReadTypes};
 use crate::wire::{FieldNumber, GroupOp, NumericField, NumericWireType};
@@ -103,10 +101,7 @@ pub enum ParseEvent<L> {
 }
 
 pub fn parse<'a, R: Read + 'a>(r: R) -> impl ParseEventReader<ReadTypes = R::ReadTypes> + 'a {
-    EventReader {
-        inner: Either::Left(r),
-        do_before: DoBeforeNext::DoNothing,
-    }
+    EventReader::new(r)
 }
 
 #[derive(Debug, Default)]
