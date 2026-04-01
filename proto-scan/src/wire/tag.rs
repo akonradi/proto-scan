@@ -22,7 +22,7 @@ pub(crate) enum WireType {
 
 impl Tag {
     pub(crate) fn read_from<R: Read>(
-        r: &mut R,
+        mut r: R,
     ) -> Result<Self, DecodeError<<R::ReadTypes as ReadTypes>::Error>> {
         let value: u32 = r
             .read_varint()?
@@ -58,7 +58,7 @@ mod test {
     fn read_tag() {
         let bytes = [0x08, 0x96, 0x01];
 
-        let tag = Tag::read_from(&mut bytes.as_slice());
+        let tag = Tag::read_from(bytes.as_slice());
         assert_eq!(
             tag,
             Ok(Tag {
@@ -72,7 +72,7 @@ mod test {
     fn read_i32() {
         let bytes = [61u8];
 
-        let tag = Tag::read_from(&mut bytes.as_slice());
+        let tag = Tag::read_from(bytes.as_slice());
 
         assert_eq!(
             tag,

@@ -23,7 +23,7 @@ fn scan_message(input: InputKind) {
         .string_to_i32(Save)
         .string_to_message(Save::with_value(proto::MapValue::scanner().id(Save)));
 
-    let output = scanner.scan(&mut bytes.as_slice()).read_all().unwrap();
+    let output = scanner.scan(bytes.as_slice()).read_all().unwrap();
 
     let expected = proto::ScanWithMapOutput::<_, _, _, _> {
         fixed64_to_i32: input.fixed64_to_i32,
@@ -67,7 +67,7 @@ fn save_single_key(input: InputKind) {
         ))
         .fixed64_to_i32(Save::map_value(FIXED64_KEY, Save));
 
-    let output = scanner.scan(&mut bytes.as_slice()).read_all().unwrap();
+    let output = scanner.scan(bytes.as_slice()).read_all().unwrap();
     let expected = proto::ScanWithMapOutput {
         string_to_message: input
             .string_to_message
@@ -108,7 +108,7 @@ fn scan_as_repeated(input: InputKind) {
                 .repeat_by(KeepLastForKey(FIXED64_KEY)),
         );
 
-    let output = scanner.scan(&mut bytes.as_slice()).read_all().unwrap();
+    let output = scanner.scan(bytes.as_slice()).read_all().unwrap();
     let expected = proto::ScanWithMapOutput {
         string_to_message: input
             .string_to_message

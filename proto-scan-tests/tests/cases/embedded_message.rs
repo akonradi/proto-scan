@@ -122,7 +122,7 @@ fn optional_embedded(input: InputKind) {
         bool_wrapper,
         oneof,
         other_bool_wrapper,
-    } = scanner.scan(&mut bytes.as_slice()).read_all().unwrap();
+    } = scanner.scan(bytes.as_slice()).read_all().unwrap();
 
     assert_eq!(optional_bool, input.optional_bool);
     assert_eq!(

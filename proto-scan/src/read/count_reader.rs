@@ -6,12 +6,12 @@ pub(crate) struct CountReader<R> {
     count: usize,
 }
 
-impl<R: ReadTypes> ReadTypes for CountReader<R> {
+impl<R: ReadTypes> ReadTypes for CountReader<&mut R> {
     type Error = R::Error;
     type Buffer = R::Buffer;
 }
 
-impl<R: Read> Read for CountReader<R> {
+impl<R: Read> Read for CountReader<&mut R> {
     type ReadTypes = R::ReadTypes;
     fn read_varint(
         &mut self,

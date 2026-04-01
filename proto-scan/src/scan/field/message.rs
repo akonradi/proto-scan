@@ -249,8 +249,8 @@ mod test {
             },
         );
 
-        let mut input = &INPUT[..];
-        let scan = Scan::new(crate::wire::parse(&mut input), scanner);
+        let input = INPUT;
+        let scan = Scan::new(crate::wire::parse(input), scanner);
         let result = scan.read_all();
 
         assert_matches!(result, Ok(ScanOutput(ScanOutput(150))))
@@ -289,8 +289,7 @@ mod test {
                 },
             );
 
-            let mut input = &input[..];
-            let scan = Scan::new(crate::wire::parse(&mut input), scanner);
+            let scan = Scan::new(crate::wire::parse(&input[..]), scanner);
             let result = scan.read_all();
 
             assert_matches!(result, Ok(ScanOutput(ScanOutput(()))));

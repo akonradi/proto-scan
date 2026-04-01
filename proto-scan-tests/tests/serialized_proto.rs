@@ -84,8 +84,7 @@ fn extract_numerics_parse() {
     let mut events = HashMap::<_, Vec<_>>::new();
 
     let bytes = with_repeats().encode_to_vec();
-    let mut read = bytes.as_slice();
-    let mut reader = proto_scan::wire::parse(&mut read);
+    let mut reader = proto_scan::wire::parse(bytes.as_slice());
     while let Some(event) = reader.next() {
         let (field_number, event) = event.unwrap();
         match event {
@@ -102,8 +101,7 @@ fn extract_packed_fields_parse() {
     let bytes = with_repeats().encode_to_vec();
     let mut events = HashMap::<_, Vec<_>>::new();
 
-    let mut read = bytes.as_slice();
-    let mut reader = proto_scan::wire::parse(&mut read);
+    let mut reader = proto_scan::wire::parse(bytes.as_slice());
     while let Some(event) = reader.next() {
         let (field_number, event) = event.unwrap();
         let values = match event {
@@ -142,8 +140,7 @@ fn extract_packed_fields_parse() {
 #[test]
 fn extract_string() {
     let bytes = with_repeats().encode_to_vec();
-    let mut read = bytes.as_slice();
-    let mut reader = proto_scan::wire::parse(&mut read);
+    let mut reader = proto_scan::wire::parse(bytes.as_slice());
     while let Some(event) = reader.next() {
         let (field_number, event) = event.unwrap();
         match event {

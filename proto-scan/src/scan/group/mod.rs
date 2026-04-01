@@ -94,7 +94,7 @@ mod test {
 
         // With no group stack, an error is returned.
         let result = Scan::new(
-            parse(&mut input.as_slice()),
+            parse(input.as_slice()),
             ScannerImpl {
                 field_2: ArrayVec::new(),
             },
@@ -104,7 +104,7 @@ mod test {
 
         // With space for a group, the values can be saved.
         let result = Scan::new(
-            parse(&mut input.as_slice()),
+            parse(input.as_slice()),
             ScannerImpl {
                 field_2: ArrayVec::new(),
             },

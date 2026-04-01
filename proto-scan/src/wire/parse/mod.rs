@@ -159,8 +159,7 @@ mod test {
         ]
         .concat();
 
-        let mut read = &input[..];
-        let mut parse = parse(&mut read);
+        let mut parse = parse(&input[..]);
 
         let mut iter = match parse.next().unwrap().unwrap() {
             (field_number, ParseEvent::LengthDelimited(value)) => {
@@ -220,8 +219,7 @@ mod test {
         ]
         .concat();
 
-        let mut read = &input[..];
-        let mut parse = parse(&mut read);
+        let mut parse = parse(&input[..]);
 
         let embedded = match parse.next().unwrap().unwrap() {
             (field_number, ParseEvent::LengthDelimited(value)) => {

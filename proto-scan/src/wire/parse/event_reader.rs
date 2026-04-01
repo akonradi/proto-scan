@@ -58,9 +58,9 @@ impl<'a, R: Read> ParseEventReader for EventReader<'a, R> {
             match wire_type {
                 WireType::Varint => Varint::read_from(&mut self.inner)
                     .map(|value| ParseEvent::Numeric(NumericField::Varint(value))),
-                WireType::I64 => I64::read_from(&mut &mut self.inner)
+                WireType::I64 => I64::read_from(&mut self.inner)
                     .map(|value| ParseEvent::Numeric(NumericField::I64(value))),
-                WireType::I32 => I32::read_from(&mut &mut self.inner)
+                WireType::I32 => I32::read_from(&mut self.inner)
                     .map(|value| ParseEvent::Numeric(NumericField::I32(value))),
                 WireType::Sgroup => Ok(ParseEvent::Group(GroupOp::Start)),
                 WireType::Egroup => Ok(ParseEvent::Group(GroupOp::End)),

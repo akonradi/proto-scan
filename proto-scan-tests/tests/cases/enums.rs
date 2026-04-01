@@ -19,6 +19,6 @@ fn enum_is_int(input: InputKind) {
     let bytes = input.encode_to_vec();
 
     let scanner = proto::WithRepeats::scanner().packed_enum(Save);
-    let result = scanner.scan(&mut bytes.as_slice()).read_all().unwrap();
+    let result = scanner.scan(bytes.as_slice()).read_all().unwrap();
     assert_eq!(result.packed_enum, input.packed_enum);
 }
