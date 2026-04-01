@@ -1,5 +1,6 @@
 use crate::decode_error::DecodeVarintError;
 use crate::read::{Read, ReadBytesError, ReadTypes};
+use crate::wire::parse::event_reader::EventRead;
 use crate::wire::{VARINT_MAX_BYTES, parse_base128_varint, varint_encoded_length};
 
 pub(super) struct LimitReader<R> {
@@ -74,6 +75,22 @@ impl<R: Read> Read for LimitReader<R> {
         let skipped = self.inner.skip(bytes)?;
         self.remaining -= skipped;
         Ok(skipped)
+    }
+}
+
+impl<R: Read> EventRead for LimitReader<R> {
+    type RealReader = R;
+    fn skip_direct(
+        &mut self,
+        bytes: u32,
+    ) -> Result<(), crate::DecodeError<<Self::ReadTypes as ReadTypes>::Error>> {
+        let _ = self.inner.skip(bytes)?;
+        Ok(())
+    }
+
+    fn take_as_reader(&mut self, bytes: u32) -> LimitReader<&mut Self::RealReader> {
+        self.remaining -= bytes;
+        LimitReader::new(&mut self.inner, bytes)
     }
 }
 

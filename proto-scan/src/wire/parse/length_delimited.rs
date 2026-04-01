@@ -4,11 +4,12 @@ use assert_matches::debug_assert_matches;
 
 use crate::decode_error::DecodeVarintError;
 use crate::read::{Read, ReadBytesError, ReadTypes};
+use crate::wire::parse::event_reader::EventRead;
 use crate::wire::parse::{DelimitedTypes, DoBeforeNext, EventReader, LimitReader, NumericIter};
 use crate::wire::{LengthDelimited, NumericWireType, ParseEventReader};
 
 pub(super) struct LengthDelimitedImpl<'a, R> {
-    pub(super) reader: LimitReader<&'a mut R>,
+    pub(super) reader: LimitReader<R>,
     pub(super) write_back_to: &'a mut DoBeforeNext,
 }
 
@@ -73,6 +74,23 @@ impl<'a, R: Read> LengthDelimited for LengthDelimitedImpl<'a, R> {
 
     fn into_events(self) -> impl ParseEventReader<ReadTypes = Self::ReadTypes> {
         EventReader::new(self)
+    }
+}
+
+impl<R: Read> EventRead for LengthDelimitedImpl<'_, R> {
+    type RealReader = R;
+
+    #[inline]
+    fn skip_direct(
+        &mut self,
+        bytes: u32,
+    ) -> Result<(), crate::DecodeError<<Self::ReadTypes as ReadTypes>::Error>> {
+        self.reader.skip_direct(bytes)
+    }
+
+    #[inline]
+    fn take_as_reader(&mut self, bytes: u32) -> LimitReader<&mut Self::RealReader> {
+        self.reader.take_as_reader(bytes)
     }
 }
 
