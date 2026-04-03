@@ -16,6 +16,7 @@ use crate::scan::field::{Map, MapKey, Repeated};
 mod bytes;
 pub(crate) use bytes::DecodeFromBytes;
 use bytes::SaveBytesScanner;
+mod cast;
 mod map;
 use map::SaveMap;
 mod optional;

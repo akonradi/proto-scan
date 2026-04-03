@@ -55,3 +55,21 @@ fn save_bytes(input: InputKind) {
     };
     assert_eq!(output, expected);
 }
+
+#[test_case(Empty)]
+#[test_case(Full)]
+fn save_string_as_bytes(input: InputKind) {
+    let input = input.into_bytes_field_types();
+
+    let scanner = proto::BytesFieldTypes::scanner().string_field(Save::as_bytes());
+    let bytes = input.encode_to_vec();
+    let output = { scanner.scan(bytes.as_slice()).read_all().unwrap() };
+
+    let expected = proto::ScanBytesFieldTypesOutput {
+        string_field: input.string_field.as_bytes(),
+        bytes_field: (),
+        repeated_bytes_field: (),
+        repeated_string_field: (),
+    };
+    assert_eq!(output, expected);
+}
