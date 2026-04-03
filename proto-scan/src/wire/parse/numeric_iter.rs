@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use crate::decode_error::DecodeError;
 use crate::read::{Read, ReadTypes};
 use crate::wire::NumericWireType;
-use crate::wire::parse::{DoBeforeNext, LengthDelimitedImpl};
+use crate::wire::parse::LengthDelimitedImpl;
 
 pub(super) struct NumericIter<'a, R, W> {
     inner: LengthDelimitedImpl<'a, R>,
@@ -28,13 +28,7 @@ impl<'a, R: Read, W: NumericWireType> Iterator for NumericIter<'a, R, W> {
             return None;
         }
 
-        Some(match W::read_from(inner) {
-            Ok(r) => Ok(r),
-            Err(e) => {
-                *self.inner.write_back_to = DoBeforeNext::Error;
-                Err(e)
-            }
-        })
+        Some(W::read_from(inner))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {

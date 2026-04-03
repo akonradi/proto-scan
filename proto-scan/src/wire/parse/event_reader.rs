@@ -44,7 +44,6 @@ impl<R: Read> ParseEventReader for EventReader<R> {
                     return Some(Err(e.into()));
                 }
             }
-            DoBeforeNext::Error => return Some(Err(DecodeError::UnexpectedEnd)),
             DoBeforeNext::DoNothing => {}
         }
 

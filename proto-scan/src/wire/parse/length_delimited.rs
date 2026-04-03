@@ -27,26 +27,14 @@ impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
         <Self::ReadTypes as ReadTypes>::Buffer,
         ReadBytesError<<Self::ReadTypes as ReadTypes>::Error>,
     > {
-        match self.reader.read(bytes) {
-            Ok(b) => Ok(b),
-            Err(e) => {
-                *self.write_back_to = DoBeforeNext::Error;
-                Err(e)
-            }
-        }
+        self.reader.read(bytes)
     }
 
     fn skip(
         &mut self,
         bytes: u32,
     ) -> Result<u32, ReadBytesError<<Self::ReadTypes as ReadTypes>::Error>> {
-        match self.reader.skip(bytes) {
-            Ok(b) => Ok(b),
-            Err(e) => {
-                *self.write_back_to = DoBeforeNext::Error;
-                Err(e)
-            }
-        }
+        self.reader.skip(bytes)
     }
 }
 
@@ -70,7 +58,6 @@ impl<'a, R: Read> LengthDelimited for LengthDelimitedImpl<'a, R> {
         let remaining = self.reader.remaining();
         let bytes = self.reader.read(remaining)?;
         if bytes.as_ref().len() != remaining as usize {
-            *self.write_back_to = DoBeforeNext::Error;
             return Err(ReadBytesError::UnexpectedEnd);
         }
         Ok(bytes)
@@ -96,12 +83,11 @@ impl<'a, R> Drop for LengthDelimitedImpl<'a, R> {
             write_back_to,
         } = self;
         if let Some(remaining) = NonZeroU32::new(reader.remaining()) {
-            debug_assert_matches!(write_back_to, DoBeforeNext::DoNothing | DoBeforeNext::Error);
+            debug_assert_matches!(write_back_to, DoBeforeNext::DoNothing );
             match write_back_to {
                 DoBeforeNext::DoNothing | DoBeforeNext::Skip(_) => {
                     **write_back_to = DoBeforeNext::Skip(remaining)
                 }
-                DoBeforeNext::Error => {}
             }
         }
     }

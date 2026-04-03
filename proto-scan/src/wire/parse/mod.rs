@@ -109,7 +109,6 @@ enum DoBeforeNext {
     #[default]
     DoNothing,
     Skip(NonZeroU32),
-    Error,
 }
 
 #[cfg(test)]
