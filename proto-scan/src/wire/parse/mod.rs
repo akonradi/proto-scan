@@ -131,7 +131,7 @@ mod test {
             _ => panic!("invalid"),
         };
 
-        assert_eq!(length_delimited.into_bytes().unwrap().as_ref(), b"testing");
+        assert_eq!(length_delimited.into_bytes().unwrap(), b"testing");
     }
 
     #[test]

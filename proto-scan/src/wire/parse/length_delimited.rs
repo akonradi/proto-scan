@@ -83,7 +83,7 @@ impl<'a, R> Drop for LengthDelimitedImpl<'a, R> {
             write_back_to,
         } = self;
         if let Some(remaining) = NonZeroU32::new(reader.remaining()) {
-            debug_assert_matches!(write_back_to, DoBeforeNext::DoNothing );
+            debug_assert_matches!(write_back_to, DoBeforeNext::DoNothing);
             match write_back_to {
                 DoBeforeNext::DoNothing | DoBeforeNext::Skip(_) => {
                     **write_back_to = DoBeforeNext::Skip(remaining)
