@@ -106,10 +106,7 @@ pub fn varint_bytes_chunk<E>(
 }
 
 pub fn varint_encoded_length(value: u64) -> u8 {
-    if value < 128 {
-        return 1;
-    }
-    1 + varint_encoded_length(value >> 7)
+    (u64::BITS - value.leading_zeros()) as u8 / 7 + 1
 }
 
 #[cfg(test)]
