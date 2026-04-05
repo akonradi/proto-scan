@@ -3,13 +3,16 @@ use core::num::NonZeroU32;
 
 use crate::DecodeError;
 use crate::read::{Read, ReadBytesError, ReadTypes};
+use crate::scan::IntoScanOutput;
 use crate::wire::{FieldNumber, GroupOp, NumericField, NumericWireType};
 
+pub use callbacks::ParseCallbacks;
 use event_reader::EventReader;
 use length_delimited::LengthDelimitedImpl;
 use limit_reader::LimitReader;
 use numeric_iter::NumericIter;
 
+mod callbacks;
 mod event_reader;
 mod length_delimited;
 mod limit_reader;
@@ -77,6 +80,34 @@ pub trait ParseEventReader {
     ) -> Option<
         ParseEventReaderOutput<Self::ReadTypes, impl LengthDelimited<ReadTypes = Self::ReadTypes>>,
     >;
+
+    /// Reads all remaining events and passes them through the callbacks.
+    fn read_all<S: ParseCallbacks<Self::ReadTypes> + IntoScanOutput>(
+        mut self,
+        mut cb: S,
+    ) -> Result<S::ScanOutput, S::ParseError>
+    where
+        Self: Sized,
+    {
+        loop {
+            let (field_number, wire_type) = match self.next().transpose()? {
+                Some(f) => f,
+                None => break,
+            };
+
+            match wire_type {
+                ParseEvent::Numeric(value) => cb.on_numeric(field_number, value)?,
+                ParseEvent::Group(GroupOp::End) => cb.on_group_end(field_number)?,
+                ParseEvent::Group(GroupOp::Start) => {
+                    drop(wire_type);
+                    cb.on_group_start(field_number, &mut self)?
+                }
+                ParseEvent::LengthDelimited(l) => cb.on_length_delimited(field_number, l)?,
+            }
+        }
+
+        Ok(cb.into_scan_output())
+    }
 }
 
 pub(crate) type ParseEventReaderOutput<RT, LD> =

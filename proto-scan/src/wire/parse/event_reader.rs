@@ -35,9 +35,10 @@ impl<R: Read> ParseEventReader for EventReader<R> {
             DecodeError<<R::ReadTypes as ReadTypes>::Error>,
         >,
     > {
-        let Self { inner, do_before } = self;
-
-        let reader = inner;
+        let Self {
+            inner: reader,
+            do_before,
+        } = self;
 
         match core::mem::take(do_before) {
             DoBeforeNext::Skip(to_skip) => {
