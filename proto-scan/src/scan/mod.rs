@@ -187,7 +187,9 @@
 //! supply its own implementations of [`IntoScanner`] and
 //! [`field::OnScanField`].
 use crate::read::ReadTypes;
-use crate::wire::{FieldNumber, GroupOp, I32, I64, NumericField, Varint};
+use crate::scan::delimited::ScanDelimitedImpl;
+use crate::scan::group::GroupDelimitedImpl;
+use crate::wire::{FieldNumber, GroupOp, I32, I64, NumericField, ParseCallbacks, Varint};
 use crate::wire::{ParseEvent, ParseEventReader};
 
 mod builder;
@@ -375,50 +377,92 @@ impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>, G: GroupStack> Iterato
             group_stack,
         } = self;
 
-        next_event(parse, scanner, group_stack)
+        let (field_number, event) = match parse.next() {
+            Some(Err(e)) => return Some(Err(e.into())),
+            None => return None,
+            Some(Ok(event)) => event,
+        };
+
+        Some(match event {
+            ParseEvent::Numeric(numeric_field) => scanner.on_numeric(field_number, numeric_field),
+            ParseEvent::Group(GroupOp::Start) => {
+                drop(event);
+                group::GroupDelimitedImpl::new(parse, group_stack)
+                    .scan_through(scanner, field_number)
+            }
+            ParseEvent::Group(GroupOp::End) => {
+                // If this was paired with a GroupOp::Start, it would have
+                // been read by the arm for that method. This must be an
+                // unmatched end tag.
+                Err(ScanError::GroupMismatch)
+            }
+            ParseEvent::LengthDelimited(length_delimited) => scanner.on_length_delimited(
+                field_number,
+                delimited::ScanDelimitedImpl::new(length_delimited, group_stack),
+            ),
+        })
     }
-}
-
-#[inline]
-fn next_event<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>, G: GroupStack>(
-    parse: &mut P,
-    scanner: &mut S,
-    group_stack: &mut G,
-) -> Option<Result<(), ScanError<<P::ReadTypes as ReadTypes>::Error>>> {
-    let (field_number, event) = match parse.next() {
-        Some(Err(e)) => return Some(Err(e.into())),
-        None => return None,
-        Some(Ok(event)) => event,
-    };
-
-    Some(match event {
-        ParseEvent::Numeric(numeric_field) => scanner.on_numeric(field_number, numeric_field),
-        ParseEvent::Group(GroupOp::Start) => {
-            drop(event);
-            group::GroupDelimitedImpl::new(parse, group_stack).scan_through(scanner, field_number)
-        }
-        ParseEvent::Group(GroupOp::End) => {
-            // If this was paired with a GroupOp::Start, it would have
-            // been read by the arm for that method. This must be an
-            // unmatched end tag.
-            Err(ScanError::GroupMismatch)
-        }
-        ParseEvent::LengthDelimited(length_delimited) => scanner.on_length_delimited(
-            field_number,
-            delimited::ScanDelimitedImpl::new(length_delimited, group_stack),
-        ),
-    })
 }
 
 impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes> + IntoScanOutput, G: GroupStack>
     Scan<P, S, G>
 {
     pub fn read_all(self) -> Result<S::ScanOutput, ParseEventReaderScanError<P>> {
-        let mut it = self.into_iter();
-        for r in it.by_ref() {
-            r?;
-        }
-        Ok(it.scanner.into_scan_output())
+        let Self {
+            scanner,
+            mut group_stack,
+            parse,
+        } = self;
+
+        parse.read_all(ParseCallbacksImpl(scanner, &mut group_stack))
+    }
+}
+
+struct ParseCallbacksImpl<S, G>(S, G);
+
+impl<S: ScanCallbacks<R>, G: GroupStack, R: ReadTypes> ParseCallbacks<R>
+    for ParseCallbacksImpl<S, &mut G>
+{
+    type ParseError = ScanError<R::Error>;
+    #[inline]
+    fn on_numeric(
+        &mut self,
+        field: FieldNumber,
+        value: NumericField,
+    ) -> Result<(), Self::ParseError> {
+        self.0.on_numeric(field, value)
+    }
+
+    #[cold]
+    fn on_group_start(
+        &mut self,
+        field: FieldNumber,
+        parse: &mut impl ParseEventReader<ReadTypes = R>,
+    ) -> Result<(), Self::ParseError> {
+        GroupDelimitedImpl::new(parse, self.1).scan_through(&mut self.0, field)
+    }
+
+    #[cold]
+    fn on_group_end(&mut self, _field: FieldNumber) -> Result<(), Self::ParseError> {
+        // The on_group_start impl handles reading to the end of the group, so if an end tag is encountered, it wasn't paired with a start.
+        Err(ScanError::GroupMismatch)
+    }
+
+    #[inline]
+    fn on_length_delimited(
+        &mut self,
+        field: FieldNumber,
+        delimited: impl crate::wire::LengthDelimited<ReadTypes = R>,
+    ) -> Result<(), Self::ParseError> {
+        self.0
+            .on_length_delimited(field, ScanDelimitedImpl::new(delimited, self.1))
+    }
+}
+
+impl<S: IntoScanOutput, G> IntoScanOutput for ParseCallbacksImpl<S, G> {
+    type ScanOutput = S::ScanOutput;
+    fn into_scan_output(self) -> Self::ScanOutput {
+        self.0.into_scan_output()
     }
 }
 

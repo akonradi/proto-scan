@@ -1,5 +1,5 @@
 use crate::read::{Read, ReadTypes};
-use crate::scan::{GroupStack, IntoScanOutput, ScanCallbacks, ScanError};
+use crate::scan::{GroupStack, IntoScanOutput, ParseCallbacksImpl, ScanCallbacks, ScanError};
 use crate::wire::{DelimitedTypes, LengthDelimited, ParseEventReader};
 
 /// Allows scanning the contents of a delimited field.
@@ -74,17 +74,14 @@ impl<L: LengthDelimited, G> LengthDelimited for ScanDelimitedImpl<'_, L, G> {
 impl<L: LengthDelimited, G: GroupStack> ScanDelimited for ScanDelimitedImpl<'_, L, G> {
     fn scan_with<S: ScanCallbacks<Self::ReadTypes> + IntoScanOutput>(
         self,
-        mut scanner: S,
+        scanner: S,
     ) -> Result<S::ScanOutput, ScanError<<Self::ReadTypes as ReadTypes>::Error>> {
         let Self {
             group_stack,
             length_delimited,
         } = self;
-        let mut parse = length_delimited.into_events();
-
-        while let Some(r) = super::next_event(&mut parse, &mut scanner, group_stack) {
-            r?;
-        }
-        Ok(scanner.into_scan_output())
+        length_delimited
+            .into_events()
+            .read_all(ParseCallbacksImpl(scanner, group_stack))
     }
 }
