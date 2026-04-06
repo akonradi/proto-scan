@@ -22,7 +22,9 @@ fn byte_types_inputs() -> &'static [u8] {
     &BYTES
 }
 
-#[library_benchmark]
+#[library_benchmark(
+    config = LibraryBenchmarkConfig::default().valgrind_args(["--dump-instr=yes"])
+)]
 #[bench::byte_types(byte_types_inputs())]
 fn byte_types(encoded: &[u8]) -> usize {
     let scanner = proto::BytesFieldTypes::scanner()
@@ -50,7 +52,9 @@ fn embedded_message_input() -> &'static [u8] {
     &BYTES
 }
 
-#[library_benchmark]
+#[library_benchmark(
+    config = LibraryBenchmarkConfig::default().valgrind_args(["--dump-instr=yes"])
+)]
 #[bench::embedded_message(embedded_message_input())]
 fn embedded_message(encoded: &[u8]) -> usize {
     let scanner = proto::ScanExample::scanner().single_msg(
