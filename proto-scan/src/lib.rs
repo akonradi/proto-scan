@@ -1,3 +1,6 @@
+#![cfg_attr(feature = "nightly", allow(incomplete_features))]
+#![cfg_attr(feature = "tail-call", feature(explicit_tail_calls))]
+#![cfg_attr(feature = "tail-call", feature(rust_preserve_none_cc))]
 //! This crate provides allocation-free access to fields in a protobuf message.
 //! It's most useful when only one or two values are needed from a larger
 //! message and the performance cost of deserializing the other fields or

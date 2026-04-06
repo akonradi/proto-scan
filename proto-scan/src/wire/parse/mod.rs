@@ -17,6 +17,8 @@ mod event_reader;
 mod length_delimited;
 mod limit_reader;
 mod numeric_iter;
+#[cfg(feature = "tail-call")]
+mod tail_call;
 
 pub trait DelimitedTypes {
     type ReadTypes: ReadTypes;

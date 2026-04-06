@@ -14,7 +14,9 @@ rust-version.workspace = true
 default = ["bytes", "derive", "std"]
 bytes = ["dep:bytes", "dep:bytes-utils"]
 derive = ["dep:proto-scan-derive"]
+nightly = []
 std = []
+tail-call = ["nightly"]
 
 [dependencies]
 assert_matches = { workspace = true }
