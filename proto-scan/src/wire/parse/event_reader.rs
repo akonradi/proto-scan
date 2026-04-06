@@ -91,4 +91,12 @@ impl<R: Read> ParseEventReader for EventReader<R> {
             .map(|field| (field_number, field)),
         )
     }
+
+    #[cfg(feature = "tail-call")]
+    fn read_all<S: super::ParseCallbacks<Self::ReadTypes> + crate::scan::IntoScanOutput>(
+        self,
+        scanner: S,
+    ) -> Result<S::ScanOutput, S::ParseError> {
+        super::tail_call::read_all(self.inner, scanner)
+    }
 }
