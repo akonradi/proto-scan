@@ -1,5 +1,5 @@
-use std::convert::Infallible;
-use std::marker::PhantomData;
+use core::convert::Infallible;
+use core::marker::PhantomData;
 
 use crate::read::ReadTypes;
 use crate::scan::field::{NoOutput, OnScanField};

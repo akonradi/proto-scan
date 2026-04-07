@@ -422,6 +422,7 @@ impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes> + IntoScanOutput, G: Gr
     }
 }
 
+#[cfg(feature = "std")]
 impl<T: IntoScanOutput> IntoScanOutput for Box<T> {
     type ScanOutput = T::ScanOutput;
     fn into_scan_output(self) -> Self::ScanOutput {
@@ -429,6 +430,7 @@ impl<T: IntoScanOutput> IntoScanOutput for Box<T> {
     }
 }
 
+#[cfg(feature = "std")]
 impl<S: ScanCallbacks<R>, R: ReadTypes> ScanCallbacks<R> for Box<S> {
     fn on_numeric(
         &mut self,

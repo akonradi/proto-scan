@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 use crate::scan::IntoScanner;
 use crate::scan::field::Save;

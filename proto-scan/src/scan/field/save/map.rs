@@ -5,20 +5,14 @@ use core::hash::Hash;
 #[cfg(any(feature = "std", doc))]
 use std::collections::HashMap;
 
-#[cfg(feature = "std")]
 use crate::read::ReadTypes;
-use crate::scan::ScanMessage;
-use crate::scan::field::map::MapEntry;
-#[cfg(feature = "std")]
-use crate::scan::field::map::MapEntryScanner;
-#[cfg(feature = "std")]
+use crate::scan::field::map::{MapEntry, MapEntryScanner};
 use crate::scan::field::{Map, MapKey, OnScanField, Save};
-#[cfg(feature = "std")]
 use crate::scan::{
-    GroupDelimited, IntoResettableScanner, IntoScanOutput, IntoScanner, ResettableScanner,
-    ScanError, ScanLengthDelimited,
+    GroupDelimited, IntoScanOutput, IntoScanner, ScanError, ScanLengthDelimited, ScanMessage,
 };
 #[cfg(feature = "std")]
+use crate::scan::{IntoResettableScanner, ResettableScanner};
 use crate::wire::NumericField;
 
 /// Saves map keys and the output of a provided value scanner.
@@ -65,6 +59,7 @@ where
 }
 
 #[allow(type_alias_bounds)]
+#[cfg(feature = "std")]
 type ScannerOutput<S: IntoScanner<M, Scanner<R>: IntoScanOutput>, M, R> =
     <<S as IntoScanner<M>>::Scanner<R> as IntoScanOutput>::ScanOutput;
 

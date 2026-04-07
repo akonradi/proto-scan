@@ -40,6 +40,7 @@ pub trait OnScanField<R: ReadTypes>: IntoScanOutput {
     ) -> Result<(), ScanError<R::Error>>;
 }
 
+#[cfg(feature = "std")]
 impl<S: OnScanField<R>, R: ReadTypes> OnScanField<R> for Box<S> {
     fn on_numeric(
         &mut self,
