@@ -23,6 +23,7 @@ impl<R> EventReader<R> {
 
 impl<R: Read> ParseEventReader for EventReader<R> {
     type ReadTypes = R::ReadTypes;
+    #[inline]
     fn next(
         &mut self,
     ) -> Option<
