@@ -1,0 +1,12 @@
+syntax = "proto3";
+package raw_identifiers;
+
+message WithKeywords {
+    string as = 1;
+    int32 type = 2;
+    bytes impl = 3;
+
+    oneof enum {
+        bool loop = 5;
+    }
+}

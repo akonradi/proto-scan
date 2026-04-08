@@ -95,8 +95,12 @@ fn visit_mod(mod_items: &[syn::Item]) -> syn::Result<TokenStream> {
                         .content
                         .as_ref()
                         .map(|(_, t)| visit_mod(t))
-                        .transpose()?;
-                    let items: syn::ItemMod = syn::parse_quote! { mod m { #module_tokens } };
+                        .transpose()?.unwrap_or_default();
+                    let items: syn::ItemMod = syn::parse2(quote!( mod m { #module_tokens } ))
+                        .unwrap_or_else(|e| {
+                            eprintln!("{module_tokens}");
+                            panic!("failed to parse generated module contents: {e}");
+                        });
                     let module = syn::ItemMod {
                         content: items.content,
                         ..module.clone()

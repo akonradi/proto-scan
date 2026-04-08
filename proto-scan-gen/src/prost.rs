@@ -100,7 +100,10 @@ fn enum_impl(name: Ident, data_enum: DataEnum) -> Result<TokenStream> {
             };
 
             let generic = Ident::new(&format!("T{i}"), span);
-            let field_name = Ident::new(&ccase!(snake, variant_name.to_string()), span);
+            let field_name = {
+                let field_name = ccase!(snake, variant_name.to_string());
+                Ident::new_raw(&field_name, span)
+            };
 
             Ok(Field {
                 field_name,
@@ -145,7 +148,11 @@ fn message_impl(name: Ident, data_struct: DataStruct) -> Result<TokenStream> {
 
             let field_name =
                 field_name.ok_or_else(|| syn::Error::new(span, "message fields must be named"))?;
-            let variant_name = Ident::new(&ccase!(pascal, field_name.to_string()), span);
+            let variant_name = {
+                let field_name = field_name.to_string();
+                let field_name = field_name.strip_prefix("r#").unwrap_or(&field_name);
+                Ident::new(&ccase!(pascal, field_name), span)
+            };
 
             let ProstAttrs { field_type } = (attrs, ty).try_into()?;
 

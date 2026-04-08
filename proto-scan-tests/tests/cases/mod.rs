@@ -11,6 +11,7 @@ mod groups;
 mod map;
 mod merge_semantics;
 mod oneof;
+mod raw_identifiers;
 mod read_all;
 mod repeated;
 mod single_numeric;
