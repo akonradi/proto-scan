@@ -3,10 +3,10 @@ use crate::read::ReadTypes;
 use crate::wire::{FieldNumber, LengthDelimited, NumericField, ParseEventReader};
 
 /// Callback interface for handling a stream of parse events.
-/// 
+///
 /// This provides a push-based interface for handling parse events. That's in
 /// contrast to [`ParseEventReader::next`], which is a pull-based mechanism.
-/// 
+///
 /// This can be used with [`ParseEventReader::read_all`] to receive callbacks
 /// for each parsed tag.
 pub trait ParseCallbacks<R: ReadTypes> {

@@ -95,7 +95,8 @@ fn visit_mod(mod_items: &[syn::Item]) -> syn::Result<TokenStream> {
                         .content
                         .as_ref()
                         .map(|(_, t)| visit_mod(t))
-                        .transpose()?.unwrap_or_default();
+                        .transpose()?
+                        .unwrap_or_default();
                     let items: syn::ItemMod = syn::parse2(quote!( mod m { #module_tokens } ))
                         .unwrap_or_else(|e| {
                             eprintln!("{module_tokens}");

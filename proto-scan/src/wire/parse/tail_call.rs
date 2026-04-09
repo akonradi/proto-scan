@@ -132,7 +132,7 @@ define_callback!(on_length_delimited ( reader, cb, field_number) {
 });
 
 /// Optimized implementation of [`ParseEventReader::read_all`](super::ParseEventReader::read_all).
-/// 
+///
 /// Uses tail recursion and table-based dispatch on wire type to speed up parsing.
 #[inline(always)]
 pub(super) fn read_all<R: Read, S: ParseCallbacks<R::ReadTypes> + IntoScanOutput>(

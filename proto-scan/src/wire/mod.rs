@@ -83,7 +83,7 @@ pub fn parse_base128_varint<R>(
     let mut bytes = bytes.into_iter();
 
     #[cold]
-    fn unlikely_invalid_error<R>() ->  DecodeVarintError<R> {
+    fn unlikely_invalid_error<R>() -> DecodeVarintError<R> {
         DecodeVarintError::InvalidVarint
     }
 

@@ -43,7 +43,7 @@ impl<R: EventRead> ParseEventReader for EventReader<R> {
         match core::mem::take(do_before) {
             DoBeforeNext::Skip(to_skip) => {
                 if let Err(e) = reader.skip_direct(to_skip.get()) {
-                    return Some(Err(e.into()));
+                    return Some(Err(e));
                 }
             }
             DoBeforeNext::DoNothing => {}
@@ -105,14 +105,14 @@ pub(super) trait EventRead: Read {
     type RealReader: Read<ReadTypes = Self::ReadTypes>;
 
     /// Takes some number of bytes as a [`LimitReader`].
-    /// 
+    ///
     /// The caller must guarante that after the `LimitReader` is dropped,
     /// [`Self::skip_direct`] is called with the count of bytes that were taken
     /// but that it didn't consume.
     fn take_as_reader(&mut self, bytes: u32) -> LimitReader<&mut Self::RealReader>;
 
     /// Skips some number of bytes.
-    /// 
+    ///
     /// Skips without adjusting any counters, assuming they were already
     /// adjusted by [`Self::take_as_reader`].
     fn skip_direct(
