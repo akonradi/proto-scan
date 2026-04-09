@@ -81,15 +81,20 @@ pub fn parse_base128_varint<R>(
 ) -> Result<(u64, u8), DecodeVarintError<R>> {
     let mut value = 0u64;
     let mut bytes = bytes.into_iter();
+
+    #[cold]
+    fn unlikely_invalid_error<R>() ->  DecodeVarintError<R> {
+        DecodeVarintError::InvalidVarint
+    }
+
     for i in 0..VARINT_MAX_BYTES {
         let byte = bytes.next().ok_or(DecodeVarintError::UnexpectedEnd)??;
-        let (byte, continue_flag) = (byte & !0x80, byte & 0x80 != 0);
-
-        if i != 0 && !continue_flag && byte == 0 {
+        if i != 0 && byte == 0 {
             // Reject varints that were encoded with more than the necessary
             // number of bytes.
-            return Err(DecodeVarintError::InvalidVarint);
+            return Err(unlikely_invalid_error());
         }
+        let (byte, continue_flag) = (byte & !0x80, byte & 0x80 != 0);
 
         value |= u64::from(byte) << (i * 7);
         if !continue_flag {
@@ -97,7 +102,7 @@ pub fn parse_base128_varint<R>(
         }
     }
 
-    Err(DecodeVarintError::InvalidVarint)
+    Err(unlikely_invalid_error())
 }
 
 pub fn varint_bytes_chunk<E>(
