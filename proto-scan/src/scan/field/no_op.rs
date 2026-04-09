@@ -10,10 +10,12 @@ use crate::scan::{
 pub struct NoOp;
 
 impl<R: ReadTypes> OnScanField<R> for NoOp {
+    #[inline]
     fn on_numeric(&mut self, _value: NumericField) -> Result<(), ScanError<R::Error>> {
         Ok(())
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
@@ -21,6 +23,7 @@ impl<R: ReadTypes> OnScanField<R> for NoOp {
         Ok(())
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         _delimited: impl ScanLengthDelimited,
@@ -30,10 +33,12 @@ impl<R: ReadTypes> OnScanField<R> for NoOp {
 }
 
 impl<R: ReadTypes, F> ScanCallbacks<R, F> for NoOp {
+    #[inline]
     fn on_numeric(&mut self, _field: F, _value: NumericField) -> Result<(), ScanError<R::Error>> {
         Ok(())
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         _field: F,
@@ -42,6 +47,7 @@ impl<R: ReadTypes, F> ScanCallbacks<R, F> for NoOp {
         Ok(())
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         _field: F,
@@ -52,11 +58,13 @@ impl<R: ReadTypes, F> ScanCallbacks<R, F> for NoOp {
 }
 
 impl ResettableScanner for NoOp {
+    #[inline]
     fn reset(&mut self) {}
 }
 
 impl IntoResettableScanner for NoOp {
     type Resettable = Self;
+    #[inline]
     fn into_resettable(self) -> Self::Resettable {
         self
     }
@@ -64,6 +72,7 @@ impl IntoResettableScanner for NoOp {
 
 impl<T: ?Sized> IntoScanner<T> for NoOp {
     type Scanner<R: ReadTypes> = Self;
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         self
     }
@@ -71,5 +80,6 @@ impl<T: ?Sized> IntoScanner<T> for NoOp {
 
 impl IntoScanOutput for NoOp {
     type ScanOutput = ();
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {}
 }
