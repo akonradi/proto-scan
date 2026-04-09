@@ -107,7 +107,13 @@ pub fn varint_bytes_chunk<E>(
 }
 
 pub fn varint_encoded_length(value: u64) -> u8 {
-    (u64::BITS - value.leading_zeros()) as u8 / 7 + 1
+    // 0 => 1,
+    // 1..=7 => 1,
+    // 8..=14 => 2,
+    if value == 0 {
+        return 1;
+    }
+    ((u64::BITS - value.leading_zeros()) as u8).div_ceil(7)
 }
 
 #[cfg(test)]
@@ -162,13 +168,27 @@ mod test {
     #[allow(unused_imports)]
     use super::*;
 
-    #[test]
-    #[cfg(feature = "std")]
-    fn u32_inverse() {
-        const VALUES: [u64; 9] = [0, 1, 8, 127, 128, 255, 256, 1848593, u32::MAX as u64];
+    const VALUES: &[u64] = &[
+        0,
+        1,
+        8,
+        127,
+        128,
+        255,
+        256,
+        1848593,
+        u32::MAX as u64,
+        1 << 33,
+        1 << 40,
+        (1 << 55) - 1,
+        1 << 63,
+        u64::MAX,
+    ];
 
-        for value in VALUES {
-            use std::convert::Infallible;
+    #[test]
+    fn round_trip() {
+        for value in VALUES.iter().copied() {
+            use core::convert::Infallible;
 
             let serialized = serialize_base128_varint(value);
             let deserialized =
@@ -176,6 +196,19 @@ mod test {
             assert_eq!(
                 deserialized,
                 Ok(value),
+                "{value} serialized as {serialized:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn encoded_length() {
+        for value in VALUES.iter().copied() {
+            let serialized = serialize_base128_varint(value);
+            let len = varint_encoded_length(value);
+            assert_eq!(
+                usize::from(len),
+                serialized.len(),
                 "{value} serialized as {serialized:?}"
             );
         }
