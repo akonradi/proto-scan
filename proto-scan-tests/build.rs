@@ -11,6 +11,7 @@ fn main() -> Result<()> {
         "src/proto/testing.proto",
         "src/proto/empty_message.proto",
         "src/proto/groups.proto",
+        "src/proto/anymap.proto",
     ];
     let make_config = || {
         let mut config = prost_build::Config::new();
