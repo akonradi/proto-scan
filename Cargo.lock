@@ -404,7 +404,7 @@ dependencies = [
 
 [[package]]
 name = "proto-scan"
-version = "0.4.1"
+version = "0.4.2-dev"
 dependencies = [
  "arrayvec",
  "assert_matches",
@@ -422,7 +422,7 @@ dependencies = [
 
 [[package]]
 name = "proto-scan-build"
-version = "0.4.1"
+version = "0.4.2-dev"
 dependencies = [
  "derive_more",
  "either",
@@ -439,7 +439,7 @@ dependencies = [
 
 [[package]]
 name = "proto-scan-derive"
-version = "0.4.1"
+version = "0.4.2-dev"
 dependencies = [
  "derive_more",
  "proc-macro2",
@@ -449,7 +449,7 @@ dependencies = [
 
 [[package]]
 name = "proto-scan-gen"
-version = "0.4.1"
+version = "0.4.2-dev"
 dependencies = [
  "convert_case",
  "derive-where",
@@ -461,7 +461,7 @@ dependencies = [
 
 [[package]]
 name = "proto-scan-tests"
-version = "0.4.1"
+version = "0.4.2-dev"
 dependencies = [
  "either",
  "gungraun",
