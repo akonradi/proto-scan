@@ -200,9 +200,10 @@ impl<R: Read, L: Read<ReadTypes = R::ReadTypes>> Read for Either<L, R> {
     fn read_varint(
         &mut self,
     ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
-        self.as_mut()
-            .map_either(|r| r.read_varint(), |r| r.read_varint())
-            .into_inner()
+        match self {
+            Either::Left(r) => r.read_varint(),
+            Either::Right(r) => r.read_varint(),
+        }
     }
 
     #[inline]
@@ -213,9 +214,10 @@ impl<R: Read, L: Read<ReadTypes = R::ReadTypes>> Read for Either<L, R> {
         <Self::ReadTypes as ReadTypes>::Buffer,
         ReadBytesError<<Self::ReadTypes as ReadTypes>::Error>,
     > {
-        self.as_mut()
-            .map_either(|r| r.read(bytes), |r| r.read(bytes))
-            .into_inner()
+        match self {
+            Either::Left(r) => r.read(bytes),
+            Either::Right(r) => r.read(bytes),
+        }
     }
 
     #[inline]
@@ -223,9 +225,10 @@ impl<R: Read, L: Read<ReadTypes = R::ReadTypes>> Read for Either<L, R> {
         &mut self,
         bytes: u32,
     ) -> Result<u32, ReadBytesError<<Self::ReadTypes as ReadTypes>::Error>> {
-        self.as_mut()
-            .map_either(|r| r.skip(bytes), |r| r.skip(bytes))
-            .into_inner()
+        match self {
+            Either::Left(r) => r.skip(bytes),
+            Either::Right(r) => r.skip(bytes),
+        }
     }
 }
 
