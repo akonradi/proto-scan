@@ -7,7 +7,7 @@ use derive_where::derive_where;
 use crate::read::ReadTypes;
 use crate::scan::encoding::{Encoding, Fixed, Varint, ZigZag};
 use crate::scan::field::repeated::RepeatedScanner;
-use crate::scan::field::{Message, NoOp, OnScanField, RepeatStrategy, Repeated};
+use crate::scan::field::{Message, NoOp, OnScanField, RepeatStrategy, Repeated, Save};
 use crate::scan::{
     GroupDelimited, IntoScanOutput, IntoScanner, MessageScanner, ScanCallbacks, ScanError,
     ScanLengthDelimited, ScanMessage,
@@ -22,11 +22,22 @@ pub struct Map<K: ?Sized, V: ?Sized>(PhantomData<K>, PhantomData<V>, Infallible)
 /// Per the protobuf documentation this can be any integral or string type. This
 /// is implemented on the type representing the protobuf wire format, like
 /// [`Varint`] or [`str`].
-pub trait MapKey {}
+pub trait MapKey {
+    type SaveScanner: IntoScanner<Self>;
+    fn save_scanner() -> Self::SaveScanner;
+}
 
 macro_rules! impl_map_key_for {
     ($p:ty) => {
-        impl MapKey for $p where <Self as Encoding>::Repr: Default + Hash + Eq {}
+        impl MapKey for $p
+        where
+            <Self as Encoding>::Repr: Default + Hash + Eq,
+        {
+            type SaveScanner = Save;
+            fn save_scanner() -> Self::SaveScanner {
+                Save
+            }
+        }
     };
 }
 
@@ -42,7 +53,12 @@ impl_map_key_for!(Fixed<u32>);
 impl_map_key_for!(Fixed<i64>);
 impl_map_key_for!(Fixed<i32>);
 
-impl MapKey for str {}
+impl MapKey for str {
+    type SaveScanner = Save;
+    fn save_scanner() -> Self::SaveScanner {
+        Save
+    }
+}
 
 /// Synthetic message type for a protobuf map entry.
 ///

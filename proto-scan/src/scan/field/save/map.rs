@@ -6,7 +6,9 @@ use core::hash::Hash;
 use std::collections::HashMap;
 
 use crate::read::ReadTypes;
+use crate::scan::encoding::Encoding;
 use crate::scan::field::map::{MapEntry, MapEntryScanner};
+use crate::scan::field::save::bytes::SaveBytesScanner;
 use crate::scan::field::{Map, MapKey, OnScanField, Save};
 use crate::scan::{
     GroupDelimited, IntoScanOutput, IntoScanner, ScanError, ScanLengthDelimited, ScanMessage,
@@ -36,10 +38,26 @@ pub struct SaveMapValue<K, SV>(K, SV);
 impl super::Save {
     /// Saves a single value from a map.
     ///
-    /// Returns an [`IntoScanner`] impl thatl saves only the scanned value for
+    /// Returns an [`IntoScanner`] impl that saves only the scanned value for
     /// the given key from the map.
     pub fn map_value<K, SV>(key: K, value_scanner: SV) -> SaveMapValue<K, SV> {
         SaveMapValue(key, value_scanner)
+    }
+}
+
+impl<K: AsRef<str>, SV> SaveMapValue<K, SV> {
+    #[inline]
+    pub fn skip_keys_utf8_validation(self) -> SaveMapValue<SkipUtf8Validation<K>, SV> {
+        SaveMapValue(SkipUtf8Validation(self.0), self.1)
+    }
+}
+
+pub struct SkipUtf8Validation<K>(K);
+
+impl<K: AsRef<str>, B: AsRef<[u8]>> PartialEq<B> for SkipUtf8Validation<K> {
+    #[inline]
+    fn eq(&self, other: &B) -> bool {
+        self.0.as_ref().as_bytes() == other.as_ref()
     }
 }
 
@@ -169,24 +187,62 @@ pub struct SaveMapValueScanner<
     V: ?Sized,
     R: ReadTypes,
     Q,
+    SK: IntoScanner<K>,
     SV: IntoScanner<V, Scanner<R>: IntoScanOutput>,
 > {
     needle: Q,
-    scanner: MapEntryScanner<K, V, Save, SV>,
+    scanner: MapEntryScanner<K, V, SK, SV>,
     found: Option<<SV::Scanner<R> as IntoScanOutput>::ScanOutput>,
 }
 
-impl<K: MapKey + ?Sized, V: ?Sized, Q, SV: IntoScanner<V>> IntoScanner<Map<K, V>>
-    for SaveMapValue<Q, SV>
+pub trait SaveMapKey<K: ?Sized> {
+    type SaveScanner: IntoScanner<K>;
+    fn save_scanner() -> Self::SaveScanner;
+}
+
+impl<T: MapKey + Encoding> SaveMapKey<T> for T::Repr
 where
-    Save: IntoScanner<K>,
+    Save: IntoScanner<T>,
 {
-    type Scanner<R: ReadTypes> = SaveMapValueScanner<K, V, R, Q, SV>;
+    type SaveScanner = <T as MapKey>::SaveScanner;
+    fn save_scanner() -> Self::SaveScanner {
+        <T as MapKey>::save_scanner()
+    }
+}
+
+impl<S: AsRef<str>> SaveMapKey<str> for S {
+    type SaveScanner = Save;
+    fn save_scanner() -> Self::SaveScanner {
+        Save
+    }
+}
+
+impl<S: AsRef<str>> SaveMapKey<str> for SkipUtf8Validation<S> {
+    type SaveScanner = SaveBytes;
+    fn save_scanner() -> Self::SaveScanner {
+        SaveBytes
+    }
+}
+
+#[derive(Clone)]
+pub struct SaveBytes;
+
+impl IntoScanner<str> for SaveBytes {
+    type Scanner<R: ReadTypes> = SaveBytesScanner<[u8], R>;
+    fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
+        SaveBytesScanner::new()
+    }
+}
+
+impl<K: MapKey + ?Sized, V: ?Sized, Q: SaveMapKey<K>, SV: IntoScanner<V>> IntoScanner<Map<K, V>>
+    for SaveMapValue<Q, SV>
+{
+    type Scanner<R: ReadTypes> = SaveMapValueScanner<K, V, R, Q, Q::SaveScanner, SV>;
 
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         SaveMapValueScanner {
             needle: self.0,
-            scanner: MapEntry::scanner().key(Save).value(self.1),
+            scanner: MapEntry::scanner().key(Q::save_scanner()).value(self.1),
             found: None,
         }
     }
@@ -198,10 +254,11 @@ impl<
     V: ?Sized,
     Q,
     O,
+    SK: IntoScanner<K, Scanner<R>: OnScanField<R> + IntoScanOutput> + Clone,
     SV: IntoScanner<V, Scanner<R>: OnScanField<R> + IntoScanOutput<ScanOutput = O>> + Clone,
-> OnScanField<R> for SaveMapValueScanner<K, V, R, Q, SV>
+> OnScanField<R> for SaveMapValueScanner<K, V, R, Q, SK, SV>
 where
-    Save: IntoScanner<K, Scanner<R>: OnScanField<R> + IntoScanOutput<ScanOutput: PartialEq<Q>>>,
+    Q: PartialEq<<SK::Scanner<R> as IntoScanOutput>::ScanOutput>,
 {
     fn on_numeric(
         &mut self,
@@ -225,15 +282,15 @@ where
         let (key, value) =
             delimited.scan_with(IntoScanner::<MapEntry<K, V>>::into_scanner(scanner))?;
 
-        if key == self.needle {
+        if self.needle == key {
             self.found = Some(value);
         }
         Ok(())
     }
 }
 
-impl<K: ?Sized, V: ?Sized, R: ReadTypes, Q, SV: IntoScanner<V>> IntoScanOutput
-    for SaveMapValueScanner<K, V, R, Q, SV>
+impl<K: ?Sized, V: ?Sized, R: ReadTypes, Q, SK: IntoScanner<K>, SV: IntoScanner<V>> IntoScanOutput
+    for SaveMapValueScanner<K, V, R, Q, SK, SV>
 {
     type ScanOutput = Option<<SV::Scanner<R> as IntoScanOutput>::ScanOutput>;
     fn into_scan_output(self) -> Self::ScanOutput {

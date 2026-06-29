@@ -82,6 +82,31 @@ fn save_single_key(input: InputKind) {
 
 #[test_case(Empty)]
 #[test_case(Full)]
+fn save_single_key_skip_utf8_validation(input: InputKind) {
+    const STR_KEY: &str = "message";
+    assert_ne!(Full.into_map_message().string_to_message.get(STR_KEY), None);
+
+    let input = input.into_map_message();
+    let bytes = input.encode_to_vec();
+
+    let scanner = proto::WithMap::scanner().string_to_message(
+        Save::map_value(STR_KEY, proto::MapValue::scanner().id(Save)).skip_keys_utf8_validation(),
+    );
+
+    let output = scanner.scan(&mut bytes.as_slice()).read_all().unwrap();
+    let expected = proto::ScanWithMapOutput {
+        string_to_message: input
+            .string_to_message
+            .get(STR_KEY)
+            .map(|v| proto::ScanMapValueOutput { id: v.id }),
+        ..Default::default()
+    };
+
+    assert_eq!(output, expected);
+}
+
+#[test_case(Empty)]
+#[test_case(Full)]
 fn scan_as_repeated(input: InputKind) {
     const STR_KEY: &str = "message";
     const FIXED64_KEY: u64 = 2;
