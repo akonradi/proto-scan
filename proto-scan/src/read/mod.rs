@@ -111,6 +111,7 @@ impl<'a> ReadBuffer for &'a [u8] {
 impl Read for &[u8] {
     type ReadTypes = Self;
 
+    #[inline]
     fn read_varint(
         &mut self,
     ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
@@ -123,6 +124,7 @@ impl Read for &[u8] {
         Ok(value)
     }
 
+    #[inline]
     fn read(
         &mut self,
         bytes: u32,
@@ -139,6 +141,7 @@ impl Read for &[u8] {
         Ok(bytes)
     }
 
+    #[inline]
     fn skip(
         &mut self,
         bytes: u32,
@@ -155,12 +158,14 @@ impl<R: ReadTypes> ReadTypes for &mut R {
 
 impl<R: Read> Read for &mut R {
     type ReadTypes = R::ReadTypes;
+    #[inline]
     fn read_varint(
         &mut self,
     ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
         (*self).read_varint()
     }
 
+    #[inline]
     fn read(
         &mut self,
         bytes: u32,
@@ -171,6 +176,7 @@ impl<R: Read> Read for &mut R {
         (*self).read(bytes)
     }
 
+    #[inline]
     fn skip(
         &mut self,
         bytes: u32,
@@ -190,6 +196,7 @@ impl ReadBuffer for ::bytes::Bytes {
 
 impl<R: Read, L: Read<ReadTypes = R::ReadTypes>> Read for Either<L, R> {
     type ReadTypes = R::ReadTypes;
+    #[inline]
     fn read_varint(
         &mut self,
     ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
@@ -198,6 +205,7 @@ impl<R: Read, L: Read<ReadTypes = R::ReadTypes>> Read for Either<L, R> {
             .into_inner()
     }
 
+    #[inline]
     fn read(
         &mut self,
         bytes: u32,
@@ -210,6 +218,7 @@ impl<R: Read, L: Read<ReadTypes = R::ReadTypes>> Read for Either<L, R> {
             .into_inner()
     }
 
+    #[inline]
     fn skip(
         &mut self,
         bytes: u32,
@@ -248,6 +257,7 @@ impl<R: std::io::Read> ReadTypes for IoRead<R> {
 impl<R: std::io::BufRead + std::io::Seek> Read for IoRead<R> {
     type ReadTypes = Self;
 
+    #[inline]
     fn read_varint(
         &mut self,
     ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
@@ -265,6 +275,7 @@ impl<R: std::io::BufRead + std::io::Seek> Read for IoRead<R> {
         .map(|(value, _consumed)| value)
     }
 
+    #[inline]
     fn read(
         &mut self,
         bytes: u32,
@@ -277,6 +288,7 @@ impl<R: std::io::BufRead + std::io::Seek> Read for IoRead<R> {
         Ok(buffer)
     }
 
+    #[inline]
     fn skip(
         &mut self,
         bytes: u32,

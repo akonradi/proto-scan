@@ -13,6 +13,7 @@ impl<R: ReadTypes> ReadTypes for CountReader<&mut R> {
 
 impl<R: Read> Read for CountReader<&mut R> {
     type ReadTypes = R::ReadTypes;
+    #[inline]
     fn read_varint(
         &mut self,
     ) -> Result<u64, crate::decode_error::DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>>
@@ -21,6 +22,7 @@ impl<R: Read> Read for CountReader<&mut R> {
         self.count += usize::from(varint_encoded_length(r));
         Ok(r)
     }
+    #[inline]
     fn read(
         &mut self,
         bytes: u32,
@@ -33,6 +35,7 @@ impl<R: Read> Read for CountReader<&mut R> {
         Ok(r)
     }
 
+    #[inline]
     fn skip(
         &mut self,
         bytes: u32,

@@ -76,6 +76,7 @@ mod wire_type;
 
 pub const VARINT_MAX_BYTES: u8 = 10;
 
+#[inline]
 pub fn parse_base128_varint<R>(
     bytes: impl IntoIterator<Item = Result<u8, R>>,
 ) -> Result<(u64, u8), DecodeVarintError<R>> {
@@ -105,12 +106,14 @@ pub fn parse_base128_varint<R>(
     Err(unlikely_invalid_error())
 }
 
+#[inline]
 pub fn varint_bytes_chunk<E>(
     bytes: &[u8; VARINT_MAX_BYTES as usize],
 ) -> impl IntoIterator<Item = Result<u8, E>> {
     bytes.iter().cloned().map(Ok)
 }
 
+#[inline]
 pub fn varint_encoded_length(value: u64) -> u8 {
     // 0 => 1,
     // 1..=7 => 1,

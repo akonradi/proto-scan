@@ -15,12 +15,14 @@ pub(super) struct LengthDelimitedImpl<'a, R> {
 
 impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
     type ReadTypes = R::ReadTypes;
+    #[inline]
     fn read_varint(
         &mut self,
     ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
         self.reader.read_varint()
     }
 
+    #[inline]
     fn read(
         &mut self,
         bytes: u32,
@@ -31,6 +33,7 @@ impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
         self.reader.read(bytes)
     }
 
+    #[inline]
     fn skip(
         &mut self,
         bytes: u32,
@@ -46,10 +49,12 @@ impl<'a, R: Read> DelimitedTypes for LengthDelimitedImpl<'a, R> {
 impl<'a, R: Read> LengthDelimited for LengthDelimitedImpl<'a, R> {
     type PackedIter<W: NumericWireType> = NumericIter<'a, R, W>;
 
+    #[inline]
     fn len(&self) -> u32 {
         self.reader.remaining()
     }
 
+    #[inline]
     fn into_bytes(
         mut self,
     ) -> Result<
@@ -64,14 +69,17 @@ impl<'a, R: Read> LengthDelimited for LengthDelimitedImpl<'a, R> {
         Ok(bytes)
     }
 
+    #[inline]
     fn into_packed<W: NumericWireType>(self) -> Self::PackedIter<W> {
         NumericIter::<_, W>::new(self)
     }
 
+    #[inline]
     fn into_reader(self) -> impl Read<ReadTypes = Self::ReadTypes> {
         self
     }
 
+    #[inline]
     fn into_events(self) -> impl ParseEventReader<ReadTypes = Self::ReadTypes> {
         EventReader::new(self)
     }

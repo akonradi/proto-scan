@@ -21,6 +21,7 @@ impl<R> LimitReader<R> {
 impl<R: Read> Read for LimitReader<R> {
     type ReadTypes = R::ReadTypes;
 
+    #[inline]
     fn read_varint(
         &mut self,
     ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
@@ -51,6 +52,7 @@ impl<R: Read> Read for LimitReader<R> {
         }
     }
 
+    #[inline]
     fn read(
         &mut self,
         bytes: u32,
@@ -68,6 +70,7 @@ impl<R: Read> Read for LimitReader<R> {
         Ok(r)
     }
 
+    #[inline]
     fn skip(
         &mut self,
         bytes: u32,

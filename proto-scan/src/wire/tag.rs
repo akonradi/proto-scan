@@ -21,6 +21,7 @@ pub(crate) enum WireType {
 }
 
 impl Tag {
+    #[inline]
     pub(crate) fn read_from<R: Read>(
         mut r: R,
     ) -> Result<Self, DecodeError<<R::ReadTypes as ReadTypes>::Error>> {
