@@ -26,12 +26,14 @@ impl<E, D> WriteNumeric<E, D> {
 }
 
 impl<E: Encoding, D: SaveFrom<E::Repr>, R: ReadTypes> OnScanField<R> for WriteNumeric<E, D> {
+    #[inline]
     fn on_numeric(&mut self, value: NumericField) -> Result<(), ScanError<R::Error>> {
         let value = <E::Wire as NumericWireType>::from_value(value)?;
         self.0.save_from(E::decode(value).map_err(Into::into)?);
         Ok(())
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
@@ -39,6 +41,7 @@ impl<E: Encoding, D: SaveFrom<E::Repr>, R: ReadTypes> OnScanField<R> for WriteNu
         Err(WrongWireType.into())
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         _delimited: impl ScanLengthDelimited,
@@ -49,6 +52,7 @@ impl<E: Encoding, D: SaveFrom<E::Repr>, R: ReadTypes> OnScanField<R> for WriteNu
 
 impl<E: Encoding, D> IntoScanOutput for WriteNumeric<E, D> {
     type ScanOutput = ();
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {}
 }
 
@@ -78,6 +82,7 @@ impl<E, D> WriteRepeatedNumeric<E, D> {
 impl<E: Encoding, R: ReadTypes, D: DerefMut<Target: Extend<E::Repr>>> OnScanField<R>
     for WriteRepeatedNumeric<E, D>
 {
+    #[inline]
     fn on_numeric(&mut self, value: NumericField) -> Result<(), ScanError<R::Error>> {
         let value = <E::Wire as NumericWireType>::from_value(value)?;
         let decoded = E::decode(value).map_err(Into::into)?;
@@ -85,6 +90,7 @@ impl<E: Encoding, R: ReadTypes, D: DerefMut<Target: Extend<E::Repr>>> OnScanFiel
         Ok(())
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
@@ -92,6 +98,7 @@ impl<E: Encoding, R: ReadTypes, D: DerefMut<Target: Extend<E::Repr>>> OnScanFiel
         Err(WrongWireType.into())
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
@@ -117,6 +124,7 @@ impl<E: Encoding, R: ReadTypes, D: DerefMut<Target: Extend<E::Repr>>> OnScanFiel
 
 impl<E: Encoding, D> IntoScanOutput for WriteRepeatedNumeric<E, D> {
     type ScanOutput = ();
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {}
 }
 

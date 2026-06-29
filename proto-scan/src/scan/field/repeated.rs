@@ -72,6 +72,7 @@ impl<S: MessageScanner + IntoScanner<S::Message>, F: RepeatStrategy<S>>
 {
     type Scanner<R: ReadTypes> = RepeatedScannerImpl<R, S, F::Impl<R>>;
 
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         RepeatedScannerImpl(self.0, self.1.into_impl(), PhantomData)
     }
@@ -82,6 +83,7 @@ impl<S: MessageScanner + IntoScanner<S::Message>, F: RepeatStrategy<S>>
 {
     type Scanner<R: ReadTypes> = RepeatedScannerImpl<R, S, F::Impl<R>>;
 
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         RepeatedScannerImpl(self.0, self.1.into_impl(), PhantomData)
     }
@@ -89,6 +91,7 @@ impl<S: MessageScanner + IntoScanner<S::Message>, F: RepeatStrategy<S>>
 
 impl<R, S, F: IntoScanOutput> IntoScanOutput for RepeatedScannerImpl<R, S, F> {
     type ScanOutput = F::ScanOutput;
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {
         self.1.into_scan_output()
     }
@@ -100,10 +103,12 @@ impl<
     F: RepeatStrategyScanner<R, S::Scanner<R>>,
 > OnScanField<R> for RepeatedScannerImpl<R, S, F>
 {
+    #[inline]
     fn on_numeric(&mut self, _value: NumericField) -> Result<(), ScanError<R::Error>> {
         Err(WrongWireType.into())
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         delimited: impl GroupDelimited<ReadTypes = R>,
@@ -111,6 +116,7 @@ impl<
         self.1.on_message(self.0.clone().into_scanner(), delimited)
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
@@ -138,6 +144,7 @@ impl<F, T, S: MessageScanner + IntoScanner<S::Message>> RepeatStrategy<S> for Fo
 
 impl<T, F> IntoScanOutput for RepeatedFold<T, F> {
     type ScanOutput = T;
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {
         self.0
     }
@@ -169,6 +176,7 @@ impl<M: MessageScanner, D> RepeatStrategy<M> for WriteCloned<D> {
 
 impl<D> IntoScanOutput for RepeatedWriteCloned<D> {
     type ScanOutput = ();
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {}
 }
 

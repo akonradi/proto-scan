@@ -52,6 +52,7 @@ macro_rules! impl_into_scanner {
         impl IntoScanner<$p> for Save {
             type Scanner<R: ReadTypes> = SaveNumeric<$p>;
 
+            #[inline]
             fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
                 SaveNumeric::default()
             }
@@ -60,6 +61,7 @@ macro_rules! impl_into_scanner {
         impl IntoScanner<super::Repeated<$p>> for Save {
             type Scanner<R: ReadTypes> = SaveRepeated<$p>;
 
+            #[inline]
             fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
                 SaveRepeated::default()
             }
@@ -83,6 +85,7 @@ impl_into_scanner!(Fixed<f32>);
 
 impl IntoScanner<str> for Save {
     type Scanner<R: ReadTypes> = SaveBytesScanner<str, R>;
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         SaveBytesScanner::new()
     }
@@ -90,6 +93,7 @@ impl IntoScanner<str> for Save {
 
 impl IntoScanner<[u8]> for Save {
     type Scanner<R: ReadTypes> = SaveBytesScanner<[u8], R>;
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         SaveBytesScanner::new()
     }
@@ -101,6 +105,7 @@ where
 {
     type Scanner<R: ReadTypes> = SaveOptional<<Save as IntoScanner<N>>::Scanner<R>>;
 
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         SaveOptional {
             inner: Save.into_scanner(),
@@ -112,6 +117,7 @@ where
 #[cfg(feature = "std")]
 impl IntoScanner<Repeated<str>> for Save {
     type Scanner<R: ReadTypes> = SaveRepeatedBytes<str, R>;
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         SaveRepeatedBytes::new()
     }
@@ -120,6 +126,7 @@ impl IntoScanner<Repeated<str>> for Save {
 #[cfg(feature = "std")]
 impl IntoScanner<Repeated<[u8]>> for Save {
     type Scanner<R: ReadTypes> = SaveRepeatedBytes<[u8], R>;
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         SaveRepeatedBytes::new()
     }
@@ -133,6 +140,7 @@ where
 {
     type Scanner<R: ReadTypes> = SaveMapScanner<K, V, R, Save>;
 
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         IntoScanner::<Map<K, V>>::into_scanner(Save::with_value(Save))
     }

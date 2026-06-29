@@ -81,6 +81,7 @@ impl<'t, P: ParseEventReader, G: GroupStack> DelimitedTypes for &mut GroupDelimi
 
 impl<'t, P: ParseEventReader, G: GroupStack> GroupDelimited for &mut GroupDelimitedImpl<'t, P, G> {}
 impl<'t, P: ParseEventReader, G: GroupStack> ScanDelimited for &mut GroupDelimitedImpl<'t, P, G> {
+    #[inline]
     fn scan_with<S: ScanCallbacks<Self::ReadTypes> + IntoScanOutput>(
         self,
         mut scanner: S,

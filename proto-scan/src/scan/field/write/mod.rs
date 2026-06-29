@@ -22,6 +22,7 @@ macro_rules! impl_into_scanner {
         {
             type Scanner<R: ReadTypes> = WriteNumeric<$p, &'t mut T>;
 
+            #[inline]
             fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
                 WriteNumeric::new(self.0)
             }
@@ -33,6 +34,7 @@ macro_rules! impl_into_scanner {
         {
             type Scanner<R: ReadTypes> = WriteRepeatedNumeric<$p, D>;
 
+            #[inline]
             fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
                 WriteRepeatedNumeric::new(self.0)
             }
@@ -56,12 +58,14 @@ impl_into_scanner!(Fixed<f32>);
 
 impl<T> IntoScanner<[u8]> for Write<T> {
     type Scanner<R: ReadTypes> = WriteBytes<[u8], T>;
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         WriteBytes::new(self.0)
     }
 }
 impl<T> IntoScanner<str> for Write<T> {
     type Scanner<R: ReadTypes> = WriteBytes<str, T>;
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         WriteBytes::new(self.0)
     }
@@ -69,12 +73,14 @@ impl<T> IntoScanner<str> for Write<T> {
 
 impl<T> IntoScanner<Repeated<[u8]>> for Write<T> {
     type Scanner<R: ReadTypes> = WriteRepeatedBytes<[u8], T>;
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         WriteRepeatedBytes::new(self.0)
     }
 }
 impl<T> IntoScanner<Repeated<str>> for Write<T> {
     type Scanner<R: ReadTypes> = WriteRepeatedBytes<str, T>;
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         WriteRepeatedBytes::new(self.0)
     }

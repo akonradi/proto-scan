@@ -72,6 +72,7 @@ impl<L: LengthDelimited, G> LengthDelimited for ScanDelimitedImpl<'_, L, G> {
 }
 
 impl<L: LengthDelimited, G: GroupStack> ScanDelimited for ScanDelimitedImpl<'_, L, G> {
+    #[inline]
     fn scan_with<S: ScanCallbacks<Self::ReadTypes> + IntoScanOutput>(
         self,
         scanner: S,

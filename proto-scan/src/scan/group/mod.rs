@@ -21,6 +21,7 @@ mod test {
     }
 
     impl<R: ReadTypes> ScanCallbacks<R> for ScannerImpl {
+        #[inline]
         fn on_numeric(
             &mut self,
             field: FieldNumber,
@@ -32,6 +33,7 @@ mod test {
             }
             Ok(())
         }
+        #[inline]
         fn on_group(
             &mut self,
             _field: FieldNumber,
@@ -40,6 +42,7 @@ mod test {
             Ok(())
         }
 
+        #[inline]
         fn on_length_delimited(
             &mut self,
             _field: FieldNumber,
@@ -51,6 +54,7 @@ mod test {
 
     impl IntoScanOutput for ScannerImpl {
         type ScanOutput = ArrayVec<u64, 2>;
+        #[inline]
         fn into_scan_output(self) -> Self::ScanOutput {
             self.field_2
         }

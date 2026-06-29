@@ -15,12 +15,14 @@ use crate::wire::{NumericField, NumericWireType, WrongWireType};
 pub struct SaveNumeric<E: Encoding>(E::Repr);
 
 impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveNumeric<E> {
+    #[inline]
     fn on_numeric(&mut self, value: NumericField) -> Result<(), ScanError<R::Error>> {
         let value = <E::Wire as NumericWireType>::from_value(value)?;
         self.0 = E::decode(value).map_err(Into::into)?;
         Ok(())
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
@@ -28,6 +30,7 @@ impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveNumeric<E> {
         Err(WrongWireType.into())
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         _delimited: impl ScanLengthDelimited,
@@ -51,6 +54,7 @@ impl<E: Encoding> IntoResettableScanner for SaveNumeric<E> {
 
 impl<E: Encoding> IntoScanOutput for SaveNumeric<E> {
     type ScanOutput = E::Repr;
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {
         self.0
     }

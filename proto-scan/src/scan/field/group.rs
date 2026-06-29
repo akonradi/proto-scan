@@ -13,16 +13,19 @@ pub struct Group<F>(F);
 impl<M, S: MessageScanner<Message = M> + IntoScanner<M>> IntoScanner<Group<M>> for S {
     type Scanner<R: ReadTypes> = Group<S::Scanner<R>>;
 
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         Group(S::into_scanner(self))
     }
 }
 
 impl<F: ScanCallbacks<R> + IntoScanOutput, R: ReadTypes> OnScanField<R> for Group<F> {
+    #[inline]
     fn on_numeric(&mut self, _value: crate::scan::NumericField) -> Result<(), ScanError<R::Error>> {
         Err(WrongWireType.into())
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         delimited: impl GroupDelimited<ReadTypes = R>,
@@ -31,6 +34,7 @@ impl<F: ScanCallbacks<R> + IntoScanOutput, R: ReadTypes> OnScanField<R> for Grou
         Ok(())
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         _delimited: impl ScanLengthDelimited<ReadTypes = R>,
@@ -42,6 +46,7 @@ impl<F: ScanCallbacks<R> + IntoScanOutput, R: ReadTypes> OnScanField<R> for Grou
 impl<F: IntoScanOutput> IntoScanOutput for Group<F> {
     type ScanOutput = F::ScanOutput;
 
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {
         self.0.into_scan_output()
     }

@@ -27,10 +27,12 @@ impl<E: ?Sized, D> WriteBytes<E, D> {
 impl<B: DecodeFromBytes + ?Sized, D: SaveFrom<B::Decoded<R>>, R: ReadTypes> OnScanField<R>
     for WriteBytes<B, D>
 {
+    #[inline]
     fn on_numeric(&mut self, _value: NumericField) -> Result<(), ScanError<R::Error>> {
         Err(WrongWireType.into())
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
@@ -38,6 +40,7 @@ impl<B: DecodeFromBytes + ?Sized, D: SaveFrom<B::Decoded<R>>, R: ReadTypes> OnSc
         Err(WrongWireType.into())
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
@@ -51,6 +54,7 @@ impl<B: DecodeFromBytes + ?Sized, D: SaveFrom<B::Decoded<R>>, R: ReadTypes> OnSc
 
 impl<S: ?Sized, D> IntoScanOutput for WriteBytes<S, D> {
     type ScanOutput = ();
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {}
 }
 
@@ -80,15 +84,18 @@ impl<E: ?Sized, D> WriteRepeatedBytes<E, D> {
 impl<E: ?Sized, D> IntoScanOutput for WriteRepeatedBytes<E, D> {
     type ScanOutput = ();
 
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {}
 }
 
 impl<B: DecodeFromBytes + ?Sized, D: DerefMut<Target: Extend<B::Decoded<R>>>, R: ReadTypes>
     OnScanField<R> for WriteRepeatedBytes<B, D>
 {
+    #[inline]
     fn on_numeric(&mut self, _value: NumericField) -> Result<(), ScanError<R::Error>> {
         Err(WrongWireType.into())
     }
+    #[inline]
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
@@ -96,6 +103,7 @@ impl<B: DecodeFromBytes + ?Sized, D: DerefMut<Target: Extend<B::Decoded<R>>>, R:
         Err(WrongWireType.into())
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,

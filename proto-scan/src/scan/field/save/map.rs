@@ -68,6 +68,7 @@ where
 {
     type Scanner<R: ReadTypes> = SaveMapScanner<K, V, R, SV>;
 
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         SaveMapScanner {
             output: HashMap::new(),
@@ -105,6 +106,7 @@ where
         <<SV as IntoScanner<V>>::Scanner<R> as IntoScanOutput>::ScanOutput,
     >;
 
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {
         self.output
     }
@@ -120,10 +122,12 @@ impl<
 where
     Save: IntoScanner<K, Scanner<R>: OnScanField<R> + IntoScanOutput<ScanOutput: Hash + Eq>>,
 {
+    #[inline]
     fn on_numeric(&mut self, _value: NumericField) -> Result<(), ScanError<<R>::Error>> {
         Err(ScanError::WrongWireType)
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
@@ -131,6 +135,7 @@ where
         Err(ScanError::WrongWireType)
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
@@ -239,6 +244,7 @@ impl<K: MapKey + ?Sized, V: ?Sized, Q: SaveMapKey<K>, SV: IntoScanner<V>> IntoSc
 {
     type Scanner<R: ReadTypes> = SaveMapValueScanner<K, V, R, Q, Q::SaveScanner, SV>;
 
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         SaveMapValueScanner {
             needle: self.0,
@@ -260,6 +266,7 @@ impl<
 where
     Q: PartialEq<<SK::Scanner<R> as IntoScanOutput>::ScanOutput>,
 {
+    #[inline]
     fn on_numeric(
         &mut self,
         _value: NumericField,
@@ -267,6 +274,7 @@ where
         Err(ScanError::WrongWireType)
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
@@ -274,6 +282,7 @@ where
         Err(ScanError::WrongWireType)
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
@@ -293,6 +302,7 @@ impl<K: ?Sized, V: ?Sized, R: ReadTypes, Q, SK: IntoScanner<K>, SV: IntoScanner<
     for SaveMapValueScanner<K, V, R, Q, SK, SV>
 {
     type ScanOutput = Option<<SV::Scanner<R> as IntoScanOutput>::ScanOutput>;
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {
         self.found
     }

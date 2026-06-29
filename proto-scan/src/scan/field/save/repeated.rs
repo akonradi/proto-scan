@@ -36,6 +36,7 @@ pub struct SaveRepeated<E: Encoding>(Vec<E::Repr>);
 impl<E: Encoding> IntoScanOutput for SaveRepeated<E> {
     type ScanOutput = Vec<E::Repr>;
 
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {
         self.0
     }
@@ -43,12 +44,14 @@ impl<E: Encoding> IntoScanOutput for SaveRepeated<E> {
 
 #[cfg(feature = "std")]
 impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveRepeated<E> {
+    #[inline]
     fn on_numeric(&mut self, value: NumericField) -> Result<(), ScanError<R::Error>> {
         let value = <E::Wire as NumericWireType>::from_value(value)?;
         self.0.extend([E::decode(value).map_err(Into::into)?]);
         Ok(())
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
@@ -71,6 +74,7 @@ impl<E: Encoding, R: ReadTypes> OnScanField<R> for SaveRepeated<E> {
         result
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
@@ -132,6 +136,7 @@ impl<R: ReadTypes, S: ScanCallbacks<R> + IntoScanOutput + Clone> RepeatStrategyS
 #[cfg(feature = "std")]
 impl<S: IntoScanOutput> IntoScanOutput for RepeatedSave<S> {
     type ScanOutput = Vec<S::ScanOutput>;
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {
         self.0
     }
@@ -154,6 +159,7 @@ impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> SaveRepeatedBytes<E, R> {
 impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> IntoScanOutput for SaveRepeatedBytes<E, R> {
     type ScanOutput = Vec<E::Decoded<R>>;
 
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {
         self.0
     }
@@ -161,10 +167,12 @@ impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> IntoScanOutput for SaveRepeatedB
 
 #[cfg(feature = "std")]
 impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> OnScanField<R> for SaveRepeatedBytes<E, R> {
+    #[inline]
     fn on_numeric(&mut self, _value: NumericField) -> Result<(), ScanError<R::Error>> {
         Err(ScanError::WrongWireType)
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
@@ -176,6 +184,7 @@ impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> OnScanField<R> for SaveRepeatedB
         Ok(())
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,

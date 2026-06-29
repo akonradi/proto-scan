@@ -24,6 +24,7 @@ impl<S> SaveOptional<S> {
 
 impl<S: IntoScanOutput> IntoScanOutput for SaveOptional<S> {
     type ScanOutput = Option<S::ScanOutput>;
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {
         let Self { inner, present } = self;
         present.then(|| inner.into_scan_output())
@@ -31,12 +32,14 @@ impl<S: IntoScanOutput> IntoScanOutput for SaveOptional<S> {
 }
 
 impl<S: OnScanField<R>, R: ReadTypes> OnScanField<R> for SaveOptional<S> {
+    #[inline]
     fn on_numeric(&mut self, value: NumericField) -> Result<(), ScanError<R::Error>> {
         self.inner.on_numeric(value)?;
         self.present = true;
         Ok(())
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         group: impl GroupDelimited<ReadTypes = R>,
@@ -46,6 +49,7 @@ impl<S: OnScanField<R>, R: ReadTypes> OnScanField<R> for SaveOptional<S> {
         Ok(())
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,

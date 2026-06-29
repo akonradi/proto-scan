@@ -262,10 +262,12 @@ pub trait ScanCallbacks<R: ReadTypes, F = FieldNumber> {
 }
 
 impl<R: ReadTypes, F, S: ScanCallbacks<R, F>> ScanCallbacks<R, F> for &mut S {
+    #[inline]
     fn on_numeric(&mut self, field: F, value: NumericField) -> Result<(), ScanError<<R>::Error>> {
         (*self).on_numeric(field, value)
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         field: F,
@@ -274,6 +276,7 @@ impl<R: ReadTypes, F, S: ScanCallbacks<R, F>> ScanCallbacks<R, F> for &mut S {
         (*self).on_group(field, group)
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         field: F,
@@ -407,6 +410,7 @@ impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes>, G: GroupStack> Iterato
 impl<P: ParseEventReader, S: ScanCallbacks<P::ReadTypes> + IntoScanOutput, G: GroupStack>
     Scan<P, S, G>
 {
+    #[inline]
     pub fn read_all(self) -> Result<S::ScanOutput, ParseEventReaderScanError<P>> {
         let Self {
             scanner,
@@ -469,6 +473,7 @@ impl<S: IntoScanOutput, G> IntoScanOutput for ParseCallbacksImpl<S, G> {
 #[cfg(feature = "std")]
 impl<T: IntoScanOutput> IntoScanOutput for Box<T> {
     type ScanOutput = T::ScanOutput;
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {
         (*self).into_scan_output()
     }
@@ -476,6 +481,7 @@ impl<T: IntoScanOutput> IntoScanOutput for Box<T> {
 
 #[cfg(feature = "std")]
 impl<S: ScanCallbacks<R>, R: ReadTypes> ScanCallbacks<R> for Box<S> {
+    #[inline]
     fn on_numeric(
         &mut self,
         field: FieldNumber,
@@ -484,6 +490,7 @@ impl<S: ScanCallbacks<R>, R: ReadTypes> ScanCallbacks<R> for Box<S> {
         S::on_numeric(&mut *self, field, value)
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         field: FieldNumber,
@@ -492,6 +499,7 @@ impl<S: ScanCallbacks<R>, R: ReadTypes> ScanCallbacks<R> for Box<S> {
         S::on_group(&mut *self, field, group)
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         field: FieldNumber,

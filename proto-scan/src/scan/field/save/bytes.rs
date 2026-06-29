@@ -44,10 +44,12 @@ impl DecodeFromBytes for [u8] {
 }
 
 impl<T: DecodeFromBytes + ?Sized, R: ReadTypes> OnScanField<R> for SaveBytesScanner<T, R> {
+    #[inline]
     fn on_numeric(&mut self, _value: NumericField) -> Result<(), ScanError<R::Error>> {
         Err(WrongWireType.into())
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         _group: impl GroupDelimited<ReadTypes = R>,
@@ -55,6 +57,7 @@ impl<T: DecodeFromBytes + ?Sized, R: ReadTypes> OnScanField<R> for SaveBytesScan
         Err(WrongWireType.into())
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
@@ -74,6 +77,7 @@ impl<E: DecodeFromBytes + ?Sized, R: ReadTypes> IntoResettableScanner for SaveBy
 
 impl<T: DecodeFromBytes + ?Sized, R: ReadTypes> IntoScanOutput for SaveBytesScanner<T, R> {
     type ScanOutput = T::Decoded<R>;
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {
         self.0
     }

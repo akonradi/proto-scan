@@ -16,6 +16,7 @@ pub struct Message<F>(PhantomData<F>, Infallible);
 impl<M, S: MessageScanner<Message = M> + IntoScanner<M>> IntoScanner<Option<Message<M>>> for S {
     type Scanner<R: ReadTypes> = Scanner<S::Scanner<R>, Option<Present>>;
 
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         Scanner {
             scanner: S::into_scanner(self),
@@ -27,6 +28,7 @@ impl<M, S: MessageScanner<Message = M> + IntoScanner<M>> IntoScanner<Option<Mess
 impl<M, S: MessageScanner<Message = M> + IntoScanner<M>> IntoScanner<Message<M>> for S {
     type Scanner<R: ReadTypes> = Scanner<S::Scanner<R>, Present>;
 
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         Scanner {
             scanner: S::into_scanner(self),
@@ -45,6 +47,7 @@ impl<M, S: MessageScanner<Message = M> + IntoScanner<M>> IntoScanner<Option<Mess
 {
     type Scanner<R: ReadTypes> = Scanner<S::Scanner<R>, Present>;
 
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         Scanner {
             scanner: S::into_scanner(self.0),
@@ -98,10 +101,12 @@ pub trait Presence: PartialEq<Present> + From<Present> + Default {
 impl<F: ScanCallbacks<R> + IntoScanOutput, R: ReadTypes, P: Presence> OnScanField<R>
     for Scanner<F, P>
 {
+    #[inline]
     fn on_numeric(&mut self, _value: crate::scan::NumericField) -> Result<(), ScanError<R::Error>> {
         Err(WrongWireType.into())
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         delimited: impl GroupDelimited<ReadTypes = R>,
@@ -112,6 +117,7 @@ impl<F: ScanCallbacks<R> + IntoScanOutput, R: ReadTypes, P: Presence> OnScanFiel
         Ok(())
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
@@ -126,6 +132,7 @@ impl<F: ScanCallbacks<R> + IntoScanOutput, R: ReadTypes, P: Presence> OnScanFiel
 impl<F: IntoScanOutput, P: Presence> IntoScanOutput for Scanner<F, P> {
     type ScanOutput = P::Output<F::ScanOutput>;
 
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {
         let Self { presence, scanner } = self;
         presence.then(|| scanner.into_scan_output())
@@ -180,6 +187,7 @@ mod test {
     struct ScanOutput<T>(T);
 
     impl<R: ReadTypes, T: OnScanField<R>> ScanCallbacks<R> for Scanner<T> {
+        #[inline]
         fn on_numeric(
             &mut self,
             field: FieldNumber,
@@ -192,6 +200,7 @@ mod test {
             }
         }
 
+        #[inline]
         fn on_group(
             &mut self,
             field: FieldNumber,
@@ -204,6 +213,7 @@ mod test {
             }
         }
 
+        #[inline]
         fn on_length_delimited(
             &mut self,
             field: FieldNumber,
@@ -219,6 +229,7 @@ mod test {
 
     impl<T: IntoScanOutput> IntoScanOutput for Scanner<T> {
         type ScanOutput = ScanOutput<T::ScanOutput>;
+        #[inline]
         fn into_scan_output(self) -> Self::ScanOutput {
             ScanOutput(self.1.into_scan_output())
         }

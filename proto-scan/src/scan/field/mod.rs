@@ -42,6 +42,7 @@ pub trait OnScanField<R: ReadTypes>: IntoScanOutput {
 
 #[cfg(feature = "std")]
 impl<S: OnScanField<R>, R: ReadTypes> OnScanField<R> for Box<S> {
+    #[inline]
     fn on_numeric(
         &mut self,
         value: NumericField,
@@ -49,6 +50,7 @@ impl<S: OnScanField<R>, R: ReadTypes> OnScanField<R> for Box<S> {
         S::on_numeric(&mut *self, value)
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         group: impl GroupDelimited<ReadTypes = R>,
@@ -56,6 +58,7 @@ impl<S: OnScanField<R>, R: ReadTypes> OnScanField<R> for Box<S> {
         S::on_group(&mut *self, group)
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         delimited: impl ScanLengthDelimited<ReadTypes = R>,
@@ -69,10 +72,12 @@ struct NoOutput<S>(S);
 
 impl<S> IntoScanOutput for NoOutput<S> {
     type ScanOutput = ();
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {}
 }
 
 impl<R: ReadTypes, S: ScanCallbacks<R>> ScanCallbacks<R> for NoOutput<S> {
+    #[inline]
     fn on_numeric(
         &mut self,
         field: crate::wire::FieldNumber,
@@ -81,6 +86,7 @@ impl<R: ReadTypes, S: ScanCallbacks<R>> ScanCallbacks<R> for NoOutput<S> {
         S::on_numeric(&mut self.0, field, value)
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         field: crate::wire::FieldNumber,
@@ -89,6 +95,7 @@ impl<R: ReadTypes, S: ScanCallbacks<R>> ScanCallbacks<R> for NoOutput<S> {
         S::on_group(&mut self.0, field, group)
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         field: crate::wire::FieldNumber,

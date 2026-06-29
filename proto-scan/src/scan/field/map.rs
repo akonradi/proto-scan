@@ -103,6 +103,7 @@ impl<K: MapKey + ?Sized, V: ?Sized, SK: IntoScanner<K>, SV: IntoScanner<V>>
     IntoScanner<MapEntry<K, V>> for MapEntryScanner<K, V, SK, SV>
 {
     type Scanner<R: ReadTypes> = MapEntryScanner<K, V, SK::Scanner<R>, SV::Scanner<R>>;
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         MapEntryScanner::new(self.0.into_scanner(), self.1.into_scanner())
     }
@@ -112,6 +113,7 @@ impl<K: ?Sized, V: ?Sized, SK: IntoScanOutput, SV: IntoScanOutput> IntoScanOutpu
     for MapEntryScanner<K, V, SK, SV>
 {
     type ScanOutput = (SK::ScanOutput, SV::ScanOutput);
+    #[inline]
     fn into_scan_output(self) -> Self::ScanOutput {
         (self.0.into_scan_output(), self.1.into_scan_output())
     }
@@ -120,6 +122,7 @@ impl<K: ?Sized, V: ?Sized, SK: IntoScanOutput, SV: IntoScanOutput> IntoScanOutpu
 impl<K: ?Sized, V: ?Sized, SK: OnScanField<R>, SV: OnScanField<R>, R: ReadTypes> ScanCallbacks<R>
     for MapEntryScanner<K, V, SK, SV>
 {
+    #[inline]
     fn on_numeric(
         &mut self,
         field: FieldNumber,
@@ -133,6 +136,7 @@ impl<K: ?Sized, V: ?Sized, SK: OnScanField<R>, SV: OnScanField<R>, R: ReadTypes>
         Ok(())
     }
 
+    #[inline]
     fn on_group(
         &mut self,
         field: FieldNumber,
@@ -146,6 +150,7 @@ impl<K: ?Sized, V: ?Sized, SK: OnScanField<R>, SV: OnScanField<R>, R: ReadTypes>
         Ok(())
     }
 
+    #[inline]
     fn on_length_delimited(
         &mut self,
         field: FieldNumber,
@@ -171,6 +176,7 @@ impl<
     type Scanner<R: ReadTypes> =
         <Self as IntoScanner<Repeated<Message<MapEntry<K, V>>>>>::Scanner<R>;
 
+    #[inline]
     fn into_scanner<R: ReadTypes>(self) -> Self::Scanner<R> {
         IntoScanner::<Repeated<Message<MapEntry<K, V>>>>::into_scanner(self)
     }
