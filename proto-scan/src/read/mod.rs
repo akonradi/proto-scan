@@ -115,6 +115,15 @@ impl Read for &[u8] {
     fn read_varint(
         &mut self,
     ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
+        // Fast path for single-byte varints (the common case for tags and small
+        // lengths/values), mirroring CodedInputStream's hot path. Avoids the
+        // 10-byte chunk requirement and the parse loop setup.
+        if let Some(&byte) = self.first() {
+            if byte < 0x80 {
+                *self = &self[1..];
+                return Ok(u64::from(byte));
+            }
+        }
         let (value, consumed) = if let Some(bytes) = self.first_chunk() {
             parse_base128_varint(varint_bytes_chunk(bytes))
         } else {
