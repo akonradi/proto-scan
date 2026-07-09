@@ -7,7 +7,7 @@ use crate::scan::group::error::{GroupStackCapacity, WrongGroupId};
 /// the same field number. Per the protobuf specification, corresponding start
 /// and end tags must be correctly nested for a protobuf wire format to be
 /// valid.
-pub trait GroupStack {
+pub trait GroupStack: core::fmt::Debug {
     /// Pushes a new field number onto the stack if there is space.
     fn push(&mut self, field_number: u32) -> Result<(), GroupStackCapacity>;
 

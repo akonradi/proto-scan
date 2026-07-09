@@ -89,7 +89,16 @@ pub fn parse_base128_varint<R>(
     }
 
     for i in 0..VARINT_MAX_BYTES {
-        let byte = bytes.next().ok_or(DecodeVarintError::UnexpectedEnd)??;
+        let byte = match bytes.next() {
+            Some(byte) => byte?,
+            None => {
+                return Err(if i == 0 {
+                    DecodeVarintError::UnexpectedEnd
+                } else {
+                    unlikely_invalid_error()
+                });
+            }
+        };
         if i != 0 && byte == 0 {
             // Reject varints that were encoded with more than the necessary
             // number of bytes.
@@ -175,6 +184,7 @@ pub(crate) fn serialize_base128_varint<V: ParseVarint>(mut value: V) -> arrayvec
 mod test {
     #[allow(unused_imports)]
     use super::*;
+    use core::convert::Infallible;
 
     const VALUES: &[u64] = &[
         0,
@@ -196,8 +206,6 @@ mod test {
     #[test]
     fn round_trip() {
         for value in VALUES.iter().copied() {
-            use core::convert::Infallible;
-
             let serialized = serialize_base128_varint(value);
             let deserialized =
                 parse_base128_varint::<Infallible>(serialized.iter().cloned().map(Ok)).map(|v| v.0);
@@ -218,6 +226,26 @@ mod test {
                 usize::from(len),
                 serialized.len(),
                 "{value} serialized as {serialized:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn empty_input_is_clean_end() {
+        // Empty input is a clean end of stream, not a truncated varint.
+        let parsed = parse_base128_varint::<Infallible>(core::iter::empty());
+        assert_eq!(parsed, Err(DecodeVarintError::UnexpectedEnd));
+    }
+
+    #[test]
+    fn truncated_varint_is_invalid_not_clean_end() {
+        // A varint truncated mid-decode is invalid, distinct from empty input.
+        for truncated in [[0x80].as_slice(), &[0x80, 0x80], &[0xff; 9]] {
+            let parsed = parse_base128_varint::<Infallible>(truncated.iter().copied().map(Ok));
+            assert_eq!(
+                parsed,
+                Err(DecodeVarintError::InvalidVarint),
+                "truncated varint {truncated:?}"
             );
         }
     }

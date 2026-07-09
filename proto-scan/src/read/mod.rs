@@ -62,7 +62,7 @@ pub trait ReadBuffer: AsRef<[u8]> + Default + Eq + Hash {
 /// This trait is implemented for `&[u8]` and `Vec<u8>` when the `std` feature
 /// is enabled. Consuming crates can provide implementations for their own
 /// types to allow them to be read as protobuf tag streams.
-pub trait Read {
+pub trait Read: core::fmt::Debug {
     type ReadTypes: ReadTypes;
 
     /// Reads the next protobuf varint from the stream.
@@ -243,6 +243,7 @@ impl<R: Read, L: Read<ReadTypes = R::ReadTypes>> Read for Either<L, R> {
 
 /// Implementation of [`Read`] that wraps a [`std::io::Read`] impl.
 #[cfg(feature = "std")]
+#[derive(Debug)]
 pub struct IoRead<R>(R);
 
 #[cfg(feature = "std")]
@@ -266,7 +267,7 @@ impl<R: std::io::Read> ReadTypes for IoRead<R> {
 }
 
 #[cfg(feature = "std")]
-impl<R: std::io::BufRead + std::io::Seek> Read for IoRead<R> {
+impl<R: std::io::BufRead + std::io::Seek + core::fmt::Debug> Read for IoRead<R> {
     type ReadTypes = Self;
 
     #[inline]
