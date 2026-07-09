@@ -33,7 +33,7 @@ pub trait DelimitedTypes {
 ///
 /// This trait allows interpreting the contents of length-delimited field as at
 /// most one of those representations.
-pub trait LengthDelimited: DelimitedTypes {
+pub trait LengthDelimited: DelimitedTypes + Debug {
     /// Returns the number of bytes in the field.
     fn len(&self) -> u32;
 
@@ -148,6 +148,8 @@ enum DoBeforeNext {
 mod test {
     use crate::wire::{FieldNumber, NumericField, Tag, Varint, WireType, serialize_base128_varint};
 
+    use assert_matches::assert_matches;
+
     use super::*;
 
     #[test]
@@ -165,6 +167,38 @@ mod test {
         };
 
         assert_eq!(length_delimited.into_bytes().unwrap(), b"testing");
+    }
+
+    #[test]
+    fn truncated_trailing_tag_is_error_not_clean_end() {
+        // A truncated trailing tag varint must surface as an error, not a clean end.
+        let input = [0x08, 0x96, 0x01, 0x80];
+        let mut reader = parse(input.as_slice());
+
+        assert_matches!(
+            reader.next(),
+            Some(Ok((
+                FieldNumber(1),
+                ParseEvent::Numeric(NumericField::Varint(150))
+            )))
+        );
+        assert_matches!(reader.next(), Some(Err(DecodeError::InvalidVarint)));
+    }
+
+    #[test]
+    fn lone_truncated_varint_is_error() {
+        // A lone truncated varint is an error, not an empty message.
+        let input = [0x80];
+        let mut reader = parse(input.as_slice());
+        assert_matches!(reader.next(), Some(Err(DecodeError::InvalidVarint)));
+    }
+
+    #[test]
+    fn empty_input_is_a_clean_end() {
+        // Genuinely empty input still ends cleanly.
+        let input: [u8; 0] = [];
+        let mut reader = parse(input.as_slice());
+        assert_matches!(reader.next(), None);
     }
 
     #[test]

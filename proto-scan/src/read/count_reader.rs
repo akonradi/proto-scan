@@ -1,6 +1,7 @@
 use crate::read::{Read, ReadTypes};
 use crate::wire::varint_encoded_length;
 
+#[derive(Debug)]
 pub(crate) struct CountReader<R> {
     inner: R,
     count: usize,

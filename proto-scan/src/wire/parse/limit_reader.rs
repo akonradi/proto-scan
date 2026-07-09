@@ -3,6 +3,7 @@ use crate::read::{Read, ReadBytesError, ReadTypes};
 use crate::wire::parse::event_reader::EventRead;
 use crate::wire::{VARINT_MAX_BYTES, parse_base128_varint, varint_encoded_length};
 
+#[derive(Debug)]
 pub(super) struct LimitReader<R> {
     inner: R,
     remaining: u32,

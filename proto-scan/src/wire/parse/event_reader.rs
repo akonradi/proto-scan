@@ -122,6 +122,7 @@ pub(super) trait EventRead: Read {
 }
 
 /// Wrapper type that implements [`EventRead`] for a [`Read`].
+#[derive(Debug)]
 pub(super) struct BaseEventReader<R>(R);
 
 impl<R: Read> Read for BaseEventReader<R> {

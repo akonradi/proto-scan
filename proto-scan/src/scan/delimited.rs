@@ -20,6 +20,7 @@ pub trait ScanDelimited: DelimitedTypes {
 pub trait ScanLengthDelimited: LengthDelimited + ScanDelimited {}
 impl<L: LengthDelimited + ScanDelimited> ScanLengthDelimited for L {}
 
+#[derive(Debug)]
 pub(super) struct ScanDelimitedImpl<'g, L, G> {
     length_delimited: L,
     group_stack: &'g mut G,
@@ -38,7 +39,7 @@ impl<L: LengthDelimited, G> DelimitedTypes for ScanDelimitedImpl<'_, L, G> {
     type ReadTypes = L::ReadTypes;
 }
 
-impl<L: LengthDelimited, G> LengthDelimited for ScanDelimitedImpl<'_, L, G> {
+impl<L: LengthDelimited, G: GroupStack> LengthDelimited for ScanDelimitedImpl<'_, L, G> {
     fn len(&self) -> u32 {
         self.length_delimited.len()
     }

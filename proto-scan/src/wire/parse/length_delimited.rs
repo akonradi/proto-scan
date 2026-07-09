@@ -8,6 +8,7 @@ use crate::wire::parse::event_reader::EventRead;
 use crate::wire::parse::{DelimitedTypes, DoBeforeNext, EventReader, LimitReader, NumericIter};
 use crate::wire::{LengthDelimited, NumericWireType, ParseEventReader};
 
+#[derive(Debug)]
 pub(super) struct LengthDelimitedImpl<'a, R> {
     pub(super) reader: LimitReader<R>,
     pub(super) write_back_to: &'a mut DoBeforeNext,
