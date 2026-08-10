@@ -127,10 +127,8 @@ pub fn varint_encoded_length(value: u64) -> u8 {
     // 0 => 1,
     // 1..=7 => 1,
     // 8..=14 => 2,
-    if value == 0 {
-        return 1;
-    }
-    ((u64::BITS - value.leading_zeros()) as u8).div_ceil(7)
+    let significant_bits = u64::BITS - value.leading_zeros();
+    ((significant_bits.max(1) + 6) / 7) as u8
 }
 
 #[cfg(test)]
