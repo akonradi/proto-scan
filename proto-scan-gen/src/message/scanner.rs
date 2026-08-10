@@ -205,6 +205,7 @@ impl<'m> MessageScanner<'m> {
         quote! {
 
             impl <#(#generics_on_scan_bounds,)* R: ::proto_scan::read::ReadTypes> ::proto_scan::scan::ScanCallbacks<R> for #scanner_name<#(#generics,)*> {
+                #[inline]
                 fn on_numeric(
                     &mut self,
                     #[allow(unused)]
@@ -219,6 +220,7 @@ impl<'m> MessageScanner<'m> {
                     })
                 }
 
+                #[inline]
                 fn on_group(&mut self,
                     #[allow(unused)]
                     field: ::proto_scan::wire::FieldNumber,
@@ -232,6 +234,7 @@ impl<'m> MessageScanner<'m> {
                     })
                 }
 
+                #[inline]
                 fn on_length_delimited(
                     &mut self,
                     #[allow(unused)]
