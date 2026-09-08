@@ -108,6 +108,20 @@ impl<'a> ReadBuffer for &'a [u8] {
     }
 }
 
+/// Decodes a multi-byte varint from `bytes`, or reports the end of the stream.
+///
+/// Deliberately not inlined; see `<&[u8] as Read>::read_varint`.
+#[inline(never)]
+fn read_slice_varint_multibyte(r: &mut &[u8]) -> Result<u64, DecodeVarintError<Infallible>> {
+    let (value, consumed) = if let Some(bytes) = r.first_chunk() {
+        parse_base128_varint(varint_bytes_chunk(bytes))
+    } else {
+        parse_base128_varint(r.iter().cloned().map(Ok))
+    }?;
+    *r = &r[consumed.into()..];
+    Ok(value)
+}
+
 impl Read for &[u8] {
     type ReadTypes = Self;
 
@@ -116,21 +130,17 @@ impl Read for &[u8] {
         &mut self,
     ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
         // Fast path for single-byte varints (the common case for tags and small
-        // lengths/values), mirroring CodedInputStream's hot path. Avoids the
-        // 10-byte chunk requirement and the parse loop setup.
-        if let Some(&byte) = self.first() {
+        // lengths/values). Avoids the 10-byte chunk requirement and the parse
+        // loop setup.
+        if let Some((&byte, rest)) = self.split_first() {
             if byte < 0x80 {
-                *self = &self[1..];
+                *self = rest;
                 return Ok(u64::from(byte));
             }
         }
-        let (value, consumed) = if let Some(bytes) = self.first_chunk() {
-            parse_base128_varint(varint_bytes_chunk(bytes))
-        } else {
-            parse_base128_varint(self.iter().cloned().map(Ok))
-        }?;
-        *self = &self[consumed.into()..];
-        Ok(value)
+        // Slow path: call an intentionally-un-inlined function so that this
+        // function body, and the fast path, can be inlined.
+        read_slice_varint_multibyte(self)
     }
 
     #[inline]
