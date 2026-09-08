@@ -19,6 +19,34 @@ impl<R> LimitReader<R> {
     }
 }
 
+impl<R: Read> LimitReader<R> {
+    /// Decodes a varint one byte at a time, so a bulk read cannot overrun the limit.
+    ///
+    /// Deliberately not inlined: this is the cold half of [`Read::read_varint`],
+    /// and inlining it there pushes that method past the inlining threshold.
+    #[inline(never)]
+    fn read_varint_near_limit(
+        &mut self,
+    ) -> Result<(u64, u8), DecodeVarintError<<<Self as Read>::ReadTypes as ReadTypes>::Error>> {
+        parse_base128_varint(core::iter::from_fn(|| {
+            Some(self.read(1).and_then(|buf| {
+                buf.as_ref()
+                    .first()
+                    .copied()
+                    .ok_or(ReadBytesError::UnexpectedEnd)
+            }))
+        }))
+        .map_err(|e| match e {
+            DecodeVarintError::Read(ReadBytesError::UnexpectedEnd) => {
+                DecodeVarintError::UnexpectedEnd
+            }
+            DecodeVarintError::Read(ReadBytesError::Read(r)) => DecodeVarintError::Read(r),
+            DecodeVarintError::InvalidVarint => DecodeVarintError::InvalidVarint,
+            DecodeVarintError::UnexpectedEnd => DecodeVarintError::UnexpectedEnd,
+        })
+    }
+}
+
 impl<R: Read> Read for LimitReader<R> {
     type ReadTypes = R::ReadTypes;
 
@@ -32,23 +60,8 @@ impl<R: Read> Read for LimitReader<R> {
             self.remaining -= u32::from(consumed);
             Ok((value, consumed))
         } else {
-            let (value, consumed) = parse_base128_varint(core::iter::from_fn(|| {
-                Some(self.read(1).and_then(|buf| {
-                    buf.as_ref()
-                        .first()
-                        .copied()
-                        .ok_or(ReadBytesError::UnexpectedEnd)
-                }))
-            }))
-            .map_err(|e| match e {
-                DecodeVarintError::Read(ReadBytesError::UnexpectedEnd) => {
-                    DecodeVarintError::UnexpectedEnd
-                }
-                DecodeVarintError::Read(ReadBytesError::Read(r)) => DecodeVarintError::Read(r),
-                DecodeVarintError::InvalidVarint => DecodeVarintError::InvalidVarint,
-                DecodeVarintError::UnexpectedEnd => DecodeVarintError::UnexpectedEnd,
-            })?;
-            Ok((value, consumed))
+            // Fall back to an out-of-line call for the slow path.
+            self.read_varint_near_limit()
         }
     }
 
