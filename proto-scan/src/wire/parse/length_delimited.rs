@@ -19,7 +19,7 @@ impl<R: Read> Read for LengthDelimitedImpl<'_, R> {
     #[inline]
     fn read_varint(
         &mut self,
-    ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
+    ) -> Result<(u64, u8), DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
         self.reader.read_varint()
     }
 

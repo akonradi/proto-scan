@@ -1,7 +1,7 @@
 use crate::decode_error::DecodeVarintError;
 use crate::read::{Read, ReadBytesError, ReadTypes};
 use crate::wire::parse::event_reader::EventRead;
-use crate::wire::{VARINT_MAX_BYTES, parse_base128_varint, varint_encoded_length};
+use crate::wire::{VARINT_MAX_BYTES, parse_base128_varint};
 
 #[derive(Debug)]
 pub(super) struct LimitReader<R> {
@@ -25,15 +25,14 @@ impl<R: Read> Read for LimitReader<R> {
     #[inline]
     fn read_varint(
         &mut self,
-    ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
+    ) -> Result<(u64, u8), DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
         let Self { inner, remaining } = self;
         if *remaining >= VARINT_MAX_BYTES.into() {
-            let value = inner.read_varint()?;
-            let consumed = varint_encoded_length(value);
+            let (value, consumed) = inner.read_varint()?;
             self.remaining -= u32::from(consumed);
-            Ok(value)
+            Ok((value, consumed))
         } else {
-            let (value, _consumed) = parse_base128_varint(core::iter::from_fn(|| {
+            let (value, consumed) = parse_base128_varint(core::iter::from_fn(|| {
                 Some(self.read(1).and_then(|buf| {
                     buf.as_ref()
                         .first()
@@ -49,7 +48,7 @@ impl<R: Read> Read for LimitReader<R> {
                 DecodeVarintError::InvalidVarint => DecodeVarintError::InvalidVarint,
                 DecodeVarintError::UnexpectedEnd => DecodeVarintError::UnexpectedEnd,
             })?;
-            Ok(value)
+            Ok((value, consumed))
         }
     }
 

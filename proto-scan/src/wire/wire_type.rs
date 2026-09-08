@@ -38,7 +38,7 @@ impl NumericWireType for Varint {
     fn read_from<R: Read>(
         r: &mut R,
     ) -> Result<Self::Repr, DecodeError<<R::ReadTypes as ReadTypes>::Error>> {
-        r.read_varint().map_err(Into::into)
+        r.read_varint().map(|(value, _consumed)| value).map_err(Into::into)
     }
 
     fn from_value(s: NumericField) -> Result<u64, WrongWireType> {

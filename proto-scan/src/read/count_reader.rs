@@ -1,5 +1,4 @@
 use crate::read::{Read, ReadTypes};
-use crate::wire::varint_encoded_length;
 
 #[derive(Debug)]
 pub(crate) struct CountReader<R> {
@@ -17,11 +16,11 @@ impl<R: Read> Read for CountReader<&mut R> {
     #[inline]
     fn read_varint(
         &mut self,
-    ) -> Result<u64, crate::decode_error::DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>>
+    ) -> Result<(u64, u8), crate::decode_error::DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>>
     {
-        let r = self.inner.read_varint()?;
-        self.count += usize::from(varint_encoded_length(r));
-        Ok(r)
+        let (r, count) = self.inner.read_varint()?;
+        self.count += usize::from(count);
+        Ok((r, count))
     }
     #[inline]
     fn read(

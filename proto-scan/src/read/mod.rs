@@ -66,9 +66,11 @@ pub trait Read: core::fmt::Debug {
     type ReadTypes: ReadTypes;
 
     /// Reads the next protobuf varint from the stream.
+    /// 
+    /// Returns the value read and the number of bytes consumed.
     fn read_varint(
         &mut self,
-    ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>>;
+    ) -> Result<(u64, u8), DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>>;
 
     /// Reads the given number of bytes.
     ///
@@ -112,14 +114,14 @@ impl<'a> ReadBuffer for &'a [u8] {
 ///
 /// Deliberately not inlined; see `<&[u8] as Read>::read_varint`.
 #[inline(never)]
-fn read_slice_varint_multibyte(r: &mut &[u8]) -> Result<u64, DecodeVarintError<Infallible>> {
+fn read_slice_varint_multibyte(r: &mut &[u8]) -> Result<(u64, u8), DecodeVarintError<Infallible>> {
     let (value, consumed) = if let Some(bytes) = r.first_chunk() {
         parse_base128_varint(varint_bytes_chunk(bytes))
     } else {
         parse_base128_varint(r.iter().cloned().map(Ok))
     }?;
     *r = &r[consumed.into()..];
-    Ok(value)
+    Ok((value, consumed))
 }
 
 impl Read for &[u8] {
@@ -128,14 +130,14 @@ impl Read for &[u8] {
     #[inline]
     fn read_varint(
         &mut self,
-    ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
+    ) -> Result<(u64, u8), DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
         // Fast path for single-byte varints (the common case for tags and small
         // lengths/values). Avoids the 10-byte chunk requirement and the parse
         // loop setup.
         if let Some((&byte, rest)) = self.split_first() {
             if byte < 0x80 {
                 *self = rest;
-                return Ok(u64::from(byte));
+                return Ok((u64::from(byte), 1));
             }
         }
         // Slow path: call an intentionally-un-inlined function so that this
@@ -180,7 +182,7 @@ impl<R: Read> Read for &mut R {
     #[inline]
     fn read_varint(
         &mut self,
-    ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
+    ) -> Result<(u64, u8), DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
         (*self).read_varint()
     }
 
@@ -218,7 +220,7 @@ impl<R: Read, L: Read<ReadTypes = R::ReadTypes>> Read for Either<L, R> {
     #[inline]
     fn read_varint(
         &mut self,
-    ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
+    ) -> Result<(u64, u8), DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
         match self {
             Either::Left(r) => r.read_varint(),
             Either::Right(r) => r.read_varint(),
@@ -283,19 +285,18 @@ impl<R: std::io::BufRead + std::io::Seek + core::fmt::Debug> Read for IoRead<R> 
     #[inline]
     fn read_varint(
         &mut self,
-    ) -> Result<u64, DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
+    ) -> Result<(u64, u8), DecodeVarintError<<Self::ReadTypes as ReadTypes>::Error>> {
         let buf = self.0.fill_buf()?;
         if let Some(bytes) = buf.first_chunk() {
             let (value, consumed) = parse_base128_varint(varint_bytes_chunk(bytes))?;
             self.0.consume(consumed.into());
-            return Ok(value);
+            return Ok((value, consumed));
         }
 
         parse_base128_varint(std::iter::from_fn(|| {
             let mut buf = [0];
             Some(self.0.read_exact(&mut buf).map(|()| buf[0]))
         }))
-        .map(|(value, _consumed)| value)
     }
 
     #[inline]
