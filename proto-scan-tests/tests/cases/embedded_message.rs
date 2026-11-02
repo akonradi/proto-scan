@@ -148,3 +148,26 @@ fn optional_embedded(input: InputKind) {
         })
     );
 }
+
+#[test_case(Empty)]
+#[test_case(Full)]
+fn save_message_bytes(input: InputKind) {
+    let input = input.into_example_msg();
+    let bytes = input.encode_to_vec();
+
+    let scanner = proto::ScanExample::scanner().single_msg(Save::as_bytes());
+    let proto::ScanScanExampleOutput {
+        single_bool: (),
+        repeated_msg: (),
+        single_msg,
+        repeated_bool: (),
+        oneof_group: (),
+        single_fixed64: (),
+    } = scanner.scan(bytes.as_slice()).read_all().unwrap();
+
+    let expected = input
+        .single_msg
+        .map(|m| m.encode_to_vec())
+        .unwrap_or_default();
+    assert_eq!(single_msg, expected.as_slice());
+}
