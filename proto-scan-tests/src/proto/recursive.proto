@@ -1,0 +1,11 @@
+syntax = "proto3";
+package recursive;
+
+message Recursive {
+  int32 id = 1;
+  Recursive child = 2;
+  oneof kind {
+    bool leaf = 3;
+    Recursive boxed_oneof_child = 4;
+  }
+}

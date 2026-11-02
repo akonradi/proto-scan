@@ -4,6 +4,7 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/map.rs"));
     include!(concat!(env!("OUT_DIR"), "/groups.rs"));
     include!(concat!(env!("OUT_DIR"), "/raw_identifiers.rs"));
+    include!(concat!(env!("OUT_DIR"), "/recursive.rs"));
 }
 
 pub mod prost_proto {
@@ -12,4 +13,5 @@ pub mod prost_proto {
     include!(concat!(env!("OUT_DIR"), "/prost/map.rs"));
     include!(concat!(env!("OUT_DIR"), "/prost/groups.rs"));
     include!(concat!(env!("OUT_DIR"), "/prost/raw_identifiers.rs"));
+    include!(concat!(env!("OUT_DIR"), "/prost/recursive.rs"));
 }

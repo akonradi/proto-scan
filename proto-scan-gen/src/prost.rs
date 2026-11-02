@@ -486,7 +486,7 @@ fn strip_outer_path(ty: &syn::Type) -> Result<syn::TypePath> {
 
         let last = path.path.segments.iter().last().ok_or("path is empty")?;
 
-        if last.ident == "Vec" || last.ident == "Option" {
+        if ["Vec", "Option", "Box"].iter().any(|t| last.ident == t) {
             match &last.arguments {
                 syn::PathArguments::AngleBracketed(args) if args.args.len() == 1 => {
                     if let syn::GenericArgument::Type(ty) = args.args.iter().next().unwrap() {

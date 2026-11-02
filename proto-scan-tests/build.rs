@@ -12,6 +12,7 @@ fn main() -> Result<()> {
         "src/proto/empty_message.proto",
         "src/proto/groups.proto",
         "src/proto/anymap.proto",
+        "src/proto/recursive.proto",
     ];
     let make_config = || {
         let mut config = prost_build::Config::new();

@@ -13,6 +13,7 @@ mod merge_semantics;
 mod oneof;
 mod raw_identifiers;
 mod read_all;
+mod recursive;
 mod repeated;
 mod single_numeric;
 
