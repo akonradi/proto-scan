@@ -1,8 +1,11 @@
 use core::marker::PhantomData;
 
+use derive_where::derive_where;
+
 use crate::scan::IntoScanner;
 use crate::scan::field::{Message, Save};
 
+#[derive_where(Copy, Clone, Debug;)]
 pub struct SaveAs<S: ?Sized, T: ?Sized>(PhantomData<S>, PhantomData<T>);
 
 pub trait SaveAsBytes {}
@@ -10,6 +13,7 @@ pub trait SaveAsBytes {}
 impl SaveAsBytes for str {}
 
 impl<M> SaveAsBytes for Option<Message<M>> {}
+impl<M> SaveAsBytes for Message<M> {}
 
 impl Save {
     /// Returns an [`IntoScanner`] for a length-delimited field that saves the

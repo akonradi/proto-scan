@@ -171,3 +171,35 @@ fn save_message_bytes(input: InputKind) {
         .unwrap_or_default();
     assert_eq!(single_msg, expected.as_slice());
 }
+
+#[test]
+fn save_oneof_message_bytes() {
+    use crate::prost_proto::scan_example::OneofGroup;
+
+    let msg = crate::prost_proto::MultiFieldMessage {
+        name: "abc123".into(),
+        id: 7,
+        flag: true,
+    };
+    let bytes = crate::prost_proto::ScanExample {
+        oneof_group: Some(OneofGroup::OneofMessage(msg.clone())),
+        ..Default::default()
+    }
+    .encode_to_vec();
+
+    let scanner = proto::ScanExample::scanner()
+        .oneof_group(proto::scan_example::OneofGroup::scanner().oneof_message(Save::as_bytes()));
+    let oneof_group = scanner
+        .scan(bytes.as_slice())
+        .read_all()
+        .unwrap()
+        .oneof_group;
+
+    let expected = msg.encode_to_vec();
+    match oneof_group {
+        Some(proto::scan_example::ScanOneofGroupOutput::OneofMessage(saved)) => {
+            assert_eq!(saved, expected.as_slice())
+        }
+        _ => panic!("expected oneof_message"),
+    }
+}
