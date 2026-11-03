@@ -1,27 +1,12 @@
 use core::marker::PhantomData;
 
-use derive_where::derive_where;
-
 use crate::scan::IntoScanner;
-use crate::scan::field::{Message, Save};
+use crate::scan::field::Save;
 
-#[derive_where(Copy, Clone, Debug;)]
 pub struct SaveAs<S: ?Sized, T: ?Sized>(PhantomData<S>, PhantomData<T>);
 
-pub trait SaveAsBytes {}
-
-impl SaveAsBytes for str {}
-
-impl<M> SaveAsBytes for Option<Message<M>> {}
-impl<M> SaveAsBytes for Message<M> {}
-
 impl Save {
-    /// Returns an [`IntoScanner`] for a length-delimited field that saves the
-    /// contents as bytes.
-    ///
-    /// This is useful for avoiding UTF-8 validation on `string` field types, or
-    /// treating an embedded message field as raw bytes.
-    pub fn as_bytes<T: SaveAsBytes + ?Sized>() -> SaveAs<[u8], T> {
+    pub fn as_bytes() -> SaveAs<[u8], str> {
         SaveAs(PhantomData, PhantomData)
     }
 }
